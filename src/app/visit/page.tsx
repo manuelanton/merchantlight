@@ -20,9 +20,10 @@ export default function VisitPage() {
           You&apos;ll find us in <b className="text-[#e8dcc4]">Gallow&apos;s Rock, Eastmarch</b>.
         </p>
         <p className="text-[#cbbfa5]">
-          Can&apos;t make the trip? We arrange <b className="text-[#e8dcc4]">deliveries across Skyrim</b> —
+          Can&apos;t make the trip? We arrange <b className="text-[#e8dcc4]">deliveries within Eastmarch</b> —
           find us in Windhelm or send word and we&apos;ll meet you on the road.
         </p>
+        <p className="text-[#e0bd4a]">Always buying: ores &amp; charcoal — bring us your surplus.</p>
         <p className="text-sm text-[#8a7c64]">All prices in gold (septims). Bulk rates marked where offered.</p>
       </div>
     </div>

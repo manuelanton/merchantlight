@@ -37,33 +37,22 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
           <span>{cat.name}</span>
         </h1>
         <p className="text-sm text-[#8a7c64] mt-1">
-          {list.length} goods · Based in Gallow&apos;s Rock, Eastmarch — deliveries arranged.
+          {list.length} goods · Based in Gallow&apos;s Rock — deliveries within Eastmarch.
         </p>
       </div>
-      <div className="grid md:grid-cols-3 gap-4">
-        {list.map((i) => (
-          <div key={i.id} className="card p-4">
-            <h3 className="font-display">{i.name}</h3>
-            {i.description && <p className="text-sm text-[#b8a888] mt-1">{i.description}</p>}
-            <div className="mt-3">
-              <span className="text-lg text-[#e0bd4a]">{i.sale_price}g</span>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="card overflow-hidden">
-        <table className="ledger">
-          <thead><tr><th>Item</th><th>Description</th><th>Price</th></tr></thead>
-          <tbody>
-            {list.map((i) => (
-              <tr key={i.id}>
-                <td>{i.name}</td>
-                <td className="text-[#8a7c64]">{i.description}</td>
-                <td className="text-[#e0bd4a]">{i.sale_price}g</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="card overflow-hidden px-2 py-1">
+        <ul className="md:columns-2 md:gap-8">
+          {list.map((i) => (
+            <li key={i.id} className="px-3 py-3 border-b border-[#1c2b31] break-inside-avoid hover:bg-[#d97a1f]/5 transition">
+              <div className="flex items-baseline gap-3">
+                <span className="font-display text-lg">{i.name}</span>
+                <span aria-hidden className="flex-1 border-b border-dotted border-[#5a4a33] -translate-y-1" />
+                <span className="text-lg text-[#e0bd4a] whitespace-nowrap">{i.sale_price}g</span>
+              </div>
+              {i.description && <p className="text-sm text-[#8a7c64] mt-0.5">{i.description}</p>}
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );

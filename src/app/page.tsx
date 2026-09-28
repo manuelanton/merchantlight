@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Sigil from "@/components/Sigil";
 import { UPCOMING_SECTIONS, getCatalogue, isSheetsConfigured } from "@/lib/sheets";
 
 export const revalidate = 60;
@@ -24,17 +25,23 @@ export default async function Home() {
 
   return (
     <div className="space-y-8">
-      <section className="card p-6 md:p-8">
-        <h1 className="font-display text-3xl md:text-4xl">Merchantlight Company</h1>
-        <p className="mt-2 text-[#cbbfa5] max-w-2xl">
-          Outfitters of Eastmarch. Bags, clothes, arms, jewelry and trade goods —
-          crafted by friends, sold fair. White shirts welcome: come live, work, and trade with us.
-        </p>
-        {!isSheetsConfigured() && (
-          <p className="mt-4 text-xs text-[#8a7c64]">
-            Running on built-in seed data. Connect a Google Sheet (SHEET_ID) to edit stock without redeploying.
+      <section className="card p-6 md:p-8 flex items-center gap-6">
+        <div className="shrink-0 hidden sm:block">
+          <Sigil size={128} />
+        </div>
+        <div>
+          <h1 className="font-display text-3xl md:text-4xl">Merchantlight Company</h1>
+          <p className="mt-2 text-[#cbbfa5] max-w-2xl">
+            Outfitters of Eastmarch. Bags, clothes, arms, jewelry and trade goods —
+            crafted by friends, sold fair. White shirts welcome: come work and trade with us.
           </p>
-        )}
+          <p className="mt-1 text-sm text-[#e0bd4a]">Always buying: ores &amp; charcoal.</p>
+          {!isSheetsConfigured() && (
+            <p className="mt-4 text-xs text-[#8a7c64]">
+              Running on built-in seed data. Connect a Google Sheet (SHEET_ID) to edit stock without redeploying.
+            </p>
+          )}
+        </div>
       </section>
 
       <section id="sections" className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 scroll-mt-24">
