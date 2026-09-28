@@ -1,34 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Merchantlight Company — Windhelm / Eastmarch (Keizaal)
 
-## Getting Started
+Customer catalogue + order requests (public) and quartermaster back-office (shared-password login).
 
-First, run the development server:
+## Run locally
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd merchantlight
+cp .env.example .env.local   # set ADMIN_PASSWORD + SESSION_SECRET
+npm run dev                  # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- Catalogue: `/`, per-category price lists: `/catalog/:slug`
+- Order form: `/order`
+- Back-office: `/admin` → `/admin/login` (character name + `ADMIN_PASSWORD`; dev default `merchantlight`)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Works out of the box on built-in seed data (your cloaks/satchels/backpacks + 1500g contribution / 250g bars expense).
 
-## Learn More
+## Logo
 
-To learn more about Next.js, take a look at the following resources:
+Save the three-hound sigil from chat as `public/logo.png` (square PNG). Header + favicon pick it up automatically; until then a 🕯️ fallback shows.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Font: `Cinzel Decorative` (Trajan-like, closest free match to Skyrim's carved look) + `Cinzel` + `Spectral`. Loaded in `src/app/layout.tsx`. Runic alternatives: Uncial Antiqua, Metamorphous.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Google Sheets (optional, recommended)
 
-## Deploy on Vercel
+See `SHEET_TEMPLATE.md` for the 5-tab template (Categories, Items, Sales, Ledger, Orders). Then:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Enable Sheets API, make a Service Account, get JSON key.
+2. Share sheet with service-account email (Editor).
+3. Set in `.env.local` + Vercel env: `SHEET_ID`, `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PRIVATE_KEY`.
+4. Redeploy — catalogue revalidates every 60s; admin writes go to Sheets.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Deploy to Vercel + GitHub
+
+```bash
+gh repo create merchantlight --private --source=. --push
+# Vercel → Add New Project → Import merchantlight → set env:
+# ADMIN_PASSWORD, SESSION_SECRET, (optional) SHEET_ID, GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY
+```
+
+No commits made automatically — review `git status` first.

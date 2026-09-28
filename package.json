@@ -9,13 +9,17 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "google-auth-library": "^11.1.0",
+    "google-spreadsheet": "^5.3.0",
+    "iron-session": "^8.0.4",
     "next": "16.3.6",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^20.19.43",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
