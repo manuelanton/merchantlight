@@ -29,6 +29,13 @@
       "when": 1790630556492,
       "tag": "0003_amazing_saracen",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790634785582,
+      "tag": "0004_kind_vulcan",
+      "breakpoints": true
     }
   ]
 }

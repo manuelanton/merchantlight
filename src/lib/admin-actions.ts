@@ -7,6 +7,7 @@ import { getDb } from "@/db";
 import { categories, items, ledger, notes, sales, stockMoves } from "@/db/schema";
 import { getCatalogItems } from "@/lib/catalog";
 import { g, splitEvenly } from "@/lib/format";
+import { setShopOpen } from "@/lib/shop";
 
 async function quartermaster() {
   const session = await auth();
@@ -384,4 +385,13 @@ export async function requestRestockAction(formData: FormData) {
   });
   revalidatePath("/admin", "layout");
   redirect("/admin");
+}
+
+/** Shop open/closed toggle (salesperson on duty). Shows publicly in the hero. */
+export async function setShopOpenAction(formData: FormData) {
+  await quartermaster();
+  await setShopOpen(String(formData.get('open')) === '1');
+  revalidatePath('/', 'layout');
+  revalidatePath('/admin', 'layout');
+  redirect('/admin');
 }

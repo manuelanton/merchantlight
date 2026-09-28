@@ -62,8 +62,7 @@ export const ledger = pgTable("ledger", {  id: text("id").primaryKey(),
   actorDiscordId: text("actor_discord_id").notNull().default(""),
 });
 
-/** Noticeboard: news, requests, todos, stock requests. In-app so logistics stay out of chat. */
-export const notes = pgTable("notes", {
+/** Noticeboard: news, requests, todos, stock requests. In-app so logistics stay out of chat. */export const notes = pgTable("notes", {
   id: text("id").primaryKey(),
   timestamp: timestamp("timestamp", { withTimezone: true }).notNull().defaultNow(),
   kind: text("kind").notNull().default("news"),
@@ -72,4 +71,11 @@ export const notes = pgTable("notes", {
   authorDiscordId: text("author_discord_id").notNull().default(""),
   authorName: text("author_name").notNull().default(""),
   resolved: boolean("resolved").notNull().default(false),
+});
+
+/** Key-value shop settings (open/closed toggle etc.). Admin-written, publicly read. */
+export const settings = pgTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull().default(""),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { requestRestockAction } from "@/lib/admin-actions";
+import { requestRestockAction, setShopOpenAction } from "@/lib/admin-actions";
 import { getBooks } from "@/lib/books";
 import { g } from "@/lib/format";
+import { isShopOpen } from "@/lib/shop";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ const KIND_ICON: Record<string, string> = { news: "📯", request: "🙏", todo:
 
 export default async function AdminHome() {
   const b = await getBooks();
+  const open = await isShopOpen();
   const ledgerBal = b.ledgerRows.reduce((a, e) => a + e.amountGold, 0);
   const openNotes = b.noteRows.filter((n) => !n.resolved);
   const lowStock = [...b.stockByItem.values()].filter((s) => s.qty > 0 && s.qty <= LOW_AT);
@@ -18,6 +20,18 @@ export default async function AdminHome() {
   return (
     <div className="space-y-4">
       <h1 className="font-display text-3xl">Quartermaster dashboard</h1>
+      <div className="card p-4 flex flex-wrap items-center gap-3">
+        <span className={open ? "badge badge-in" : "badge badge-out"}>
+          {open ? "● Open — salesperson on duty" : "○ Closed"}
+        </span>
+        <span className="text-sm text-[#8a7c64]">Shows in the site hero for customers.</span>
+        <form action={setShopOpenAction} className="ml-auto">
+          <input type="hidden" name="open" value={open ? "0" : "1"} />
+          <button className={open ? "btn-ghost !py-1 text-sm" : "btn-gold !py-1 text-sm"} type="submit">
+            {open ? "Close shop" : "Open shop"}
+          </button>
+        </form>
+      </div>
       <div className="grid md:grid-cols-4 gap-4">
         <div className="card p-4"><div className="lbl">Revenue (sales)</div><div className="text-2xl text-[#e0bd4a]">{g(b.revenue)}g</div></div>
         <div className="card p-4"><div className="lbl">Profit (sales)</div><div className="text-2xl text-[#e0bd4a]">{g(b.profit)}g</div></div>

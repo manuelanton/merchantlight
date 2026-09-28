@@ -2,11 +2,12 @@ import Link from "next/link";
 import Sigil from "@/components/Sigil";
 import { UPCOMING_SECTIONS, isSheetsConfigured } from "@/lib/sheets";
 import { getCatalogue } from "@/lib/catalog";
+import { isShopOpen } from "@/lib/shop";
 
 export const revalidate = 60;
 
 export default async function Home() {
-  const { categories, items } = await getCatalogue();
+  const [{ categories, items }, open] = await Promise.all([getCatalogue(), isShopOpen()]);
   const sorted = [...categories].sort((a, b) => a.sort_order - b.sort_order);
   const active = items.filter((i) => i.active);
   const sections = sorted
@@ -32,6 +33,13 @@ export default async function Home() {
         </div>
         <div>
           <h1 className="font-display text-3xl md:text-4xl">Merchantlight Company</h1>
+          <p className="mt-2">
+            {open ? (
+              <span className="badge badge-in">● Open now — salesperson at Gallow&apos;s Rock</span>
+            ) : (
+              <span className="badge badge-out">○ Currently closed — send word and we&apos;ll arrange it</span>
+            )}
+          </p>
           <p className="mt-2 text-[#cbbfa5] max-w-2xl">
             Outfitters of Eastmarch. Bags, clothes, arms, jewelry and trade goods —
             crafted by friends, sold fair. White shirts welcome: come work and trade with us.
