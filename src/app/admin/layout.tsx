@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth, isQuartermaster, signIn, signOut } from "@/auth";
 import { backofficeEnabled } from "@/lib/flags";
+import CopyId from "@/components/CopyId";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   if (!backofficeEnabled()) notFound();
@@ -38,7 +39,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <h1 className="font-display text-3xl">Not a quartermaster</h1>
         <p className="text-sm text-[#b8a888]">
           Signed in as <b>{session.user.name}</b> ({discordId || "unknown id"}), but that Discord
-          account isn&apos;t on the quartermaster list. Ask whoever runs the books to add your user ID.
+          account isn&apos;t on the quartermaster list. Send this ID to whoever runs the books:
+        </p>
+        <p className="flex items-center gap-2">
+          <code className="text-sm text-[#e0bd4a] break-all">{discordId}</code>
+          {discordId && <CopyId id={discordId} />}
         </p>
         <form
           action={async () => {
