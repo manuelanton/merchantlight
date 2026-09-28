@@ -16,7 +16,6 @@ export default async function Home() {
         ...c,
         comingSoon: list.length === 0,
         count: list.length,
-        inStock: list.filter((i) => i.stock > 0).length,
         min: prices.length ? Math.min(...prices) : 0,
         max: prices.length ? Math.max(...prices) : 0,
       };
@@ -47,7 +46,7 @@ export default async function Home() {
             ) : (
               <>
                 <p className="text-sm text-[#b8a888] mt-1">
-                  {s.count} goods{s.inStock ? ` · ${s.inStock} in stock` : " · made to order"}
+                  {s.count} goods
                 </p>
                 <p className="mt-2 text-[#e0bd4a]">
                   {s.min === s.max ? `${s.min}g` : `${s.min}–${s.max}g`}
