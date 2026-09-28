@@ -32,7 +32,8 @@ export default async function AdminHome() {
           </table>
           {b.balances.length >= 2 && (
             <p className="text-xs text-[#8a7c64] mt-2">
-              Rent bills and sale proceeds split automatically — balances already include every share.
+              Rent bills split automatically, and only sale <i>profit</i> splits — intake credits
+              already recognize each member&apos;s stock capital, so revenue is never paid out twice.
               Average: {g(ledgerBal / b.balances.length)}g each.
             </p>
           )}

@@ -17,11 +17,6 @@ async function quartermaster() {
 
 const uid = (p: string) => `${p}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
-async function catalogName(itemId: string) {
-  const catalog = await getCatalogItems();
-  return catalog.find((i) => i.id === itemId)?.name || "goods";
-}
-
 function rowsOf(formData: FormData, key: string): string[] {
   return formData.getAll(key).map(String);
 }
@@ -43,10 +38,14 @@ export async function recordSaleAction(formData: FormData) {
   const nets = new Map<string, number>();
   for (const e of existing) nets.set(e.member, (nets.get(e.member) || 0) + e.amountGold);
   const roster = [...nets.entries()].filter(([, v]) => v !== 0).map(([m]) => m).sort();
+  const catalog = await getCatalogItems();
   for (let n = 0; n < ids.length; n++) {
     const qty = Math.max(1, Number(qtys[n] || 1));
     const price = Number(prices[n] || 0);
-    const itemName = await catalogName(ids[n]);
+    const item = catalog.find((i) => i.id === ids[n]);
+    const itemName = item?.name || "goods";
+    // Cost basis: catalogue cost wins (stable); the manual field only fills gaps.
+    const itemCost = item && item.cost_value > 0 ? item.cost_value : cost;
     const saleId = uid("sl");
     await db.insert(sales).values({
       id: saleId,
@@ -54,8 +53,8 @@ export async function recordSaleAction(formData: FormData) {
       itemName,
       qty,
       unitSalePrice: price,
-      unitCostSnapshot: cost,
-      totalProfit: (price - cost) * qty,
+      unitCostSnapshot: itemCost,
+      totalProfit: (price - itemCost) * qty,
       location,
       soldByDiscordId: qm.discordId,
       soldByName: seller,
@@ -71,11 +70,12 @@ export async function recordSaleAction(formData: FormData) {
       actorDiscordId: qm.discordId,
       actorName: seller,
     });
-    // Sale money is always split across the roster — never credited to one seller.
-    const revenue = price * qty;
-    if (revenue !== 0) {
+    // Only PROFIT splits. Intake credits already recognize the contributor's
+    // capital — splitting revenue on top would pay that capital out twice.
+    const profit = Math.round((price - itemCost) * qty * 100) / 100;
+    if (profit !== 0) {
       const who = roster.length ? roster : [seller];
-      const shares = splitEvenly(revenue, who.length);
+      const shares = splitEvenly(profit, who.length);
       for (let i = 0; i < who.length; i++) {
         await db.insert(ledger).values({
           id: uid("lg"),
@@ -83,7 +83,7 @@ export async function recordSaleAction(formData: FormData) {
           member: who[i],
           amountGold: shares[i],
           category: "sales",
-          description: `Sale split [sale:${saleId}]: ${itemName} × ${qty} at ${location}${notes ? ` — ${notes}` : ""} (share ${i + 1} of ${who.length})`,
+          description: `Sale profit split [sale:${saleId}]: ${itemName} × ${qty} at ${location} (${g(price)}g − ${g(itemCost)}g cost)${notes ? ` — ${notes}` : ""} (share ${i + 1} of ${who.length})`,
           actorDiscordId: qm.discordId,
         });
       }
