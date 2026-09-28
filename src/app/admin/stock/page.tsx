@@ -17,7 +17,7 @@ export default async function StockPage() {
       />
 
       <div className="card p-4">
-        <h2 className="font-display text-lg">Current counts (moves − sales)</h2>
+        <h2 className="font-display text-lg">Current stock</h2>
         <table className="ledger mt-2"><thead><tr><th>Item</th><th>On hand</th></tr></thead>
           <tbody>
             {[...books.stockByItem.values()].map((s) => (

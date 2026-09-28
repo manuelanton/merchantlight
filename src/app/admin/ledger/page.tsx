@@ -1,4 +1,4 @@
-import { addLedgerAction, deleteLedgerAction, updateLedgerAction } from "@/lib/admin-actions";
+import { addLedgerAction, deleteLedgerAction, splitRentAction, updateLedgerAction } from "@/lib/admin-actions";
 import { getBooks } from "@/lib/books";
 
 const TYPES = ["contribution", "expense", "payout", "sale_income"] as const;
@@ -9,7 +9,10 @@ export default async function LedgerPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-display text-3xl">Ledger — contributions, expenses, rent, payouts</h1>
+      <div className="flex items-center gap-3">
+        <h1 className="font-display text-3xl">Ledger — contributions, expenses, rent, payouts</h1>
+        <a href="/api/admin/ledger" download className="btn-ghost !py-1 text-xs ml-auto whitespace-nowrap">Download JSON</a>
+      </div>
       <p className="text-sm text-[#8a7c64]">
         Balance: <b className="text-[#e0bd4a]">{bal}g</b> · Rent paid so far:{" "}
         <b className="text-[#e0bd4a]">{b.rentPaid}g</b> (log rent as type <i>expense</i>, category <i>rent</i>).
@@ -34,6 +37,29 @@ export default async function LedgerPage() {
         </div>
         <div className="flex justify-end">
           <button className="btn-gold !py-2 !px-5 text-sm" type="submit">Add entry</button>
+        </div>
+      </form>
+
+      <form action={splitRentAction} className="card p-5 space-y-3">
+        <h2 className="font-display text-lg">Split rent evenly</h2>
+        <div className="grid md:grid-cols-2 gap-3">
+          <div><label className="lbl">Total rent bill (g) *</label><input name="total_gold" type="number" min={0} required className="input" placeholder="428" /></div>
+          <div><label className="lbl">Period / note</label><input name="description" className="input" placeholder="2 days Gallow's Rock" /></div>
+        </div>
+        <div>
+          <span className="lbl">Split between (tick members)</span>
+          <div className="flex flex-wrap gap-2 mt-1">
+            {b.balances.map(([m]) => (
+              <label key={m} className="text-sm px-3 py-1 rounded-full border border-[#2b4149] flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="member" value={m} defaultChecked className="accent-[#d97a1f]" />
+                {m}
+              </label>
+            ))}
+            {!b.balances.length && <span className="text-xs text-[#8a7c64]">No members yet — log a contribution first.</span>}
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <button className="btn-gold !py-2 !px-5 text-sm" type="submit">Split rent</button>
         </div>
       </form>
 

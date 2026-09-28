@@ -1,10 +1,11 @@
+import { auth } from "@/auth";
 import { getCatalogue } from "@/lib/catalog";
 import { deleteSaleAction } from "@/lib/admin-actions";
 import { getBooks } from "@/lib/books";
 import SaleForm from "@/components/SaleForm";
 
 export default async function SalesPage() {
-  const [{ categories, items }, books] = await Promise.all([getCatalogue(), getBooks()]);
+  const [{ categories, items }, books, session] = await Promise.all([getCatalogue(), getBooks(), auth()]);
   const live = items.filter((i) => i.active);
 
   return (
@@ -13,6 +14,7 @@ export default async function SalesPage() {
       <SaleForm
         items={live.map((i) => ({ id: i.id, name: i.name, price: i.sale_price, category: i.category_slug }))}
         categories={categories.map((c) => ({ slug: c.slug, name: c.name }))}
+        sellerDefault={session?.user?.name || ""}
       />
 
       <div className="card overflow-x-auto">

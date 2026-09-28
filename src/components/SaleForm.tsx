@@ -24,7 +24,7 @@ interface Row {
 
 const LOCATIONS = ["Gallow's Rock", "Windhelm", "Darkwater Crossing", "Whiterun", "Winterhold"];
 
-export default function SaleForm({ items, categories }: { items: CatalogOption[]; categories: CategoryOption[] }) {
+export default function SaleForm({ items, categories, sellerDefault }: { items: CatalogOption[]; categories: CategoryOption[]; sellerDefault: string }) {
   const inCat = (cat: string) => (cat ? items.filter((i) => i.category === cat) : items);
   const firstOf = (cat: string) => inCat(cat)[0];
   const [rows, setRows] = useState<Row[]>(() => {
@@ -91,7 +91,8 @@ export default function SaleForm({ items, categories }: { items: CatalogOption[]
         <button type="button" onClick={addRow} className="btn-ghost !py-1 text-sm">+ Add item</button>
         <span className="text-sm text-[#8a7c64] ml-auto">Total: <b className="text-[#e0bd4a]">{total}g</b></span>
       </div>
-      <div className="grid md:grid-cols-3 gap-3">
+      <div className="grid md:grid-cols-4 gap-3">
+        <div><label className="lbl">Credit gold to</label><input name="seller" defaultValue={sellerDefault} className="input" title="Ledger name — use character names consistently" /></div>
         <div><label className="lbl">Cost each, if known (g)</label><input name="unit_cost" type="number" min={0} defaultValue={0} className="input" /></div>
         <div><label className="lbl">Location</label>
           <select name="location" className="input">{LOCATIONS.map((l) => <option key={l}>{l}</option>)}</select>
