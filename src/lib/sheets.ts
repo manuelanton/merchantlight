@@ -1,260 +1,267 @@
 import { GoogleSpreadsheet } from "google-spreadsheet";
 import { JWT } from "google-auth-library";
-import type { Category, Item, LedgerEntry, Order, Sale } from "./types";
-import { SEED_CATEGORIES, SEED_ITEMS, SEED_LEDGER, SEED_ORDERS, SEED_SALES } from "./seed";
+import type { Category, Item, Order } from "./types";
+import { SEED_CATEGORIES, SEED_ITEMS } from "./seed";
+
+// Customer-facing storefront. Google Sheets is the quartermaster:
+// stock and prices are edited directly in the Sheet, the site only reads.
+// The single write is the public order form -> Orders tab (needs a service
+// account; without one the form explains how to order via Discord instead).
+//
+// Non-coder friendly: headers accept plain words (Price, Stock, Show...),
+// categories are matched by NAME (no slugs needed), and row IDs are optional.
 
 // In-memory fallback (dev / pre-Sheets setup). Persists per server instance.
 const mem = {
   items: [...SEED_ITEMS] as Item[],
   categories: [...SEED_CATEGORIES] as Category[],
-  sales: [...SEED_SALES] as Sale[],
-  ledger: [...SEED_LEDGER] as LedgerEntry[],
-  orders: [...SEED_ORDERS] as Order[],
+  orders: [] as Order[],
 };
 
-function sheetsConfigured() {
+const SHEET_ID = () => process.env.SHEET_ID || "";
+
+function serviceAccountConfigured() {
   return Boolean(
-    process.env.SHEET_ID &&
+    SHEET_ID() &&
       process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
       process.env.GOOGLE_PRIVATE_KEY
   );
 }
 
 export function isSheetsConfigured() {
-  return sheetsConfigured();
+  return Boolean(SHEET_ID());
 }
 
-async function getDoc() {
+/** True when customer order requests can actually be saved to the Sheet. */
+export function canSaveOrders() {
+  return serviceAccountConfigured();
+}
+
+// ---------- tolerant header handling ----------
+
+/** "Sale Price" / "sale_price" / "PRICE" -> "saleprice" */
+function normHeader(h: string) {
+  return h.toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+}
+
+function pick(row: Record<string, string>, ...aliases: string[]): string {
+  const normed: Record<string, string> = {};
+  for (const [k, v] of Object.entries(row)) normed[normHeader(k)] = v;
+  for (const a of aliases) {
+    const v = normed[a];
+    if (v !== undefined && v !== "") return v;
+  }
+  return "";
+}
+
+const num = (v: unknown, d = 0) => {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  const n = Number(String(v ?? "").replace(/[^0-9.\-]/g, ""));
+  return Number.isFinite(n) && String(v ?? "").trim() !== "" ? n : d;
+};
+
+function yesNo(v: string, defaultVal: boolean): boolean {
+  const t = v.trim().toLowerCase();
+  if (!t) return defaultVal;
+  if (["true", "yes", "y", "1", "x", "✓", "show", "visible", "forsale", "listed", "inshop", "active"].includes(t)) return true;
+  if (["false", "no", "n", "0", "hide", "hidden", "soldout", "archived"].includes(t)) return false;
+  return defaultVal;
+}
+
+function slugify(s: string, fallback: string) {
+  const s2 = s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return s2 || fallback;
+}
+
+// ---------- readers: service account, else public link, else seed ----------
+
+async function getServiceDoc() {
   const auth = new JWT({
     email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
     key: (process.env.GOOGLE_PRIVATE_KEY || "").replace(/\\n/g, "\n"),
     scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
-  const doc = new GoogleSpreadsheet(process.env.SHEET_ID!, auth);
+  const doc = new GoogleSpreadsheet(SHEET_ID(), auth);
   await doc.loadInfo();
   return doc;
 }
 
-async function readSheet<T>(title: string): Promise<Record<string, string>[]> {
-  const doc = await getDoc();
-  const sheet = doc.sheetsByTitle[title];
-  if (!sheet) return [];
-  const rows = await sheet.getRows();
-  return rows.map((r) => {
-    const o: Record<string, string> = {};
-    for (const h of sheet.headerValues) o[h] = String(r.get(h) ?? "");
-    return o;
-  });
+async function readViaServiceAccount(titleCandidates: string[]): Promise<Record<string, string>[]> {
+  const doc = await getServiceDoc();
+  const titles = Object.keys(doc.sheetsByTitle);
+  for (const cand of titleCandidates) {
+    const hit = titles.find((t) => t.toLowerCase() === cand.toLowerCase());
+    if (!hit) continue;
+    const sheet = doc.sheetsByTitle[hit];
+    const rows = await sheet.getRows();
+    const out = rows.map((r) => {
+      const o: Record<string, string> = {};
+      for (const h of sheet.headerValues) o[h] = String(r.get(h) ?? "");
+      return o;
+    });
+    if (out.length) return out;
+  }
+  return [];
 }
 
-const num = (v: unknown, d = 0) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : d;
-};
-const bool = (v: unknown) =>
-  v === true || v === "TRUE" || v === "true" || v === "1";
+function parseCsv(text: string): Record<string, string>[] {
+  // minimal RFC-4180 parse (quotes, commas, newlines)
+  const cells: string[][] = [];
+  let row: string[] = [];
+  let cur = "";
+  let inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { cur += '"'; i++; }
+        else inQ = false;
+      } else cur += c;
+    } else if (c === '"') inQ = true;
+    else if (c === ",") { row.push(cur); cur = ""; }
+    else if (c === "\n") { row.push(cur); cur = ""; cells.push(row); row = []; }
+    else if (c === "\r") { /* skip */ }
+    else cur += c;
+  }
+  row.push(cur);
+  cells.push(row);
+  if (!cells.length) return [];
+  const headers = cells[0].map((h) => h.trim());
+  return cells.slice(1)
+    .filter((r) => r.some((c) => c.trim() !== ""))
+    .map((r) => Object.fromEntries(headers.map((h, i) => [h, (r[i] ?? "").trim()])));
+}
+
+/** Reads a tab from a sheet shared as "Anyone with the link can view". No Google Cloud needed. */
+async function readViaPublicLink(titleCandidates: string[]): Promise<Record<string, string>[]> {
+  for (const cand of titleCandidates) {
+    try {
+      const res = await fetch(
+        `https://docs.google.com/spreadsheets/d/${SHEET_ID()}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(cand)}`,
+        { next: { revalidate: 60 } }
+      );
+      if (!res.ok) continue;
+      const text = await res.text();
+      if (text.includes("<HTML") || text.includes("<html")) continue;
+      const rows = parseCsv(text);
+      if (rows.length) return rows;
+    } catch {
+      continue;
+    }
+  }
+  return [];
+}
+
+async function readTab(titleCandidates: string[]): Promise<Record<string, string>[]> {
+  if (!SHEET_ID()) return [];
+  if (serviceAccountConfigured()) {
+    try {
+      const rows = await readViaServiceAccount(titleCandidates);
+      if (rows.length) return rows;
+    } catch { /* fall through to public link */ }
+  }
+  try {
+    return await readViaPublicLink(titleCandidates);
+  } catch {
+    return [];
+  }
+}
+
+const CATEGORY_TABS = ["categories", "category", "sections"];
+const ITEM_TABS = ["items", "item", "stock", "inventory", "products", "catalog", "catalogue", "goods"];
+
+// ---------- mapped getters ----------
 
 export async function getCategories(): Promise<Category[]> {
-  if (!sheetsConfigured()) return mem.categories;
-  try {
-    const rows = await readSheet("Categories");
-    if (!rows.length) return mem.categories;
-    return rows.map((r, i) => ({
-      id: r.id || `c${i}`,
-      name: r.name || "Unnamed",
-      slug: r.slug || (r.name || `cat-${i}`).toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-      icon: r.icon || "",
-      sort_order: num(r.sort_order, i),
-    }));
-  } catch {
-    return mem.categories;
-  }
+  const rows = await readTab(CATEGORY_TABS);
+  if (!rows.length) return mem.categories;
+  return rows
+    .map((r, i) => {
+      const name = pick(r, "name", "category", "title", "section") || `Category ${i + 1}`;
+      const rawSlug = pick(r, "slug", "id");
+      const slug = slugify(rawSlug || name, `cat-${i}`);
+      return {
+        id: slug,
+        name,
+        slug,
+        icon: pick(r, "icon", "emoji"),
+        sort_order: num(pick(r, "sortorder", "order", "sort", "position"), i),
+      };
+    })
+    .filter((c) => c.name);
+}
+
+function resolveCategorySlug(raw: string, cats: Category[], index: number): { slug: string; auto?: Category } {
+  const t = raw.trim();
+  if (!t) return { slug: "other", auto: { id: "other", name: "Other goods", slug: "other", icon: "📦", sort_order: 999 } };
+  const n = t.toLowerCase();
+  const hit = cats.find((c) => c.slug === slugify(t, "") || c.name.toLowerCase() === n || c.slug === n);
+  if (hit) return { slug: hit.slug };
+  const slug = slugify(t, `cat-${index}`);
+  return { slug, auto: { id: slug, name: t, slug, icon: "📦", sort_order: 900 + index } };
 }
 
 export async function getItems(): Promise<Item[]> {
-  if (!sheetsConfigured()) return mem.items;
-  try {
-    const rows = await readSheet("Items");
-    if (!rows.length) return mem.items;
-    return rows.map((r) => ({
-      id: r.id,
-      name: r.name,
-      category_slug: r.category_slug,
-      description: r.description || "",
-      sale_price: num(r.sale_price),
-      cost_value: num(r.cost_value),
-      stock: num(r.stock),
-      low_threshold: num(r.low_threshold, 2),
-      image_url: r.image_url || "",
-      active: r.active === "" ? true : bool(r.active),
-      created_by_char: r.created_by_char || "",
-      updated_by_char: r.updated_by_char || "",
-      updated_at: r.updated_at || "",
-    }));
-  } catch {
-    return mem.items;
-  }
-}
-
-export async function getSales(): Promise<Sale[]> {
-  if (!sheetsConfigured()) return mem.sales;
-  try {
-    const rows = await readSheet("Sales");
-    return rows.map((r) => ({
-      id: r.id,
-      timestamp: r.timestamp,
-      item_id: r.item_id,
-      qty: num(r.qty),
-      unit_sale_price: num(r.unit_sale_price),
-      unit_cost_snapshot: num(r.unit_cost_snapshot),
-      total_profit: num(r.total_profit),
-      location: r.location || "Windhelm",
-      sold_by_char: r.sold_by_char || "",
-      notes: r.notes || "",
-    }));
-  } catch {
-    return mem.sales;
-  }
-}
-
-export async function getLedger(): Promise<LedgerEntry[]> {
-  if (!sheetsConfigured()) return mem.ledger;
-  try {
-    const rows = await readSheet("Ledger");
-    if (!rows.length) return mem.ledger;
-    return rows.map((r) => ({
-      id: r.id,
-      timestamp: r.timestamp,
-      type: (["contribution", "expense", "payout", "sale_income"].includes(r.type) ? r.type : "expense") as LedgerEntry["type"],
-      member_char: r.member_char || "",
-      amount_gold: num(r.amount_gold),
-      category: r.category || "",
-      description: r.description || "",
-    }));
-  } catch {
-    return mem.ledger;
-  }
-}
-
-export async function getOrders(): Promise<Order[]> {
-  if (!sheetsConfigured()) return mem.orders;
-  try {
-    const rows = await readSheet("Orders");
-    return rows.map((r) => ({
-      id: r.id,
-      timestamp: r.timestamp,
-      customer_char: r.customer_char,
-      discord_handle: r.discord_handle || "",
-      item_id: r.item_id,
-      qty: num(r.qty, 1),
-      status: (["new", "accepted", "fulfilled", "cancelled"].includes(r.status) ? r.status : "new") as Order["status"],
-      pickup_location: r.pickup_location || "Windhelm",
-      notes: r.notes || "",
-    }));
-  } catch {
-    return mem.orders;
-  }
-}
-
-// ---- writes: Sheets if configured, else memory ----
-
-async function appendRow(title: string, values: Record<string, string | number>) {
-  const doc = await getDoc();
-  const sheet = doc.sheetsByTitle[title];
-  if (!sheet) throw new Error(`Missing tab: ${title}`);
-  await sheet.addRow(values as Record<string, string>);
-}
-
-async function updateItemRow(id: string, patch: Partial<Item>) {
-  const doc = await getDoc();
-  const sheet = doc.sheetsByTitle["Items"];
-  const rows = await sheet.getRows();
-  const row = rows.find((r) => String(r.get("id")) === id);
-  if (!row) throw new Error("Item not found in Sheet");
-  for (const [k, v] of Object.entries(patch)) row.set(k, String(v as string | number));
-  await row.save();
-}
-
-export async function upsertItem(item: Item, actorChar: string) {
-  const stamped: Item = { ...item, updated_by_char: actorChar, updated_at: new Date().toISOString() };
-  if (!sheetsConfigured()) {
-    const i = mem.items.findIndex((x) => x.id === item.id);
-    if (i >= 0) mem.items[i] = stamped;
-    else mem.items.push({ ...stamped, created_by_char: stamped.created_by_char || actorChar });
-    return stamped;
-  }
-  try {
-    await updateItemRow(item.id, stamped);
-  } catch {
-    await appendRow("Items", {
-      id: stamped.id, name: stamped.name, category_slug: stamped.category_slug,
-      description: stamped.description, sale_price: stamped.sale_price, cost_value: stamped.cost_value,
-      stock: stamped.stock, low_threshold: stamped.low_threshold, image_url: stamped.image_url,
-      active: stamped.active ? "TRUE" : "FALSE",
-      created_by_char: stamped.created_by_char || actorChar,
-      updated_by_char: actorChar, updated_at: stamped.updated_at,
+  const [rows, cats] = await Promise.all([readTab(ITEM_TABS), getCategories()]);
+  if (!rows.length) return mem.items;
+  const autoCats = new Map<string, Category>();
+  const items: Item[] = [];
+  rows.forEach((r, i) => {
+    const name = pick(r, "name", "item", "title", "product");
+    if (!name) return;
+    const { slug, auto } = resolveCategorySlug(pick(r, "categoryslug", "category", "cat", "section", "type", "group"), [...cats, ...autoCats.values()], i);
+    if (auto && !autoCats.has(auto.slug) && !cats.some((c) => c.slug === auto.slug)) autoCats.set(auto.slug, auto);
+    items.push({
+      id: pick(r, "id", "sku", "code") || slugify(name, `item-${i}`),
+      name,
+      category_slug: slug,
+      description: pick(r, "description", "desc", "details", "notes", "info"),
+      sale_price: num(pick(r, "saleprice", "price", "sell", "sellprice", "gold", "priceg")),
+      cost_value: num(pick(r, "costvalue", "cost", "buycost", "ourcost", "wholesale")),
+      stock: num(pick(r, "stock", "qty", "quantity", "amount", "instock", "count", "onhand")),
+      low_threshold: num(pick(r, "lowthreshold", "low", "warnat", "restockat"), 2),
+      image_url: pick(r, "imageurl", "image", "picture", "photo", "img", "link"),
+      active: yesNo(pick(r, "active", "show", "visible", "display", "forsale", "listed", "inshop"), true),
+      created_by_char: "",
+      updated_by_char: "",
+      updated_at: "",
     });
-  }
-  return stamped;
+  });
+  // stash auto-created categories so getCategories() callers merging can use them
+  (getItems as unknown as { _autoCats?: Category[] })._autoCats = [...autoCats.values()];
+  return items.length ? items : mem.items;
 }
 
-export async function adjustStock(itemId: string, delta: number, actorChar: string) {
-  const items = await getItems();
-  const it = items.find((x) => x.id === itemId);
-  if (!it) throw new Error("Item not found");
-  return upsertItem({ ...it, stock: Math.max(0, it.stock + delta) }, actorChar);
+/** Categories = Sheet list + any extra sections found in the Items list (so nothing vanishes). */
+export async function getCatalogue() {
+  const [cats, items] = await Promise.all([getCategories(), getItems()]);
+  const auto = (getItems as unknown as { _autoCats?: Category[] })._autoCats || [];
+  const merged = [...cats];
+  for (const a of auto) if (!merged.some((c) => c.slug === a.slug)) merged.push(a);
+  // items whose section isn't listed anywhere yet (e.g. categories tab empty)
+  for (const it of items) {
+    if (!merged.some((c) => c.slug === it.category_slug)) {
+      merged.push({ id: it.category_slug, name: it.category_slug.replace(/-/g, " "), slug: it.category_slug, icon: "📦", sort_order: 950 });
+    }
+  }
+  return { categories: merged.sort((a, b) => a.sort_order - b.sort_order), items };
 }
 
-export async function recordSale(s: Omit<Sale, "id" | "timestamp" | "total_profit"> & { total_profit?: number }) {
-  const items = await getItems();
-  const it = items.find((x) => x.id === s.item_id);
-  const unitCost = it?.cost_value ?? s.unit_cost_snapshot ?? 0;
-  const profit = (s.unit_sale_price - unitCost) * s.qty;
-  const full: Sale = {
-    ...s, unit_cost_snapshot: unitCost, total_profit: profit,
-    id: `sl-${Date.now()}`, timestamp: new Date().toISOString(),
-  };
-  if (!sheetsConfigured()) {
-    mem.sales.unshift(full);
-    if (it) await adjustStock(it.id, -s.qty, s.sold_by_char);
-    return full;
-  }
-  await appendRow("Sales", { ...full });
-  if (it) await adjustStock(it.id, -s.qty, s.sold_by_char);
-  return full;
-}
+// ---------- the one write: public order form ----------
 
-export async function addLedger(e: Omit<LedgerEntry, "id" | "timestamp">) {
-  const full: LedgerEntry = { ...e, id: `lg-${Date.now()}`, timestamp: new Date().toISOString() };
-  if (!sheetsConfigured()) {
-    mem.ledger.unshift(full);
-    return full;
-  }
-  await appendRow("Ledger", { ...full });
-  return full;
-}
+export class OrderSaveUnavailable extends Error {}
 
 export async function addOrder(o: Omit<Order, "id" | "timestamp" | "status"> & { status?: Order["status"] }) {
   const full: Order = { ...o, id: `or-${Date.now()}`, timestamp: new Date().toISOString(), status: o.status ?? "new" };
-  if (!sheetsConfigured()) {
-    mem.orders.unshift(full);
+  if (!serviceAccountConfigured()) {
+    if (!SHEET_ID()) mem.orders.unshift(full); // local dev: pretend it saved
+    else throw new OrderSaveUnavailable("Orders tab is read-only without a service account — order via Discord instead.");
     return full;
   }
-  await appendRow("Orders", { ...full });
+  const doc = await getServiceDoc();
+  const titles = Object.keys(doc.sheetsByTitle);
+  const hit = titles.find((t) => ["orders", "order", "requests", "orderrequests"].includes(t.toLowerCase()));
+  if (!hit) throw new Error("Missing tab: Orders");
+  await doc.sheetsByTitle[hit].addRow({ ...full } as unknown as Record<string, string>);
   return full;
-}
-
-export async function setOrderStatus(id: string, status: Order["status"]) {
-  if (!sheetsConfigured()) {
-    const o = mem.orders.find((x) => x.id === id);
-    if (o) o.status = status;
-    return o;
-  }
-  const doc = await getDoc();
-  const sheet = doc.sheetsByTitle["Orders"];
-  const rows = await sheet.getRows();
-  const row = rows.find((r) => String(r.get("id")) === id);
-  if (!row) throw new Error("Order not found");
-  row.set("status", status);
-  await row.save();
 }

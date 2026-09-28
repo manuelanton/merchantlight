@@ -35,7 +35,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <nav className="ml-auto flex gap-3 text-sm">
               <Link className="hover:text-[#c9a227]" href="/">Catalogue</Link>
               <Link className="hover:text-[#c9a227]" href="/order">Order</Link>
-              <Link className="hover:text-[#c9a227]" href="/admin">Quartermaster</Link>
             </nav>
           </div>
         </header>

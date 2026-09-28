@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getCategories, getItems, isSheetsConfigured } from "@/lib/sheets";
+import { getCatalogue, isSheetsConfigured } from "@/lib/sheets";
 
 export const revalidate = 60;
 
@@ -10,8 +10,8 @@ function stockBadge(stock: number, low: number) {
 }
 
 export default async function Home() {
-  const [cats, items] = await Promise.all([getCategories(), getItems()]);
-  const sorted = [...cats].sort((a, b) => a.sort_order - b.sort_order);
+  const { categories, items } = await getCatalogue();
+  const sorted = [...categories].sort((a, b) => a.sort_order - b.sort_order);
   const active = items.filter((i) => i.active);
 
   return (
@@ -24,7 +24,6 @@ export default async function Home() {
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
           <Link href="/order" className="btn-gold">Request an item</Link>
-          <Link href="/admin" className="btn-ghost">Quartermaster books</Link>
         </div>
         {!isSheetsConfigured() && (
           <p className="mt-4 text-xs text-[#8a7c64]">
@@ -50,9 +49,8 @@ export default async function Home() {
                     {stockBadge(i.stock, i.low_threshold)}
                   </div>
                   {i.description && <p className="text-sm text-[#b8a888] mt-1">{i.description}</p>}
-                  <div className="mt-3 flex items-center justify-between">
+                  <div className="mt-3">
                     <span className="text-lg text-[#e0bd4a]">{i.sale_price}g</span>
-                    {i.created_by_char && <span className="text-xs text-[#8a7c64]">by {i.created_by_char}</span>}
                   </div>
                 </div>
               ))}
@@ -60,14 +58,13 @@ export default async function Home() {
             {/* per-category price list */}
             <div className="card p-0 overflow-hidden">
               <table className="ledger">
-                <thead><tr><th>Item</th><th>Price</th><th>Stock</th><th>Maker</th></tr></thead>
+                <thead><tr><th>Item</th><th>Price</th><th>Stock</th></tr></thead>
                 <tbody>
                   {list.map((i) => (
                     <tr key={i.id}>
                       <td>{i.name}</td>
                       <td className="text-[#e0bd4a]">{i.sale_price}g</td>
                       <td>{i.stock}</td>
-                      <td className="text-[#8a7c64]">{i.created_by_char || "—"}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -1,10 +1,10 @@
-import { getItems } from "@/lib/sheets";
+import { canSaveOrders, getItems } from "@/lib/sheets";
 import { submitOrderAction } from "@/lib/actions";
 import { PICKUP_LOCATIONS } from "@/lib/types";
 
 export const revalidate = 60;
 
-export default async function OrderPage({ searchParams }: { searchParams: Promise<{ ok?: string }> }) {
+export default async function OrderPage({ searchParams }: { searchParams: Promise<{ ok?: string; manual?: string }> }) {
   const sp = await searchParams;
   const items = (await getItems()).filter((i) => i.active);
   return (
@@ -12,6 +12,17 @@ export default async function OrderPage({ searchParams }: { searchParams: Promis
       <h1 className="font-display text-3xl">Request goods</h1>
       <p className="text-[#b8a888] text-sm">No login needed. We meet in Windhelm, Darkwater Crossing, or Whiterun. Pay in gold on pickup.</p>
       {sp.ok && <div className="card p-4 border-[#2f6b3d]">Received! The quartermaster will confirm soon. Shor&apos;s strength to you.</div>}
+      {sp.manual && (
+        <div className="card p-4">
+          <p className="font-display">Our order book is offline — send it via Discord instead:</p>
+          <p className="text-sm text-[#b8a888] mt-1">Copy-paste this into our Discord channel and we&apos;ll confirm pickup. Sorry for the extra step, traveler.</p>
+        </div>
+      )}
+      {!canSaveOrders() && !sp.manual && (
+        <div className="card p-4 text-sm text-[#b8a888]">
+          Note: requests aren&apos;t saved automatically right now — after sending, also drop us a line on Discord to be safe.
+        </div>
+      )}
       <form action={submitOrderAction} className="card p-5 space-y-4">
         <div className="grid md:grid-cols-2 gap-4">
           <div><label className="lbl">Character name *</label><input name="customer_char" required className="input" placeholder="e.g. Nalion Duryan" /></div>

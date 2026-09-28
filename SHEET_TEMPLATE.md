@@ -1,57 +1,66 @@
-# Merchantlight — Google Sheet template (5 min, you create manually)
+# Merchantlight stock sheet — guild guide (no coding needed)
 
-You chose Google Sheets as the DB. I can't create it for you, so:
+The website reads this sheet. You edit words and numbers, the site updates by itself within a minute or two.
 
-1. Create a new Google Sheet named `Merchantlight DB`.
-2. Create 5 tabs with EXACT names + header rows (copy-paste):
+## Tabs
 
-**Categories** — header:
-`id,name,slug,icon,sort_order`
-rows:
+### 1. `Items` — the important one (also accepts: Stock, Inventory, Products, Goods)
+
+Headers, in any order. Only these 6 — everything else was removed on purpose:
+
+| name | category_slug | sale_price | cost_value | stock | active |
+|---|---|---|---|---|---|
+| Reinforced Backpack | bags | 85 | 30 | 1 | TRUE |
+| Plain Clothes | clothes | 20 | | 12 | TRUE |
+
+- **name** — item name. IDs are generated from the name automatically; nobody needs to fill them in.
+- **category_slug** — plain section word (`clothes`, `bags`, `armor`, `materials`...). New words create new sections by themselves.
+- **sale_price** — what customers pay, in gold. Just the number (`85`, or even `85g`).
+- **cost_value** — what it cost you (your books only, NEVER shown on the site). Leave blank when unknown.
+- **stock** — how many you have. `0` shows as "Out / Made to order".
+  ⚠️ This column is a **formula** (see below) — never type in it. Your manual counts live in `start stock`.
+- **start stock** — your manual count. This is the only stock number you ever type.
+- **active** — `TRUE` to list it, `FALSE` to hide it.
+
+No description, image, or low-threshold columns — deleted, the site doesn't need them.
+
+### 2. `Categories` — the sections (optional)
+
+Only needed for custom order/icons. Skip it and sections appear automatically from the category column.
+
+| name | slug | icon | sort_order |
+|---|---|---|---|
+| Clothes | clothes | 🧥 | 1 |
+
+### 3. `Sales` — your sales log
+
+Headers: `item | amount | price | total sale | notes`. Write the item name exactly as in Items.
+
+- **total sale** fills itself in with the formula below — never type in that column.
+- **stock** in Items drops automatically via the script below — never adjust it by hand for sales.
+
+## Sales total formula
+
+Click cell **D2** (first row under "total sale") and paste:
+
 ```
-c1,Clothes,clothes,🧥,1
-c2,Bags & Containers,bags,🎒,2
-c3,Armor,armor,🛡️,3
-c4,Weapons,weapons,⚔️,4
-c5,Potions & Alchemy,potions,🧪,5
-c6,Food & Drink,food,🍞,6
-c7,Trade Goods,trade-goods,📦,7
-c8,Materials,materials,⛏️,8
+=IF(OR(B2="",C2=""),"",B2*C2)
 ```
 
-**Items** — header:
-`id,name,category_slug,description,sale_price,cost_value,stock,low_threshold,image_url,active,created_by_char,updated_by_char,updated_at`
-rows (your current stock):
-```
-it-cloak-exq,Exquisite Cloak (white),clothes,"Fine white cloak",130,40,1,1,,TRUE,Cyllian Braehn,,
-it-patchwork,Patchwork Satchel,bags,Sturdy everyday satchel,30,10,10,3,,TRUE,Cyllian Braehn,,
-it-reinf-bag,Reinforced Backpack,bags,Reinforced travel backpack,85,30,1,1,,TRUE,Cyllian Braehn,,
-it-reinf-lantern,Reinforced Backpack w/ Lantern,bags,With fitted lantern,95,38,2,1,,TRUE,Cyllian Braehn,,
-it-toothlock,Toothlock Satchel,bags,Secure clasp satchel,60,22,4,2,,TRUE,Cyllian Braehn,,
-it-trader-res,Trader's Resource,trade-goods,Bulk trader pack,110,45,1,1,,TRUE,Cyllian Braehn,,
-it-clothes-plain,Plain Clothes,clothes,Simple clothes various,20,6,12,4,,TRUE,Cyllian Braehn,,
-```
+Then double-click the little square at the corner of D2 to fill it down the whole column. From then on, `4 clothes at 15 each` shows `60` by itself.
 
-**Sales** — header:
-`id,timestamp,item_id,qty,unit_sale_price,unit_cost_snapshot,total_profit,location,sold_by_char,notes`
-(leave empty — app appends)
+## Automatic stock (paste-once formula — no scripts, no permissions)
 
-**Ledger** — header:
-`id,timestamp,type,member_char,amount_gold,category,description`
-rows:
+`stock` is computed as **start stock minus everything sold in Sales**. Set it up once, it covers new rows forever:
+
+1. In the Items tab, rename cell **E1** from `stock` to `start stock` (your counts stay exactly where they are).
+2. Insert a column after it: right-click column **F** → **Insert 1 column left**. Name the new **F1** `stock` (your `active` column shifts right — that's fine).
+3. Click **F2** and paste this (one line):
+
 ```
-lg-1,,contribution,Cyllian Braehn,1500,seed capital,Initial put-in
-lg-2,,expense,Cyllian Braehn,-250,materials,Bars for fancy bags
+=ARRAYFORMULA(IF(A2:A="",,IF(E2:E-SUMIF(Sales!$A:$A,A2:A,Sales!$B:$B)<0,0,E2:E-SUMIF(Sales!$A:$A,A2:A,Sales!$B:$B))))
 ```
 
-**Orders** — header:
-`id,timestamp,customer_char,discord_handle,item_id,qty,status,pickup_location,notes`
-(leave empty)
+That's it. New sales in the Sales tab subtract from stock by themselves, and new items you add get the formula automatically. Item names must match between the two tabs.
 
-3. Google Cloud (free): create project → enable Google Sheets API → create Service Account → create JSON key.
-   Copy `client_email` → `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `private_key` → `GOOGLE_PRIVATE_KEY`.
-4. In your Sheet: Share → paste service account email → Editor.
-5. Copy Sheet ID from URL (`.../d/SHEET_ID/...`) → `SHEET_ID` in Vercel env + `.env.local`.
-6. Redeploy. Catalogue edits in Sheet appear within ~60s; admin writes go straight to Sheet.
-
-Without these envs the app still works on built-in seed (good for demo), but edits won't persist across Vercel restarts.
+Rules of thumb: edit cells, never rename the tab names, never delete the header row, never type in a formula column. If a sale was logged wrong, delete that Sales row and re-add it — stocks recalculate themselves.
