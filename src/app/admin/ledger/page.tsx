@@ -1,5 +1,7 @@
 import { addLedgerAction, deleteLedgerAction, updateLedgerAction } from "@/lib/admin-actions";
 import { getBooks } from "@/lib/books";
+import { g } from "@/lib/format";
+import MemberSelect from "@/components/MemberSelect";
 
 export const dynamic = "force-dynamic";
 
@@ -17,13 +19,13 @@ export default async function LedgerPage() {
         <a href="/api/admin/ledger" download className="btn-ghost !py-1 text-xs ml-auto whitespace-nowrap">Download JSON</a>
       </div>
       <p className="text-sm text-[#8a7c64]">
-        Balance: <b className="text-[#e0bd4a]">{bal}g</b> · Rent paid so far:{" "}
-        <b className="text-[#e0bd4a]">{b.rentPaid}g</b> (type <i>expense</i> + category <i>rent</i> splits evenly across members automatically).
+        Balance: <b className="text-[#e0bd4a]">{g(bal)}g</b> · Rent paid so far:{" "}
+        <b className="text-[#e0bd4a]">{g(b.rentPaid)}g</b> (type <i>expense</i> + category <i>rent</i> splits evenly across members automatically).
       </p>
 
       <form action={addLedgerAction} className="card p-5 space-y-3">
         <div className="grid md:grid-cols-3 gap-3">
-          <div><label className="lbl">Member</label><input name="member" className="input" placeholder="Cyllian Braehn" required /></div>
+          <MemberSelect members={b.members} name="member" label="Member" required />
           <div><label className="lbl">Type</label>
             <select name="type" className="input">
               <option value="contribution">contribution (+)</option>
@@ -51,7 +53,7 @@ export default async function LedgerPage() {
                 <td className="text-xs">{new Date(e.timestamp).toLocaleString()}</td>
                 <td>{e.type}</td>
                 <td>{e.member}</td>
-                <td className={e.amountGold >= 0 ? "text-[#7fd08a]" : "text-[#e08a8a]"}>{e.amountGold}g</td>
+                <td className={e.amountGold >= 0 ? "text-[#7fd08a]" : "text-[#e08a8a]"}>{g(e.amountGold)}g</td>
                 <td>{e.category}</td>
                 <td className="text-[#8a7c64]">{e.description}</td>
                 <td className="whitespace-nowrap">
@@ -59,7 +61,7 @@ export default async function LedgerPage() {
                     <summary className="btn-ghost !py-1 !px-2 text-xs cursor-pointer list-none inline-block">Edit</summary>
                     <form action={updateLedgerAction} className="mt-2 p-3 card space-y-2 min-w-[240px]">
                       <input type="hidden" name="id" value={e.id} />
-                      <div><label className="lbl">Member</label><input name="member" defaultValue={e.member} className="input" /></div>
+                      <div><MemberSelect members={b.members} name="member" defaultValue={e.member} label="Member" /></div>
                       <div><label className="lbl">Type</label>
                         <select name="type" defaultValue={e.type} className="input">
                           {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}

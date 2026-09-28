@@ -5,13 +5,16 @@ import {
   renameCategoryAction,
 } from "@/lib/admin-actions";
 import { getCatalogue } from "@/lib/catalog";
+import { getBooks } from "@/lib/books";
 import ItemsManager from "@/components/ItemsManager";
 
 export const dynamic = "force-dynamic";
 
 export default async function ItemsPage() {
-  const { categories, items } = await getCatalogue();
+  const [{ categories, items }, books] = await Promise.all([getCatalogue(), getBooks()]);
   const sorted = [...categories].sort((a, b) => a.sort_order - b.sort_order);
+  const stock: Record<string, number> = {};
+  for (const [id, s] of books.stockByItem) stock[id] = s.qty;
 
   return (
     <div className="space-y-6">
@@ -45,6 +48,7 @@ export default async function ItemsPage() {
           description: i.description, active: i.active,
         }))}
         categories={sorted.map((c) => ({ slug: c.slug, name: c.name, icon: c.icon }))}
+        stock={stock}
       />
 
       <div className="card p-5 space-y-4">

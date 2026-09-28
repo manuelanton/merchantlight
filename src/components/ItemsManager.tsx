@@ -18,7 +18,7 @@ export interface ManagedCategory {
   icon: string;
 }
 
-export default function ItemsManager({ items, categories }: { items: ManagedItem[]; categories: ManagedCategory[] }) {
+export default function ItemsManager({ items, categories, stock }: { items: ManagedItem[]; categories: ManagedCategory[]; stock: Record<string, number> }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
 
@@ -86,13 +86,14 @@ export default function ItemsManager({ items, categories }: { items: ManagedItem
             {catIcon(slug)} {catName(slug)} <span className="text-sm text-[#8a7c64]">({list.length})</span>
           </div>
           <table className="ledger">
-            <thead><tr><th>Item</th><th>Price</th><th>Cost</th><th>Shown</th><th></th></tr></thead>
+            <thead><tr><th>Item</th><th>Price</th><th>Cost</th><th>Stock</th><th>Shown</th><th></th></tr></thead>
             <tbody>
               {list.map((i) => (
                 <tr key={i.id}>
                   <td><b>{i.name}</b></td>
                   <td className="text-[#e0bd4a]">{i.sale_price}g</td>
                   <td>{i.cost_value}g</td>
+                  <td>{stock[i.id] ?? 0}</td>
                   <td>{i.active ? "yes" : "no"}</td>
                   <td className="whitespace-nowrap">
                     <details className="inline-block">

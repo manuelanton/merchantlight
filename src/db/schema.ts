@@ -1,5 +1,4 @@
 import { boolean, integer, pgTable, real, text, timestamp } from "drizzle-orm/pg-core";
-
 /** Catalogue sections. Managed in /admin/items once migrated off the sheet. */
 export const categories = pgTable("categories", {
   id: text("id").primaryKey(),
@@ -52,8 +51,7 @@ export const stockMoves = pgTable("stock_moves", {
 });
 
 /** Company books: contributions, expenses (incl. rent), payouts, sale income. */
-export const ledger = pgTable("ledger", {
-  id: text("id").primaryKey(),
+export const ledger = pgTable("ledger", {  id: text("id").primaryKey(),
   timestamp: timestamp("timestamp", { withTimezone: true }).notNull().defaultNow(),
   type: text("type").notNull(), // contribution | expense | payout | sale_income
   member: text("member").notNull().default(""),
@@ -61,4 +59,16 @@ export const ledger = pgTable("ledger", {
   category: text("category").notNull().default(""),
   description: text("description").notNull().default(""),
   actorDiscordId: text("actor_discord_id").notNull().default(""),
+});
+
+/** Noticeboard: news, requests, todos, stock requests. In-app so logistics stay out of chat. */
+export const notes = pgTable("notes", {
+  id: text("id").primaryKey(),
+  timestamp: timestamp("timestamp", { withTimezone: true }).notNull().defaultNow(),
+  kind: text("kind").notNull().default("news"),
+  title: text("title").notNull().default(""),
+  body: text("body").notNull().default(""),
+  authorDiscordId: text("author_discord_id").notNull().default(""),
+  authorName: text("author_name").notNull().default(""),
+  resolved: boolean("resolved").notNull().default(false),
 });

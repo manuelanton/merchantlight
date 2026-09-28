@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth, isQuartermaster } from "@/auth";
 import { getDb } from "@/db";
-import { categories, items, ledger, sales, stockMoves } from "@/db/schema";
+import { categories, items, ledger, notes, sales, stockMoves } from "@/db/schema";
 import { getCatalogItems } from "@/lib/catalog";
 
 async function quartermaster() {
@@ -327,4 +327,56 @@ export async function deleteCategoryAction(formData: FormData) {
   await db.delete(categories).where(eq(categories.id, id));
   revalidatePath("/", "layout");
   redirect("/admin/items");
+}
+
+// ---------- noticeboard ----------
+
+export async function postNoteAction(formData: FormData) {  const qm = await quartermaster();
+  const title = String(formData.get("title") || '').trim();
+  if (!title) throw new Error('A note needs a title');
+  const kind = String(formData.get("kind") || 'news');
+  const db = await getDb();
+  await db.insert(notes).values({
+    id: uid("nt"),
+    kind: ['news', 'request', 'todo', 'stock'].includes(kind) ? kind : 'news',
+    title,
+    body: String(formData.get("body") || ''),
+    authorDiscordId: qm.discordId,
+    authorName: qm.name,
+  });
+  revalidatePath('/admin', 'layout');
+  redirect('/admin/notes');
+}
+
+export async function resolveNoteAction(formData: FormData) {
+  await quartermaster();
+  const db = await getDb();
+  const done = String(formData.get('resolved') || 'false') === 'true';
+  await db.update(notes).set({ resolved: !done }).where(eq(notes.id, String(formData.get('id'))));
+  revalidatePath('/admin', 'layout');
+  redirect('/admin/notes');
+}
+
+export async function deleteNoteAction(formData: FormData) {
+  await quartermaster();
+  const db = await getDb();
+  await db.delete(notes).where(eq(notes.id, String(formData.get('id'))));
+  revalidatePath('/admin', 'layout');
+  redirect('/admin/notes');
+}
+
+/** One-click stock request from the dashboard (posts a stock-kind note). */
+export async function requestRestockAction(formData: FormData) {
+  const qm = await quartermaster();
+  const db = await getDb();
+  await db.insert(notes).values({
+    id: uid("nt"),
+    kind: "stock",
+    title: String(formData.get("title") || "Restock request"),
+    body: String(formData.get("body") || ""),
+    authorDiscordId: qm.discordId,
+    authorName: qm.name,
+  });
+  revalidatePath("/admin", "layout");
+  redirect("/admin");
 }

@@ -15,6 +15,13 @@
       "when": 1790607409344,
       "tag": "0001_petite_angel",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790627737547,
+      "tag": "0002_crazy_xavin",
+      "breakpoints": true
     }
   ]
 }

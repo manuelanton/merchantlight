@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { getCatalogue } from "@/lib/catalog";
 import { deleteSaleAction } from "@/lib/admin-actions";
 import { getBooks } from "@/lib/books";
+import { g } from "@/lib/format";
 import SaleForm from "@/components/SaleForm";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ export default async function SalesPage() {
         items={live.map((i) => ({ id: i.id, name: i.name, price: i.sale_price, category: i.category_slug }))}
         categories={categories.map((c) => ({ slug: c.slug, name: c.name }))}
         sellerDefault={session?.user?.name || ""}
+        members={books.members}
       />
 
       <div className="card overflow-x-auto">
@@ -28,8 +30,8 @@ export default async function SalesPage() {
                 <td className="text-xs">{new Date(x.timestamp).toLocaleString()}</td>
                 <td>{x.itemName}</td>
                 <td>{x.qty}</td>
-                <td>{x.unitSalePrice}g</td>
-                <td className="text-[#7fd08a]">+{x.totalProfit}g</td>
+                <td>{g(x.unitSalePrice)}g</td>
+                <td className="text-[#7fd08a]">+{g(x.totalProfit)}g</td>
                 <td>{x.location}</td>
                 <td>{x.soldByName}</td>
                 <td>
