@@ -13,8 +13,10 @@ export interface Books {
   profit: number;
   rentPaid: number;
   balances: [string, number][];
-  /** Everyone who ever touched the ledger — the rent-split roster. Newcomers join it with their first entry. */
+  /** Everyone who ever touched the ledger. Newcomers appear with their first entry. */
   members: string[];
+  /** Split roster: members with nonzero net. Newcomers join future splits on their first nonzero entry; history never re-splits. */
+  roster: string[];
 }
 
 export async function getBooks(): Promise<Books> {
@@ -49,5 +51,8 @@ export async function getBooks(): Promise<Books> {
   for (const e of ledgerRows) bal.set(e.member, (bal.get(e.member) || 0) + e.amountGold);
   const balances = [...bal.entries()].sort((a, b) => b[1] - a[1]);
 
-  return { salesRows, moveRows, ledgerRows, noteRows, stockByItem, revenue, profit, rentPaid, balances, members: [...bal.keys()].sort() };
+  // Roster: members with at least one nonzero entry. Zero-only placeholder rows don't dilute splits.
+  const roster = [...bal.entries()].filter(([, v]) => v !== 0).map(([m]) => m).sort();
+
+  return { salesRows, moveRows, ledgerRows, noteRows, stockByItem, revenue, profit, rentPaid, balances, members: [...bal.keys()].sort(), roster };
 }

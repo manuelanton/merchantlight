@@ -1,3 +1,4 @@
+import { auth } from "@/auth";
 import { getCatalogue } from "@/lib/catalog";
 import { getBooks } from "@/lib/books";
 import StockForm from "@/components/StockForm";
@@ -6,7 +7,7 @@ import StockManager from "@/components/StockManager";
 export const dynamic = "force-dynamic";
 
 export default async function StockPage() {
-  const [{ categories, items }, books] = await Promise.all([getCatalogue(), getBooks()]);
+  const [{ categories, items }, books, session] = await Promise.all([getCatalogue(), getBooks(), auth()]);
   const live = items.filter((i) => i.active);
   const itemCategory: Record<string, string> = {};
   for (const i of live) itemCategory[i.name] = i.category_slug;
@@ -18,6 +19,8 @@ export default async function StockPage() {
       <StockForm
         items={live.map((i) => ({ id: i.id, name: i.name, price: i.sale_price, category: i.category_slug }))}
         categories={categories.map((c) => ({ slug: c.slug, name: c.name }))}
+        members={books.members}
+        creditDefault={session?.user?.name || ""}
       />
       <StockManager
         moves={books.moveRows.map((m) => ({

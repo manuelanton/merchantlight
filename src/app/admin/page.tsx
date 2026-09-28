@@ -32,7 +32,7 @@ export default async function AdminHome() {
           </table>
           {b.balances.length >= 2 && (
             <p className="text-xs text-[#8a7c64] mt-2">
-              Balances already include each member&apos;s share of every split rent bill.
+              Rent bills and sale proceeds split automatically — balances already include every share.
               Average: {g(ledgerBal / b.balances.length)}g each.
             </p>
           )}

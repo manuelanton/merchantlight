@@ -1,11 +1,12 @@
 "use server";
-import { eq } from "drizzle-orm";
+import { eq, like } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth, isQuartermaster } from "@/auth";
 import { getDb } from "@/db";
 import { categories, items, ledger, notes, sales, stockMoves } from "@/db/schema";
 import { getCatalogItems } from "@/lib/catalog";
+import { g, splitEvenly } from "@/lib/format";
 
 async function quartermaster() {
   const session = await auth();
@@ -37,16 +38,18 @@ export async function recordSaleAction(formData: FormData) {
   const notes = String(formData.get("notes") || "");
   const seller = String(formData.get("seller") || qm.name).trim() || qm.name;
   const db = await getDb();
-  const lines: string[] = [];
-  let revenue = 0;
+  // Roster for splitting: members with nonzero net (same rule as rent).
+  const existing = await db.select().from(ledger);
+  const nets = new Map<string, number>();
+  for (const e of existing) nets.set(e.member, (nets.get(e.member) || 0) + e.amountGold);
+  const roster = [...nets.entries()].filter(([, v]) => v !== 0).map(([m]) => m).sort();
   for (let n = 0; n < ids.length; n++) {
     const qty = Math.max(1, Number(qtys[n] || 1));
     const price = Number(prices[n] || 0);
     const itemName = await catalogName(ids[n]);
-    revenue += price * qty;
-    lines.push(`${itemName} × ${qty}`);
+    const saleId = uid("sl");
     await db.insert(sales).values({
-      id: uid("sl"),
+      id: saleId,
       itemId: ids[n],
       itemName,
       qty,
@@ -55,7 +58,7 @@ export async function recordSaleAction(formData: FormData) {
       totalProfit: (price - cost) * qty,
       location,
       soldByDiscordId: qm.discordId,
-      soldByName: qm.name,
+      soldByName: seller,
       notes,
     });
     // A sale is also a stock movement out.
@@ -66,26 +69,31 @@ export async function recordSaleAction(formData: FormData) {
       delta: -qty,
       reason: `Sale (${location})`,
       actorDiscordId: qm.discordId,
-      actorName: qm.name,
+      actorName: seller,
     });
-  }
-  // And money into the ledger, credited to the named seller.
-  if (revenue !== 0) {
-    await db.insert(ledger).values({
-      id: uid("lg"),
-      type: "sale_income",
-      member: seller,
-      amountGold: revenue,
-      category: "sales",
-      description: `Sale at ${location}: ${lines.join(", ")}${notes ? ` — ${notes}` : ""}`,
-      actorDiscordId: qm.discordId,
-    });
+    // Sale money is always split across the roster — never credited to one seller.
+    const revenue = price * qty;
+    if (revenue !== 0) {
+      const who = roster.length ? roster : [seller];
+      const shares = splitEvenly(revenue, who.length);
+      for (let i = 0; i < who.length; i++) {
+        await db.insert(ledger).values({
+          id: uid("lg"),
+          type: "sale_income",
+          member: who[i],
+          amountGold: shares[i],
+          category: "sales",
+          description: `Sale split [sale:${saleId}]: ${itemName} × ${qty} at ${location}${notes ? ` — ${notes}` : ""} (share ${i + 1} of ${who.length})`,
+          actorDiscordId: qm.discordId,
+        });
+      }
+    }
   }
   revalidatePath("/admin", "layout");
   redirect("/admin/sales");
 }
 
-/** Delete a sale + post reversing stock and ledger moves (history is never rewritten). */
+/** Delete a sale + reverse its postings (stock back, split shares removed). */
 export async function deleteSaleAction(formData: FormData) {
   const qm = await quartermaster();
   const id = String(formData.get("id"));
@@ -103,45 +111,59 @@ export async function deleteSaleAction(formData: FormData) {
     actorDiscordId: qm.discordId,
     actorName: qm.name,
   });
-  await db.insert(ledger).values({
-    id: uid("lg"),
-    type: "sale_income",
-    member: s.soldByName,
-    amountGold: -(s.unitSalePrice * s.qty),
-    category: "sales",
-    description: `Void: ${s.itemName} × ${s.qty} at ${s.location}`,
-    actorDiscordId: qm.discordId,
-  });
+  // Remove the auto-posted split shares for this exact sale (never earned).
+  const shares = await db.select().from(ledger).where(like(ledger.description, `%[sale:${id}]%`));
+  for (const row of shares) {
+    await db.delete(ledger).where(eq(ledger.id, row.id));
+  }
   revalidatePath("/admin", "layout");
   redirect("/admin/sales");
 }
 
-/** Log stock movements: one row per item (repeated item_id/delta fields). */
+/** Log stock movements: one row per item (repeated item_id/delta fields).
+ *  Positive intakes credit the named member at catalogue cost (when known). */
 export async function adjustStockAction(formData: FormData) {
   const qm = await quartermaster();
   const ids = rowsOf(formData, "item_id").filter(Boolean);
   if (!ids.length) throw new Error("No items");
   const deltas = rowsOf(formData, "delta");
-  const reason = String(formData.get("reason") || "");
+  const creditTo = String(formData.get("credit_to") || qm.name).trim() || qm.name;
   const db = await getDb();
+  const catalog = await getCatalogItems();
   for (let n = 0; n < ids.length; n++) {
     const delta = Number(deltas[n] || 0);
     if (!delta) continue;
+    const item = catalog.find((i) => i.id === ids[n]);
+    const itemName = item?.name || "goods";
+    const moveId = uid("sm");
     await db.insert(stockMoves).values({
-      id: uid("sm"),
+      id: moveId,
       itemId: ids[n],
-      itemName: await catalogName(ids[n]),
+      itemName,
       delta,
-      reason: reason || (delta > 0 ? "Restock" : "Correction"),
+      reason: "Restock",
       actorDiscordId: qm.discordId,
       actorName: qm.name,
     });
+    // Stock in = capital in: credit at catalogue cost where the cost is known.
+    const unitCost = item && Number.isFinite(item.cost_value) ? item.cost_value : 0;
+    if (delta > 0 && unitCost > 0) {
+      await db.insert(ledger).values({
+        id: uid("lg"),
+        type: "contribution",
+        member: creditTo,
+        amountGold: Math.round(delta * unitCost * 100) / 100,
+        category: "stock",
+        description: `Stock intake [move:${moveId}]: ${itemName} × ${delta} (@${g(unitCost)}g)`,
+        actorDiscordId: qm.discordId,
+      });
+    }
   }
   revalidatePath("/admin", "layout");
   redirect("/admin/stock");
 }
 
-/** Delete a manual stock move. Sale-linked moves go away via their sale instead. */
+/** Delete a manual stock move (+ its intake credit, if any). Sale-linked moves go away via their sale instead. */
 export async function deleteMoveAction(formData: FormData) {
   await quartermaster();
   const id = String(formData.get("id"));
@@ -151,6 +173,10 @@ export async function deleteMoveAction(formData: FormData) {
   if (!m) throw new Error("Move not found");
   if (m.reason.startsWith("Sale (")) throw new Error("Sale moves can only be removed by voiding the sale");
   await db.delete(stockMoves).where(eq(stockMoves.id, id));
+  const credits = await db.select().from(ledger).where(like(ledger.description, `%[move:${id}]%`));
+  for (const row of credits) {
+    await db.delete(ledger).where(eq(ledger.id, row.id));
+  }
   revalidatePath("/admin", "layout");
   redirect("/admin/stock");
 }
@@ -168,23 +194,21 @@ export async function addLedgerAction(formData: FormData) {
   // Rent is always shared: an expense categorized as rent fans out into
   // equal per-member shares instead of one lump row.
   if (type === "expense" && category.trim().toLowerCase() === "rent") {
-    const existing = await db.selectDistinct({ member: ledger.member }).from(ledger);
-    const roster = existing.map((r) => r.member).filter(Boolean);
+    const existing = await db.select().from(ledger);
+    const nets = new Map<string, number>();
+    for (const e of existing) nets.set(e.member, (nets.get(e.member) || 0) + e.amountGold);
+    const roster = [...nets.entries()].filter(([, v]) => v !== 0).map(([m]) => m).sort();
     if (roster.length) {
       const total = Math.abs(amount);
-      const base = Math.floor((total / roster.length) * 100) / 100;
-      let assigned = 0;
+      const shares = splitEvenly(total, roster.length);
       for (let i = 0; i < roster.length; i++) {
-        const last = i === roster.length - 1;
-        const share = last ? Math.round((total - assigned) * 100) / 100 : base;
-        assigned += share;
         await db.insert(ledger).values({
           id: uid("lg"),
           type: "expense",
           member: roster[i],
-          amountGold: -share,
+          amountGold: -shares[i],
           category: "rent",
-          description: `Rent split${description ? ` (${description})` : ""}: share ${i + 1} of ${roster.length} of ${total}g`,
+          description: `Rent split${description ? ` (${description})` : ""}: share ${i + 1} of ${roster.length} of ${g(total)}g`,
           actorDiscordId: qm.discordId,
         });
       }
