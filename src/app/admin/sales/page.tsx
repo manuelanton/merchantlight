@@ -4,6 +4,8 @@ import { deleteSaleAction } from "@/lib/admin-actions";
 import { getBooks } from "@/lib/books";
 import SaleForm from "@/components/SaleForm";
 
+export const dynamic = "force-dynamic";
+
 export default async function SalesPage() {
   const [{ categories, items }, books, session] = await Promise.all([getCatalogue(), getBooks(), auth()]);
   const live = items.filter((i) => i.active);

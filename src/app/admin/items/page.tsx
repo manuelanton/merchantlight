@@ -7,6 +7,8 @@ import {
 import { getCatalogue } from "@/lib/catalog";
 import ItemsManager from "@/components/ItemsManager";
 
+export const dynamic = "force-dynamic";
+
 export default async function ItemsPage() {
   const { categories, items } = await getCatalogue();
   const sorted = [...categories].sort((a, b) => a.sort_order - b.sort_order);

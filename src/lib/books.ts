@@ -1,4 +1,5 @@
 import { desc } from "drizzle-orm";
+import { auth, isQuartermaster } from "@/auth";
 import { getDb } from "@/db";
 import { ledger, sales, stockMoves } from "@/db/schema";
 
@@ -14,6 +15,11 @@ export interface Books {
 }
 
 export async function getBooks(): Promise<Books> {
+  // Defense in depth: books data never leaves the server without a quartermaster session,
+  // even if a rendering path ever evaluates without the layout gate.
+  const session = await auth();
+  const discordId = (session as unknown as { discordId?: string } | null)?.discordId;
+  if (!session?.user || !isQuartermaster(discordId)) throw new Error("UNAUTHORIZED");
   const db = await getDb();
   const [salesRows, moveRows, ledgerRows] = await Promise.all([
     db.select().from(sales).orderBy(desc(sales.timestamp)).limit(200),

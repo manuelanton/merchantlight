@@ -3,6 +3,8 @@ import { deleteMoveAction } from "@/lib/admin-actions";
 import { getBooks } from "@/lib/books";
 import StockForm from "@/components/StockForm";
 
+export const dynamic = "force-dynamic";
+
 export default async function StockPage() {
   const [{ categories, items }, books] = await Promise.all([getCatalogue(), getBooks()]);
   const live = items.filter((i) => i.active);

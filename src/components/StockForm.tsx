@@ -60,7 +60,6 @@ export default function StockForm({ items, categories }: { items: CatalogOption[
       <div className="flex items-center gap-3 pt-1">
         <button type="button" onClick={addRow} className="btn-ghost !py-1 text-sm">+ Add item</button>
       </div>
-      <div><label className="lbl">Reason (applies to all rows)</label><input name="reason" className="input" placeholder="Cyllian crafting batch, recount…" /></div>
       <div className="flex justify-end">
         <button className="btn-gold !py-2 !px-5 text-sm" type="submit">Add stock</button>
       </div>

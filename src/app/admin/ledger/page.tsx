@@ -1,6 +1,8 @@
 import { addLedgerAction, deleteLedgerAction, updateLedgerAction } from "@/lib/admin-actions";
 import { getBooks } from "@/lib/books";
 
+export const dynamic = "force-dynamic";
+
 // sale_income rows are system-posted (every sale) — not offered as a manual choice.
 const TYPES = ["contribution", "expense", "payout"] as const;
 

@@ -49,7 +49,6 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
                 <span aria-hidden className="flex-1 border-b border-dotted border-[#5a4a33] -translate-y-1" />
                 <span className="text-lg text-[#e0bd4a] whitespace-nowrap">{i.sale_price}g</span>
               </div>
-              {i.description && <p className="text-sm text-[#8a7c64] mt-0.5">{i.description}</p>}
             </li>
           ))}
         </ul>

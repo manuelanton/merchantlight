@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { getBooks } from "@/lib/books";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminHome() {
   const b = await getBooks();
   const ledgerBal = b.ledgerRows.reduce((a, e) => a + e.amountGold, 0);
