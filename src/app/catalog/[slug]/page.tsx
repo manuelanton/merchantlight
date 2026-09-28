@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getCatalogue } from "@/lib/sheets";
+import { getCatalogue } from "@/lib/catalog";
 
 export const revalidate = 60;
 

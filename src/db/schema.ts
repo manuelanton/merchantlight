@@ -1,0 +1,64 @@
+import { boolean, integer, pgTable, real, text, timestamp } from "drizzle-orm/pg-core";
+
+/** Catalogue sections. Managed in /admin/items once migrated off the sheet. */
+export const categories = pgTable("categories", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  icon: text("icon").notNull().default(""),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+/** Catalogue items. Prices shown publicly; cost is quartermaster-only. */
+export const items = pgTable("items", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  categorySlug: text("category_slug").notNull(),
+  description: text("description").notNull().default(""),
+  salePrice: real("sale_price").notNull().default(0),
+  costValue: real("cost_value").notNull().default(0),
+  active: boolean("active").notNull().default(true),
+  createdByDiscordId: text("created_by_discord_id").notNull().default(""),
+  createdByName: text("created_by_name").notNull().default(""),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** One recorded sale. Prices snapshotted so later catalogue edits don't rewrite history. */
+export const sales = pgTable("sales", {
+  id: text("id").primaryKey(),
+  timestamp: timestamp("timestamp", { withTimezone: true }).notNull().defaultNow(),
+  itemId: text("item_id").notNull(),
+  itemName: text("item_name").notNull(),
+  qty: integer("qty").notNull(),
+  unitSalePrice: real("unit_sale_price").notNull(),
+  unitCostSnapshot: real("unit_cost_snapshot").notNull().default(0),
+  totalProfit: real("total_profit").notNull().default(0),
+  location: text("location").notNull().default("Gallow's Rock"),
+  soldByDiscordId: text("sold_by_discord_id").notNull().default(""),
+  soldByName: text("sold_by_name").notNull().default(""),
+  notes: text("notes").notNull().default(""),
+});
+
+/** Every stock movement that isn't a sale: restocks, corrections, spoilage. */
+export const stockMoves = pgTable("stock_moves", {
+  id: text("id").primaryKey(),
+  timestamp: timestamp("timestamp", { withTimezone: true }).notNull().defaultNow(),
+  itemId: text("item_id").notNull(),
+  itemName: text("item_name").notNull(),
+  delta: integer("delta").notNull(),
+  reason: text("reason").notNull().default(""),
+  actorDiscordId: text("actor_discord_id").notNull().default(""),
+  actorName: text("actor_name").notNull().default(""),
+});
+
+/** Company books: contributions, expenses (incl. rent), payouts, sale income. */
+export const ledger = pgTable("ledger", {
+  id: text("id").primaryKey(),
+  timestamp: timestamp("timestamp", { withTimezone: true }).notNull().defaultNow(),
+  type: text("type").notNull(), // contribution | expense | payout | sale_income
+  member: text("member").notNull().default(""),
+  amountGold: real("amount_gold").notNull(),
+  category: text("category").notNull().default(""),
+  description: text("description").notNull().default(""),
+  actorDiscordId: text("actor_discord_id").notNull().default(""),
+});

@@ -233,7 +233,7 @@ export async function getItems(): Promise<Item[]> {
 
 /** Sections announced before they hold stock (always listed, even when empty). */
 export const UPCOMING_SECTIONS: Category[] = [
-  { id: "enchantments", name: "Enchantments", slug: "enchantments", icon: "✨", sort_order: 8.5 },
+  { id: "enchantments", name: "Enchantments", slug: "enchantments", icon: "✨", sort_order: 9 },
 ];
 
 /** Categories = Sheet list + any extra sections found in the Items list (so nothing vanishes). */
