@@ -5,8 +5,7 @@ import { SEED_CATEGORIES, SEED_ITEMS } from "./seed";
 
 // Customer-facing storefront. Google Sheets is the quartermaster:
 // stock and prices are edited directly in the Sheet, the site only reads.
-// The single write is the public order form -> Orders tab (needs a service
-// account; without one the form explains how to order via Discord instead).
+// (addOrder remains for a possible future order form; nothing calls it right now.)
 //
 // Non-coder friendly: headers accept plain words (Price, Stock, Show...),
 // categories are matched by NAME (no slugs needed), and row IDs are optional.
@@ -232,12 +231,18 @@ export async function getItems(): Promise<Item[]> {
   return items.length ? items : mem.items;
 }
 
+/** Sections announced before they hold stock (always listed, even when empty). */
+export const UPCOMING_SECTIONS: Category[] = [
+  { id: "enchantments", name: "Enchantments", slug: "enchantments", icon: "✨", sort_order: 8.5 },
+];
+
 /** Categories = Sheet list + any extra sections found in the Items list (so nothing vanishes). */
 export async function getCatalogue() {
   const [cats, items] = await Promise.all([getCategories(), getItems()]);
   const auto = (getItems as unknown as { _autoCats?: Category[] })._autoCats || [];
   const merged = [...cats];
   for (const a of auto) if (!merged.some((c) => c.slug === a.slug)) merged.push(a);
+  for (const u of UPCOMING_SECTIONS) if (!merged.some((c) => c.slug === u.slug)) merged.push(u);
   // items whose section isn't listed anywhere yet (e.g. categories tab empty)
   for (const it of items) {
     if (!merged.some((c) => c.slug === it.category_slug)) {

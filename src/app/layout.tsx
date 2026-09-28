@@ -4,14 +4,14 @@ import Sigil from "@/components/Sigil";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Merchantlight Company — Windhelm / Eastmarch",
-  description: "Catalogue, orders, and quartermaster books for the Merchantlight Company (Keizaal).",
+  title: "Merchantlight Company — Gallow's Rock, Eastmarch",
+  description: "Catalogue of the Merchantlight Company (Keizaal) — outfitters based in Gallow's Rock, Eastmarch. Deliveries arranged.",
   icons: { icon: "/logo.png" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -33,14 +33,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </span>
             </Link>
             <nav className="ml-auto flex gap-3 text-sm">
-              <Link className="hover:text-[#c9a227]" href="/">Catalogue</Link>
-              <Link className="hover:text-[#c9a227]" href="/order">Order</Link>
+              <Link className="hover:text-[#c9a227]" href="/#sections">Catalogue</Link>
+              <Link className="hover:text-[#c9a227]" href="/visit">Visit us</Link>
             </nav>
           </div>
         </header>
         <main className="max-w-6xl mx-auto px-4 py-6">{children}</main>
         <footer className="max-w-6xl mx-auto px-4 pb-10 text-sm text-[#8a7c64]">
-          <p>Merchantlight Trading Company — friends of Windhelm & Eastmarch. Prices in gold. Pickup: Windhelm, Darkwater Crossing, Whiterun.</p>
+          <p>Merchantlight Company — based in Gallow&apos;s Rock, Eastmarch. Prices in gold. Deliveries arranged across Skyrim.</p>
         </footer>
       </body>
     </html>

@@ -7,6 +7,7 @@ export const SEED_CATEGORIES: Category[] = [
   { id: "armor", name: "Armor", slug: "armor", icon: "🛡️", sort_order: 4 },
   { id: "weapons", name: "Weapons", slug: "weapons", icon: "⚔️", sort_order: 5 },
   { id: "jewelry", name: "Jewelry", slug: "jewelry", icon: "💍", sort_order: 6 },
+  { id: "enchantments", name: "Enchantments", slug: "enchantments", icon: "✨", sort_order: 7 },
   { id: "potions", name: "Potions & Alchemy", slug: "potions", icon: "🧪", sort_order: 7 },
   { id: "food", name: "Food & Drink", slug: "food", icon: "🍞", sort_order: 8 },
   { id: "trade-goods", name: "Trade Goods", slug: "trade-goods", icon: "📦", sort_order: 9 },

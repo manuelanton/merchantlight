@@ -37,7 +37,18 @@ Only needed for custom order/icons. Skip it and sections appear automatically fr
 Headers: `item | amount | price | total sale | notes`. Write the item name exactly as in Items.
 
 - **total sale** fills itself in with the formula below — never type in that column.
-- **stock** in Items drops automatically via the script below — never adjust it by hand for sales.
+- **stock** in Items drops automatically — never adjust it by hand for sales.
+
+### 4. `Restocks` — your stock-in log (whenever you craft, buy, or find more)
+
+Headers: `item | amount | notes`. A restock is just a row, same as a sale:
+
+| item | amount | notes |
+|---|---|---|
+| Reinforced Backpack | 3 | Cyllian crafting batch |
+| Iron Ore | 20 | mined Darkwater |
+
+Adding stock = adding a row. You never edit `start stock` after setup and never touch the `stock` formula column. Every movement in or out is a visible row with a note — full history for free.
 
 ## Sales total formula
 
@@ -51,16 +62,17 @@ Then double-click the little square at the corner of D2 to fill it down the whol
 
 ## Automatic stock (paste-once formula — no scripts, no permissions)
 
-`stock` is computed as **start stock minus everything sold in Sales**. Set it up once, it covers new rows forever:
+`stock` is computed as **start stock + restocks − sales**. Set it up once, it covers new rows forever:
 
-1. In the Items tab, rename cell **E1** from `stock` to `start stock` (your counts stay exactly where they are).
+1. In the Items tab, rename cell **E1** from `stock` to `start stock` (your counts stay exactly where they are — you set this once and never touch it again).
 2. Insert a column after it: right-click column **F** → **Insert 1 column left**. Name the new **F1** `stock` (your `active` column shifts right — that's fine).
-3. Click **F2** and paste this (one line):
+3. Create a **`Restocks`** tab with headers `item | amount | notes` (can be empty for now — the formula tolerates a missing tab, but create it so restocking works).
+4. Click **F2** and paste this (one line):
 
 ```
-=ARRAYFORMULA(IF(A2:A="",,IF(E2:E-SUMIF(Sales!$A:$A,A2:A,Sales!$B:$B)<0,0,E2:E-SUMIF(Sales!$A:$A,A2:A,Sales!$B:$B))))
+=ARRAYFORMULA(IF(A2:A="",,IF(E2:E+IFERROR(SUMIF(Restocks!$A:$A,A2:A,Restocks!$B:$B),0)-SUMIF(Sales!$A:$A,A2:A,Sales!$B:$B)<0,0,E2:E+IFERROR(SUMIF(Restocks!$A:$A,A2:A,Restocks!$B:$B),0)-SUMIF(Sales!$A:$A,A2:A,Sales!$B:$B))))
 ```
 
-That's it. New sales in the Sales tab subtract from stock by themselves, and new items you add get the formula automatically. Item names must match between the two tabs.
+That's it. New rows in Sales subtract, new rows in Restocks add, new items get the formula automatically. Item names must match between tabs.
 
 Rules of thumb: edit cells, never rename the tab names, never delete the header row, never type in a formula column. If a sale was logged wrong, delete that Sales row and re-add it — stocks recalculate themselves.
