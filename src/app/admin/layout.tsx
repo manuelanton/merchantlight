@@ -4,6 +4,9 @@ import { auth, isQuartermaster, signIn, signOut } from "@/auth";
 import { backofficeEnabled } from "@/lib/flags";
 import CopyId from "@/components/CopyId";
 
+// Books must never prerender: auth + data are per-request.
+export const dynamic = "force-dynamic";
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   if (!backofficeEnabled()) notFound();
   const session = await auth();

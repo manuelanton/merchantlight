@@ -161,14 +161,45 @@ export async function addLedgerAction(formData: FormData) {
   let amount = Number(formData.get("amount_gold") || 0);
   if ((type === "expense" || type === "payout") && amount > 0) amount = -amount;
   if ((type === "contribution" || type === "sale_income") && amount < 0) amount = -amount;
+  const category = String(formData.get("category") || "");
+  const description = String(formData.get("description") || "");
+  const member = String(formData.get("member") || qm.name);
   const db = await getDb();
+  // Rent is always shared: an expense categorized as rent fans out into
+  // equal per-member shares instead of one lump row.
+  if (type === "expense" && category.trim().toLowerCase() === "rent") {
+    const existing = await db.selectDistinct({ member: ledger.member }).from(ledger);
+    const roster = existing.map((r) => r.member).filter(Boolean);
+    if (roster.length) {
+      const total = Math.abs(amount);
+      const base = Math.floor((total / roster.length) * 100) / 100;
+      let assigned = 0;
+      for (let i = 0; i < roster.length; i++) {
+        const last = i === roster.length - 1;
+        const share = last ? Math.round((total - assigned) * 100) / 100 : base;
+        assigned += share;
+        await db.insert(ledger).values({
+          id: uid("lg"),
+          type: "expense",
+          member: roster[i],
+          amountGold: -share,
+          category: "rent",
+          description: `Rent split${description ? ` (${description})` : ""}: share ${i + 1} of ${roster.length} of ${total}g`,
+          actorDiscordId: qm.discordId,
+        });
+      }
+      revalidatePath("/admin", "layout");
+      redirect("/admin/ledger");
+    }
+    // No roster yet (first entry ever): store the single row as-is.
+  }
   await db.insert(ledger).values({
     id: uid("lg"),
     type,
-    member: String(formData.get("member") || qm.name),
+    member,
     amountGold: amount,
-    category: String(formData.get("category") || ""),
-    description: String(formData.get("description") || ""),
+    category,
+    description,
     actorDiscordId: qm.discordId,
   });
   revalidatePath("/admin", "layout");
@@ -201,35 +232,6 @@ export async function deleteLedgerAction(formData: FormData) {
   await quartermaster();
   const db = await getDb();
   await db.delete(ledger).where(eq(ledger.id, String(formData.get("id"))));
-  revalidatePath("/admin", "layout");
-  redirect("/admin/ledger");
-}
-
-/** Split a rent bill evenly: one expense share per checked member. */
-export async function splitRentAction(formData: FormData) {
-  const qm = await quartermaster();
-  const members = formData.getAll("member").map(String).filter(Boolean);
-  if (!members.length) throw new Error("Tick at least one member");
-  const total = Math.abs(Number(formData.get("total_gold") || 0));
-  if (!total) throw new Error("Total must be more than 0");
-  const period = String(formData.get("description") || "rent").trim() || "rent";
-  const db = await getDb();
-  const base = Math.floor((total / members.length) * 100) / 100;
-  let assigned = 0;
-  for (let i = 0; i < members.length; i++) {
-    const last = i === members.length - 1;
-    const share = last ? Math.round((total - assigned) * 100) / 100 : base;
-    assigned += share;
-    await db.insert(ledger).values({
-      id: uid("lg"),
-      type: "expense",
-      member: members[i],
-      amountGold: -share,
-      category: "rent",
-      description: `Rent split (${period}): share ${i + 1} of ${members.length} of ${total}g`,
-      actorDiscordId: qm.discordId,
-    });
-  }
   revalidatePath("/admin", "layout");
   redirect("/admin/ledger");
 }
