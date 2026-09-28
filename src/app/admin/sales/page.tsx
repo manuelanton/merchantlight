@@ -17,8 +17,6 @@ export default async function SalesPage() {
       <SaleForm
         items={live.map((i) => ({ id: i.id, name: i.name, price: i.sale_price, category: i.category_slug }))}
         categories={categories.map((c) => ({ slug: c.slug, name: c.name }))}
-        sellerDefault={session?.user?.name || ""}
-        members={books.members}
       />
 
       <div className="card overflow-x-auto">

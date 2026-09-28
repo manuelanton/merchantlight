@@ -121,14 +121,12 @@ export async function deleteSaleAction(formData: FormData) {
 }
 
 /** Log stock movements: one row per item (repeated item_id/delta fields).
- *  Positive intakes credit the named member at catalogue cost (when known). */
+ *  Stock goes to the shared pot — no individual credit. Sale profits split evenly. */
 export async function adjustStockAction(formData: FormData) {
   const qm = await quartermaster();
   const ids = rowsOf(formData, "item_id").filter(Boolean);
   if (!ids.length) throw new Error("No items");
   const deltas = rowsOf(formData, "delta");
-  const creditTo = String(formData.get("credit_to") || qm.name).trim() || qm.name;
-  const maker = String(formData.get("maker") || "").trim();
   const db = await getDb();
   const catalog = await getCatalogItems();
   for (let n = 0; n < ids.length; n++) {
@@ -136,36 +134,21 @@ export async function adjustStockAction(formData: FormData) {
     if (!delta) continue;
     const item = catalog.find((i) => i.id === ids[n]);
     const itemName = item?.name || "goods";
-    const moveId = uid("sm");
     await db.insert(stockMoves).values({
-      id: moveId,
+      id: uid("sm"),
       itemId: ids[n],
       itemName,
       delta,
       reason: "Restock",
       actorDiscordId: qm.discordId,
       actorName: qm.name,
-      maker,
     });
-    // Stock in = capital in: credit at catalogue cost where the cost is known.
-    const unitCost = item && Number.isFinite(item.cost_value) ? item.cost_value : 0;
-    if (delta > 0 && unitCost > 0) {
-      await db.insert(ledger).values({
-        id: uid("lg"),
-        type: "contribution",
-        member: creditTo,
-        amountGold: Math.round(delta * unitCost * 100) / 100,
-        category: "stock",
-        description: `Stock intake [move:${moveId}]: ${itemName} × ${delta} (@${g(unitCost)}g)`,
-        actorDiscordId: qm.discordId,
-      });
-    }
   }
   revalidatePath("/admin", "layout");
   redirect("/admin/stock");
 }
 
-/** Delete a manual stock move (+ its intake credit, if any). Sale-linked moves go away via their sale instead. */
+/** Delete a manual stock move. Sale-linked moves go away via their sale instead. */
 export async function deleteMoveAction(formData: FormData) {
   await quartermaster();
   const id = String(formData.get("id"));
@@ -175,10 +158,6 @@ export async function deleteMoveAction(formData: FormData) {
   if (!m) throw new Error("Move not found");
   if (m.reason.startsWith("Sale (")) throw new Error("Sale moves can only be removed by voiding the sale");
   await db.delete(stockMoves).where(eq(stockMoves.id, id));
-  const credits = await db.select().from(ledger).where(like(ledger.description, `%[move:${id}]%`));
-  for (const row of credits) {
-    await db.delete(ledger).where(eq(ledger.id, row.id));
-  }
   revalidatePath("/admin", "layout");
   redirect("/admin/stock");
 }

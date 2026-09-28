@@ -10,7 +10,6 @@ export interface MoveRow {
   delta: number;
   reason: string;
   actorName: string;
-  maker: string;
 }
 
 export default function StockManager({
@@ -63,7 +62,7 @@ export default function StockManager({
 
       <div className="card overflow-x-auto">
         <table className="ledger min-w-[760px]">
-          <thead><tr><th>When</th><th>Item</th><th>Δ</th><th>Made by</th><th>Reason</th><th>By</th><th></th></tr></thead>
+          <thead><tr><th>When</th><th>Item</th><th>Δ</th><th>Reason</th><th>By</th><th></th></tr></thead>
           <tbody>
             {shownMoves.map((m) => {
               const locked = m.reason.startsWith("Sale (");
@@ -72,7 +71,6 @@ export default function StockManager({
                   <td className="text-xs">{new Date(m.timestamp).toLocaleString()}</td>
                   <td>{m.itemName}</td>
                   <td className={m.delta >= 0 ? "text-[#7fd08a]" : "text-[#e08a8a]"}>{m.delta > 0 ? `+${m.delta}` : m.delta}</td>
-                  <td>{m.maker || <span className="text-[#8a7c64]">—</span>}</td>
                   <td className="text-[#8a7c64]">{m.reason}</td>
                   <td>{m.actorName}</td>
                   <td>

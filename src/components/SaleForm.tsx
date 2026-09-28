@@ -1,7 +1,6 @@
 "use client";
 import { useState } from "react";
 import { recordSaleAction } from "@/lib/admin-actions";
-import MemberSelect from "./MemberSelect";
 
 export interface CatalogOption {
   id: string;
@@ -25,7 +24,7 @@ interface Row {
 
 const LOCATIONS = ["Gallow's Rock", "Windhelm", "Darkwater Crossing", "Whiterun", "Winterhold"];
 
-export default function SaleForm({ items, categories, sellerDefault, members }: { items: CatalogOption[]; categories: CategoryOption[]; sellerDefault: string; members: string[] }) {
+export default function SaleForm({ items, categories }: { items: CatalogOption[]; categories: CategoryOption[] }) {
   const inCat = (cat: string) => (cat ? items.filter((i) => i.category === cat) : items);
   const firstOf = (cat: string) => inCat(cat)[0];
   const [rows, setRows] = useState<Row[]>(() => {
@@ -92,8 +91,7 @@ export default function SaleForm({ items, categories, sellerDefault, members }: 
         <button type="button" onClick={addRow} className="btn-ghost !py-1 text-sm">+ Add item</button>
         <span className="text-sm text-[#8a7c64] ml-auto">Total: <b className="text-[#e0bd4a]">{total}g</b></span>
       </div>
-      <div className="grid md:grid-cols-4 gap-3">
-        <MemberSelect members={members} name="seller" defaultValue={sellerDefault} label="Credit gold to" />
+      <div className="grid md:grid-cols-3 gap-3">
         <div><label className="lbl">Cost each, if known (g)</label><input name="unit_cost" type="number" min={0} defaultValue={0} className="input" /></div>
         <div><label className="lbl">Location</label>
           <select name="location" className="input">{LOCATIONS.map((l) => <option key={l}>{l}</option>)}</select>

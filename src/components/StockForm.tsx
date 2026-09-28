@@ -1,7 +1,6 @@
 "use client";
 import { useState } from "react";
 import { adjustStockAction } from "@/lib/admin-actions";
-import MemberSelect from "./MemberSelect";
 import type { CatalogOption, CategoryOption } from "./SaleForm";
 
 interface Row {
@@ -11,7 +10,7 @@ interface Row {
   delta: number;
 }
 
-export default function StockForm({ items, categories, members, creditDefault }: { items: CatalogOption[]; categories: CategoryOption[]; members: string[]; creditDefault: string }) {
+export default function StockForm({ items, categories }: { items: CatalogOption[]; categories: CategoryOption[] }) {
   const inCat = (cat: string) => (cat ? items.filter((i) => i.category === cat) : items);
   const [rows, setRows] = useState<Row[]>([{ key: 0, cat: "", itemId: items[0]?.id || "", delta: 1 }]);
   const [n, setN] = useState(1);
@@ -61,11 +60,7 @@ export default function StockForm({ items, categories, members, creditDefault }:
       <div className="flex items-center gap-3 pt-1">
         <button type="button" onClick={addRow} className="btn-ghost !py-1 text-sm">+ Add item</button>
       </div>
-      <div className="grid md:grid-cols-2 gap-3">
-        <MemberSelect members={members} name="credit_to" defaultValue={creditDefault} label="Credit stock value to" />
-        <MemberSelect members={members} name="maker" defaultValue="" label="Made by (optional)" allowEmpty emptyLabel="— unknown —" />
-      </div>
-      <p className="text-xs text-[#8a7c64]">Positive intakes credit the member at catalogue cost (where known).</p>
+      <p className="text-xs text-[#8a7c64] self-end">Stock goes to the shared pot — sale profits split evenly, no individual credit.</p>
       <div className="flex justify-end">
         <button className="btn-gold !py-2 !px-5 text-sm" type="submit">Add stock</button>
       </div>
