@@ -128,6 +128,7 @@ export async function adjustStockAction(formData: FormData) {
   if (!ids.length) throw new Error("No items");
   const deltas = rowsOf(formData, "delta");
   const creditTo = String(formData.get("credit_to") || qm.name).trim() || qm.name;
+  const maker = String(formData.get("maker") || "").trim();
   const db = await getDb();
   const catalog = await getCatalogItems();
   for (let n = 0; n < ids.length; n++) {
@@ -144,6 +145,7 @@ export async function adjustStockAction(formData: FormData) {
       reason: "Restock",
       actorDiscordId: qm.discordId,
       actorName: qm.name,
+      maker,
     });
     // Stock in = capital in: credit at catalogue cost where the cost is known.
     const unitCost = item && Number.isFinite(item.cost_value) ? item.cost_value : 0;

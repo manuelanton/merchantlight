@@ -63,8 +63,9 @@ export default function StockForm({ items, categories, members, creditDefault }:
       </div>
       <div className="grid md:grid-cols-2 gap-3">
         <MemberSelect members={members} name="credit_to" defaultValue={creditDefault} label="Credit stock value to" />
-        <p className="text-xs text-[#8a7c64] self-end">Positive intakes credit the member at catalogue cost (where known).</p>
+        <MemberSelect members={members} name="maker" defaultValue="" label="Made by (optional)" allowEmpty emptyLabel="— unknown —" />
       </div>
+      <p className="text-xs text-[#8a7c64]">Positive intakes credit the member at catalogue cost (where known).</p>
       <div className="flex justify-end">
         <button className="btn-gold !py-2 !px-5 text-sm" type="submit">Add stock</button>
       </div>

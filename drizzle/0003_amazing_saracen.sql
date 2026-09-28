@@ -1,0 +1,1 @@
+ALTER TABLE "stock_moves" ADD COLUMN "maker" text DEFAULT '' NOT NULL;

@@ -48,6 +48,7 @@ export const stockMoves = pgTable("stock_moves", {
   reason: text("reason").notNull().default(""),
   actorDiscordId: text("actor_discord_id").notNull().default(""),
   actorName: text("actor_name").notNull().default(""),
+  maker: text("maker").notNull().default(""),
 });
 
 /** Company books: contributions, expenses (incl. rent), payouts, sale income. */

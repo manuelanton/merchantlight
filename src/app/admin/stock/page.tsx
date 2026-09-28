@@ -31,6 +31,7 @@ export default async function StockPage() {
           delta: m.delta,
           reason: m.reason,
           actorName: m.actorName,
+          maker: m.maker,
         }))}
         counts={[...books.stockByItem.values()]}
         itemCategory={itemCategory}

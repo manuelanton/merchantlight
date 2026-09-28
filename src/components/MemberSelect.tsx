@@ -8,18 +8,22 @@ export default function MemberSelect({
   defaultValue = "",
   label = "Member",
   required = false,
+  allowEmpty = false,
+  emptyLabel = "—",
 }: {
   members: string[];
   name?: string;
   defaultValue?: string;
   label?: string;
   required?: boolean;
+  allowEmpty?: boolean;
+  emptyLabel?: string;
 }) {
   const [mode, setMode] = useState<"pick" | "new">(
     defaultValue && !members.includes(defaultValue) ? "new" : "pick"
   );
   const [picked, setPicked] = useState(
-    members.includes(defaultValue) ? defaultValue : members[0] || ""
+    members.includes(defaultValue) ? defaultValue : allowEmpty ? "" : members[0] || ""
   );
 
   if (mode === "new" || !members.length) {
@@ -45,6 +49,7 @@ export default function MemberSelect({
           onChange={(e) => setPicked(e.target.value)}
           required={required}
         >
+          {allowEmpty && <option value="">{emptyLabel}</option>}
           {members.map((m) => <option key={m} value={m}>{m}</option>)}
         </select>
         <input type="hidden" name={name} value={picked} />
