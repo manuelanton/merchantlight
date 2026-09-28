@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { backofficeEnabled } from "@/lib/flags";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -32,6 +33,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <nav className="ml-auto flex gap-3 text-sm">
               <Link className="hover:text-[#c9a227]" href="/#sections">Catalogue</Link>
               <Link className="hover:text-[#c9a227]" href="/visit">Visit us</Link>
+              {backofficeEnabled() && (
+                <Link className="hover:text-[#c9a227]" href="/admin">Quartermaster</Link>
+              )}
             </nav>
           </div>
         </header>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Sigil from "@/components/Sigil";
-import { UPCOMING_SECTIONS, getCatalogue, isSheetsConfigured } from "@/lib/sheets";
+import { UPCOMING_SECTIONS, isSheetsConfigured } from "@/lib/sheets";
+import { getCatalogue } from "@/lib/catalog";
 
 export const revalidate = 60;
 
