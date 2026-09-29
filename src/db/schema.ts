@@ -79,3 +79,13 @@ export const settings = pgTable("settings", {
   value: text("value").notNull().default(""),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** Recipe lines: what an item is made of. Cost math uses live catalogue costs. */
+export const itemIngredients = pgTable("item_ingredients", {
+  id: text("id").primaryKey(),
+  itemId: text("item_id").notNull(),
+  materialItemId: text("material_item_id").notNull(),
+  materialName: text("material_name").notNull().default(""),
+  qty: real("qty").notNull().default(1),
+  actorDiscordId: text("actor_discord_id").notNull().default(""),
+});

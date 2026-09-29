@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
-import { deleteItemAction, updateItemAction } from "@/lib/admin-actions";
+import { addIngredientAction, deleteIngredientAction, deleteItemAction, updateItemAction } from "@/lib/admin-actions";
+import { g } from "@/lib/format";
 
 export interface ManagedItem {
   id: string;
@@ -18,7 +19,15 @@ export interface ManagedCategory {
   icon: string;
 }
 
-export default function ItemsManager({ items, categories, stock }: { items: ManagedItem[]; categories: ManagedCategory[]; stock: Record<string, number> }) {
+export interface ManagedIngredient {
+  id: string;
+  itemId: string;
+  materialItemId: string;
+  materialName: string;
+  qty: number;
+}
+
+export default function ItemsManager({ items, categories, stock, ingredients }: { items: ManagedItem[]; categories: ManagedCategory[]; stock: Record<string, number>; ingredients: ManagedIngredient[] }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
 
@@ -49,6 +58,10 @@ export default function ItemsManager({ items, categories, stock }: { items: Mana
 
   const catName = (slug: string) => categories.find((c) => c.slug === slug)?.name || slug;
   const catIcon = (slug: string) => categories.find((c) => c.slug === slug)?.icon || "📦";
+  const matCost = (id: string) => items.find((i) => i.id === id)?.cost_value || 0;
+  const matName = (id: string, fallback: string) => items.find((i) => i.id === id)?.name || fallback;
+  const recipeCost = (itemId: string) =>
+    Math.round(ingredients.filter((r) => r.itemId === itemId).reduce((a, r) => a + r.qty * matCost(r.materialItemId), 0) * 100) / 100;
 
   return (
     <div className="space-y-4">
@@ -96,6 +109,49 @@ export default function ItemsManager({ items, categories, stock }: { items: Mana
                   <td>{stock[i.id] ?? 0}</td>
                   <td>{i.active ? "yes" : "no"}</td>
                   <td className="whitespace-nowrap">
+                    <details className="inline-block">
+                      <summary className="btn-ghost !py-1 !px-2 text-xs cursor-pointer list-none inline-block" title="Recipe + cost math">Recipe</summary>
+                      <div className="mt-2 p-3 card space-y-2 min-w-[280px]">
+                        {(() => {
+                          const lines = ingredients.filter((r) => r.itemId === i.id);
+                          const cost = recipeCost(i.id);
+                          const margin = Math.round((i.sale_price - cost) * 100) / 100;
+                          return (
+                            <>
+                              {lines.length > 0 ? (
+                                <ul className="text-xs space-y-1">
+                                  {lines.map((r) => (
+                                    <li key={r.id} className="flex items-center gap-2">
+                                      <span className="flex-1">{matName(r.materialItemId, r.materialName)} × {g(r.qty)} ({g(r.qty * matCost(r.materialItemId))}g)</span>
+                                      <form action={deleteIngredientAction} className="inline">
+                                        <input type="hidden" name="id" value={r.id} />
+                                        <button className="btn-ghost !py-0 !px-1.5 text-xs" type="submit" title="Remove ingredient">✕</button>
+                                      </form>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <p className="text-xs text-[#8a7c64]">No recipe yet.</p>
+                              )}
+                              <p className="text-xs">
+                                Materials: <b className="text-[#e0bd4a]">{g(cost)}g</b> · Sells: <b className="text-[#e0bd4a]">{g(i.sale_price)}g</b> ·{" "}
+                                Margin: <b className={margin >= 0 ? "text-[#7fd08a]" : "text-[#e08a8a]"}>{g(margin)}g</b>
+                              </p>
+                              <form action={addIngredientAction} className="flex gap-2 items-end">
+                                <input type="hidden" name="item_id" value={i.id} />
+                                <div className="flex-1"><label className="lbl">Material</label>
+                                  <select name="material_item_id" className="input">
+                                    {items.map((m) => <option key={m.id} value={m.id}>{m.name}{m.cost_value ? ` (${g(m.cost_value)}g)` : ""}</option>)}
+                                  </select>
+                                </div>
+                                <div className="w-20"><label className="lbl">Qty</label><input name="qty" type="number" min={0.01} step="any" defaultValue={1} className="input" /></div>
+                                <button className="btn-ghost !py-1 text-xs" type="submit">Add</button>
+                              </form>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </details>{" "}
                     <details className="inline-block">
                       <summary className="btn-ghost !py-1 !px-2 text-xs cursor-pointer list-none inline-block">Edit</summary>
                       <form action={updateItemAction} className="mt-2 p-3 card space-y-2 min-w-[260px]">

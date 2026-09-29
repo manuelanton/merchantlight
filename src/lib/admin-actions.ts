@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth, isQuartermaster } from "@/auth";
 import { getDb } from "@/db";
-import { categories, items, ledger, notes, sales, stockMoves } from "@/db/schema";
+import { categories, itemIngredients, items, ledger, notes, sales, stockMoves } from "@/db/schema";
 import { getCatalogItems } from "@/lib/catalog";
 import { g, splitEvenly } from "@/lib/format";
 import { setShopOpen } from "@/lib/shop";
@@ -394,4 +394,33 @@ export async function setShopOpenAction(formData: FormData) {
   revalidatePath('/', 'layout');
   revalidatePath('/admin', 'layout');
   redirect('/admin');
+}
+
+/** Recipe lines for cost math. */
+export async function addIngredientAction(formData: FormData) {
+  const qm = await quartermaster();
+  const qty = Number(formData.get('qty') || 1);
+  if (!(qty > 0)) throw new Error('Quantity must be more than 0');
+  const materialId = String(formData.get('material_item_id'));
+  const catalog = await getCatalogItems();
+  const mat = catalog.find((i) => i.id === materialId);
+  const db = await getDb();
+  await db.insert(itemIngredients).values({
+    id: uid('ig'),
+    itemId: String(formData.get('item_id')),
+    materialItemId: materialId,
+    materialName: mat?.name || 'material',
+    qty,
+    actorDiscordId: qm.discordId,
+  });
+  revalidatePath('/admin', 'layout');
+  redirect('/admin/items');
+}
+
+export async function deleteIngredientAction(formData: FormData) {
+  await quartermaster();
+  const db = await getDb();
+  await db.delete(itemIngredients).where(eq(itemIngredients.id, String(formData.get('id'))));
+  revalidatePath('/admin', 'layout');
+  redirect('/admin/items');
 }

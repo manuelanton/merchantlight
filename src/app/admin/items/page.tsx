@@ -6,15 +6,18 @@ import {
 } from "@/lib/admin-actions";
 import { getCatalogue } from "@/lib/catalog";
 import { getBooks } from "@/lib/books";
+import { getDb } from "@/db";
+import { itemIngredients } from "@/db/schema";
 import ItemsManager from "@/components/ItemsManager";
 
 export const dynamic = "force-dynamic";
 
 export default async function ItemsPage() {
-  const [{ categories, items }, books] = await Promise.all([getCatalogue(), getBooks()]);
+  const [{ categories, items }, books, db] = await Promise.all([getCatalogue(), getBooks(), getDb()]);
   const sorted = [...categories].sort((a, b) => a.sort_order - b.sort_order);
   const stock: Record<string, number> = {};
   for (const [id, s] of books.stockByItem) stock[id] = s.qty;
+  const ingredientRows = await db.select().from(itemIngredients);
 
   return (
     <div className="space-y-6">
@@ -49,6 +52,10 @@ export default async function ItemsPage() {
         }))}
         categories={sorted.map((c) => ({ slug: c.slug, name: c.name, icon: c.icon }))}
         stock={stock}
+        ingredients={ingredientRows.map((r) => ({
+          id: r.id, itemId: r.itemId, materialItemId: r.materialItemId,
+          materialName: r.materialName, qty: r.qty,
+        }))}
       />
 
       <div className="card p-5 space-y-4">
