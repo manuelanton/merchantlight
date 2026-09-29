@@ -137,15 +137,17 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                                 Materials: <b className="text-[#e0bd4a]">{g(cost)}g</b> · Sells: <b className="text-[#e0bd4a]">{g(i.sale_price)}g</b> ·{" "}
                                 Margin: <b className={margin >= 0 ? "text-[#7fd08a]" : "text-[#e08a8a]"}>{g(margin)}g</b>
                               </p>
-                              <form action={addIngredientAction} className="flex gap-2 items-end">
+                              <form action={addIngredientAction} className="space-y-2">
                                 <input type="hidden" name="item_id" value={i.id} />
-                                <div className="flex-1"><label className="lbl">Material</label>
+                                <div><label className="lbl">Material</label>
                                   <select name="material_item_id" className="input">
-                                    {items.map((m) => <option key={m.id} value={m.id}>{m.name}{m.cost_value ? ` (${g(m.cost_value)}g)` : ""}</option>)}
+                                    {items.filter((m) => m.category_slug === "materials").map((m) => <option key={m.id} value={m.id}>{m.name}{m.cost_value ? ` (${g(m.cost_value)}g)` : ""}</option>)}
                                   </select>
                                 </div>
-                                <div className="w-20"><label className="lbl">Qty</label><input name="qty" type="number" min={0.01} step="any" defaultValue={1} className="input" /></div>
-                                <button className="btn-ghost !py-1 text-xs" type="submit">Add</button>
+                                <div className="flex gap-2 items-end">
+                                  <div className="w-24"><label className="lbl">Qty</label><input name="qty" type="number" min={0.01} step="any" defaultValue={1} className="input" /></div>
+                                  <button className="btn-ghost !py-1 text-xs" type="submit">Add</button>
+                                </div>
                               </form>
                             </>
                           );
