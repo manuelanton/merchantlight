@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { recordSaleAction } from "@/lib/admin-actions";
+import LocationSelect from "./LocationSelect";
 
 export interface CatalogOption {
   id: string;
@@ -22,9 +23,9 @@ interface Row {
   price: number;
 }
 
-const LOCATIONS = ["Gallow's Rock", "Windhelm", "Darkwater Crossing", "Whiterun", "Winterhold"];
+const DEFAULT_LOCATIONS = ["Gallow's Rock", "Windhelm", "Darkwater Crossing", "Whiterun", "Winterhold"];
 
-export default function SaleForm({ items, categories }: { items: CatalogOption[]; categories: CategoryOption[] }) {
+export default function SaleForm({ items, categories, locations = DEFAULT_LOCATIONS }: { items: CatalogOption[]; categories: CategoryOption[]; locations?: string[] }) {
   const inCat = (cat: string) => (cat ? items.filter((i) => i.category === cat) : items);
   const firstOf = (cat: string) => inCat(cat)[0];
   const [rows, setRows] = useState<Row[]>(() => {
@@ -93,9 +94,7 @@ export default function SaleForm({ items, categories }: { items: CatalogOption[]
       </div>
       <div className="grid md:grid-cols-3 gap-3">
         <div><label className="lbl">Cost each, if known (g)</label><input name="unit_cost" type="number" min={0} defaultValue={0} className="input" /></div>
-        <div><label className="lbl">Location</label>
-          <select name="location" className="input">{LOCATIONS.map((l) => <option key={l}>{l}</option>)}</select>
-        </div>
+        <LocationSelect locations={locations} />
         <div><label className="lbl">Notes</label><input name="notes" className="input" placeholder="Haggled, bundle…" /></div>
       </div>
       <div className="flex justify-end">

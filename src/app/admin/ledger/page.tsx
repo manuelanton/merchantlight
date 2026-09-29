@@ -12,6 +12,73 @@ export default async function LedgerPage() {
   const b = await getBooks();
   const bal = b.ledgerRows.reduce((a, e) => a + e.amountGold, 0);
 
+  type Row = (typeof b.ledgerRows)[number];
+  interface Group {
+    key: string;
+    kind: "sale" | "rent";
+    when: string;
+    rows: Row[];
+    total: number;
+    title: string;
+  }
+  // Collapse auto-posted split shares into one expandable row per sale / rent bill.
+  const singles: Row[] = [];
+  const groups = new Map<string, Group>();
+  const groupOrder: string[] = [];
+  const saleToken = (d: string) => d.match(/\[sale:([^\]]+)\]/)?.[1];
+  const rentSplit = (d: string) => /Rent split/i.test(d);
+  for (const e of b.ledgerRows) {
+    const tok = saleToken(e.description);
+    if (e.type === "sale_income" && tok) {
+      const key = `sale:${tok}`;
+      if (!groups.has(key)) {
+        groups.set(key, { key, kind: "sale", when: String(e.timestamp), rows: [], total: 0, title: "" });
+        groupOrder.push(key);
+      }
+      const gr = groups.get(key)!;
+      gr.rows.push(e);
+      gr.total += e.amountGold;
+      continue;
+    }
+    if (e.type === "expense" && e.category.toLowerCase() === "rent" && rentSplit(e.description)) {
+      const key = `rent:${String(e.timestamp)}`;
+      if (!groups.has(key)) {
+        const m = e.description.match(/of ([\d.]+)g/i);
+        groups.set(key, {
+          key, kind: "rent", when: String(e.timestamp), rows: [], total: 0,
+          title: `Rent split of ${m ? m[1] : "?"}g`,
+        });
+        groupOrder.push(key);
+      }
+      const gr = groups.get(key)!;
+      gr.rows.push(e);
+      gr.total += e.amountGold;
+      continue;
+    }
+    singles.push(e);
+  }
+  // Interleave back into time order (rows come newest-first).
+  const order = new Map<string, number>();
+  b.ledgerRows.forEach((e, i) => {
+    const tok = e.type === "sale_income" ? saleToken(e.description) : null;
+    const k = tok ? `sale:${tok}` : (e.type === "expense" && e.category.toLowerCase() === "rent" && rentSplit(e.description) ? `rent:${String(e.timestamp)}` : `row:${e.id}`);
+    if (!order.has(k)) order.set(k, i);
+  });
+  for (const gr of groups.values()) {
+    if (!gr.title) {
+      const first = gr.rows[0]?.description.replace(/\[sale:[^\]]+\]:\s*/, "").replace(/\s*\(share \d+ of \d+\)\s*$/, "") || "Sale";
+      gr.title = first;
+    }
+  }
+  const feed: ({ t: "single"; row: Row } | { t: "group"; group: Group })[] = [
+    ...singles.map((row) => ({ t: "single" as const, row })),
+    ...groupOrder.map((k) => ({ t: "group" as const, group: groups.get(k)! })),
+  ].sort((a, c) => {
+    const ka = a.t === "single" ? `row:${a.row.id}` : a.group.key;
+    const kc = c.t === "single" ? `row:${c.row.id}` : c.group.key;
+    return (order.get(ka) ?? 0) - (order.get(kc) ?? 0);
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -48,7 +115,44 @@ export default async function LedgerPage() {
         <table className="ledger min-w-[820px]">
           <thead><tr><th>When</th><th>Type</th><th>Member</th><th>Amount</th><th>Category</th><th>Note</th><th></th></tr></thead>
           <tbody>
-            {b.ledgerRows.map((e) => (
+            {feed.map((entry) => {
+              if (entry.t === "group") {
+                const gr = entry.group;
+                const pos = gr.total >= 0;
+                return (
+                  <tr key={gr.key}>
+                    <td className="text-xs">{new Date(gr.when).toLocaleString()}</td>
+                    <td>{gr.kind === "sale" ? "sale split" : "rent split"}</td>
+                    <td className="text-[#8a7c64]">{gr.rows.length} members</td>
+                    <td className={pos ? "text-[#7fd08a]" : "text-[#e08a8a]"}>{g(gr.total)}g</td>
+                    <td>{gr.kind === "sale" ? "sales" : "rent"}</td>
+                    <td className="text-[#8a7c64]">
+                      <details>
+                        <summary className="cursor-pointer hover:text-[#e8dcc4]">{gr.title}</summary>
+                        <ul className="mt-1 space-y-0.5 text-xs">
+                          {gr.rows.map((r) => (
+                            <li key={r.id} className="flex items-center gap-2">
+                              <span>{r.member}: {g(r.amountGold)}g</span>
+                              {gr.kind === "rent" && (
+                                <form action={deleteLedgerAction} className="inline">
+                                  <input type="hidden" name="id" value={r.id} />
+                                  <button className="btn-ghost !py-0 !px-1.5 text-xs" type="submit" title="Delete this share">✕</button>
+                                </form>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                        {gr.kind === "sale" && (
+                          <p className="text-xs mt-1">Change via voiding the sale on the Sales page.</p>
+                        )}
+                      </details>
+                    </td>
+                    <td />
+                  </tr>
+                );
+              }
+              const e = entry.row;
+              return (
               <tr key={e.id}>
                 <td className="text-xs">{new Date(e.timestamp).toLocaleString()}</td>
                 <td>{e.type}</td>
@@ -82,8 +186,9 @@ export default async function LedgerPage() {
                   </form>
                 </td>
               </tr>
-            ))}
-            {!b.ledgerRows.length && <tr><td colSpan={7} className="text-[#8a7c64]">Ledger is empty — log the seed capital first.</td></tr>}
+              );
+            })}
+            {!feed.length && <tr><td colSpan={7} className="text-[#8a7c64]">Ledger is empty — log the seed capital first.</td></tr>}
           </tbody>
         </table>
       </div>
