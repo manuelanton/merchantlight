@@ -11,9 +11,11 @@ interface Row {
 export default function IngredientForm({
   itemId,
   materials,
+  onSaved,
 }: {
   itemId: string;
   materials: { id: string; name: string; cost: number }[];
+  onSaved?: () => void;
 }) {
   const [rows, setRows] = useState<Row[]>([{ key: 0, materialId: materials[0]?.id || "", qty: 1 }]);
   const [n, setN] = useState(1);
@@ -26,10 +28,19 @@ export default function IngredientForm({
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   const removeRow = (key: number) => setRows((rs) => (rs.length > 1 ? rs.filter((r) => r.key !== key) : rs));
 
+  // Reset to one fresh row after saving (also guards against double-submit duplicates).
+  const save = async (fd: FormData) => {
+    await addIngredientAction(fd);
+    const f = materials[0];
+    setRows([{ key: n + 1, materialId: f?.id || "", qty: 1 }]);
+    setN((x) => x + 2);
+    onSaved?.();
+  };
+
   if (!materials.length) return <p className="text-xs text-[#8a7c64]">No materials in the catalogue yet.</p>;
 
   return (
-    <form action={addIngredientAction} className="space-y-2">
+    <form action={save} className="space-y-2">
       <input type="hidden" name="item_id" value={itemId} />
       {rows.map((r) => (
         <div key={r.key} className="space-y-2 border-b border-[#1c2b31] pb-2">

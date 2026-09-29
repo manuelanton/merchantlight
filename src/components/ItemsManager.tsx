@@ -33,6 +33,7 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [openRecipe, setOpenRecipe] = useState<string | null>(null);
+  const [openEdit, setOpenEdit] = useState<string | null>(null);
 
   const toggle = (slug: string) =>
     setSelected((s) => (s.includes(slug) ? s.filter((x) => x !== slug) : [...s, slug]));
@@ -136,9 +137,19 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                           {expanded ? "Hide recipe" : "Recipe"}
                         </button>
                       )}
-                      <details className="inline-block">
+                      <details
+                        className="inline-block"
+                        open={openEdit === i.id}
+                        onToggle={(e) => setOpenEdit((e.target as HTMLDetailsElement).open ? i.id : null)}
+                      >
                         <summary className="btn-ghost !py-1 !px-2 text-xs cursor-pointer list-none inline-block">Edit</summary>
-                        <form action={updateItemAction} className="mt-2 p-3 card space-y-2 min-w-[300px] max-w-[340px]">
+                        <form
+                          action={async (fd: FormData) => {
+                            await updateItemAction(fd);
+                            setOpenEdit(null);
+                          }}
+                          className="mt-2 p-3 card space-y-2 min-w-[300px] max-w-[340px]"
+                        >
                           <input type="hidden" name="id" value={i.id} />
                           <div><label className="lbl">Name</label><input name="name" defaultValue={i.name} className="input" /></div>
                           <div><label className="lbl">Category</label>
@@ -197,6 +208,7 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                             <IngredientForm
                               itemId={i.id}
                               materials={items.filter((m) => m.category_slug === "materials").map((m) => ({ id: m.id, name: m.name, cost: m.cost_value }))}
+                              onSaved={() => setOpenRecipe(null)}
                             />
                           </>
                         );
