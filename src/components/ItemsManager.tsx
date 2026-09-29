@@ -110,9 +110,10 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                   <td>{stock[i.id] ?? 0}</td>
                   <td>{i.active ? "yes" : "no"}</td>
                   <td className="whitespace-nowrap">
+                    {i.category_slug !== "materials" && (
                     <details className="inline-block">
                       <summary className="btn-ghost !py-1 !px-2 text-xs cursor-pointer list-none inline-block" title="Recipe + cost math">Recipe</summary>
-                      <div className="mt-2 p-3 card space-y-2 min-w-[280px]">
+                      <div className="mt-2 p-3 card space-y-2 min-w-[300px] max-w-[340px]">
                         {(() => {
                           const lines = ingredients.filter((r) => r.itemId === i.id);
                           const cost = recipeCost(i.id);
@@ -151,7 +152,8 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                           );
                         })()}
                       </div>
-                    </details>{" "}
+                    </details>
+                    )}
                     <details className="inline-block">
                       <summary className="btn-ghost !py-1 !px-2 text-xs cursor-pointer list-none inline-block">Edit</summary>
                       <form action={updateItemAction} className="mt-2 p-3 card space-y-2 min-w-[300px] max-w-[340px]">
