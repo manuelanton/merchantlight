@@ -1,7 +1,6 @@
 "use server";
 import { eq, like } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { auth, isQuartermaster } from "@/auth";
 import { getDb } from "@/db";
 import { categories, itemIngredients, items, ledger, notes, sales, stockMoves } from "@/db/schema";
@@ -23,7 +22,9 @@ function rowsOf(formData: FormData, key: string): string[] {
   return formData.getAll(key).map(String);
 }
 
-/** Record a sale: one row per item (repeated item_id/qty/unit_sale_price fields). */
+/** Record a sale: one row per item (repeated item_id/qty/unit_sale_price fields).
+ *  Sales land PENDING (gold still with the salesperson): stock moves at once,
+ *  profit shares post only on confirm. No redirect — list refreshes in place. */
 export async function recordSaleAction(formData: FormData) {
   const qm = await quartermaster();
   const ids = rowsOf(formData, "item_id").filter(Boolean);
@@ -34,11 +35,6 @@ export async function recordSaleAction(formData: FormData) {
   const notes = String(formData.get("notes") || "");
   const seller = String(formData.get("seller") || qm.name).trim() || qm.name;
   const db = await getDb();
-  // Roster for splitting: members with nonzero net (same rule as rent).
-  const existing = await db.select().from(ledger);
-  const nets = new Map<string, number>();
-  for (const e of existing) nets.set(e.member, (nets.get(e.member) || 0) + e.amountGold);
-  const roster = [...nets.entries()].filter(([, v]) => v !== 0).map(([m]) => m).sort();
   const catalog = await getCatalogItems();
   const dbIngredients = await db.select().from(itemIngredients);
   const effCost = (itemId: string, fallback: number) => {
@@ -73,8 +69,9 @@ export async function recordSaleAction(formData: FormData) {
       soldByDiscordId: qm.discordId,
       soldByName: seller,
       notes,
+      status: "pending",
     });
-    // A sale is also a stock movement out.
+    // A sale is also a stock movement out (goods are gone either way).
     await db.insert(stockMoves).values({
       id: uid("sm"),
       itemId: ids[n],
@@ -84,27 +81,41 @@ export async function recordSaleAction(formData: FormData) {
       actorDiscordId: qm.discordId,
       actorName: seller,
     });
-    // Only PROFIT splits. Intake credits already recognize the contributor's
-    // capital — splitting revenue on top would pay that capital out twice.
-    const profit = Math.round((price - itemCost) * qty * 100) / 100;
-    if (profit !== 0) {
-      const who = roster.length ? roster : [seller];
-      const shares = splitEvenly(profit, who.length);
-      for (let i = 0; i < who.length; i++) {
-        await db.insert(ledger).values({
-          id: uid("lg"),
-          type: "sale_income",
-          member: who[i],
-          amountGold: shares[i],
-          category: "sales",
-          description: `Sale profit split [sale:${saleId}]: ${itemName} × ${qty} at ${location} (${g(price)}g − ${g(itemCost)}g cost)${notes ? ` — ${notes}` : ""} (share ${i + 1} of ${who.length})`,
-          actorDiscordId: qm.discordId,
-        });
-      }
-    }
   }
   revalidatePath("/admin", "layout");
-  redirect("/admin/sales");
+}
+
+/** Confirm a deposited sale: posts the profit split across the roster. */
+export async function confirmSaleAction(formData: FormData) {
+  const qm = await quartermaster();
+  const id = String(formData.get("id"));
+  const db = await getDb();
+  const found = await db.select().from(sales).where(eq(sales.id, id)).limit(1);
+  const s = found[0];
+  if (!s) throw new Error("Sale not found");
+  if (s.status === "confirmed") throw new Error("Already confirmed");
+  const existing = await db.select().from(ledger);
+  const nets = new Map<string, number>();
+  for (const e of existing) nets.set(e.member, (nets.get(e.member) || 0) + e.amountGold);
+  const roster = [...nets.entries()].filter(([, v]) => v !== 0).map(([m]) => m).sort();
+  const profit = Math.round((s.unitSalePrice - s.unitCostSnapshot) * s.qty * 100) / 100;
+  if (profit !== 0) {
+    const who = roster.length ? roster : [s.soldByName];
+    const shares = splitEvenly(profit, who.length);
+    for (let i = 0; i < who.length; i++) {
+      await db.insert(ledger).values({
+        id: uid("lg"),
+        type: "sale_income",
+        member: who[i],
+        amountGold: shares[i],
+        category: "sales",
+        description: `Sale profit split [sale:${s.id}]: ${s.itemName} × ${s.qty} at ${s.location} (${g(s.unitSalePrice)}g − ${g(s.unitCostSnapshot)}g cost)${s.notes ? ` — ${s.notes}` : ""} (share ${i + 1} of ${who.length})`,
+        actorDiscordId: qm.discordId,
+      });
+    }
+  }
+  await db.update(sales).set({ status: "confirmed", confirmedBy: qm.name, confirmedAt: new Date() }).where(eq(sales.id, id));
+  revalidatePath("/admin", "layout");
 }
 
 /** Delete a sale + reverse its postings (stock back, split shares removed). */
@@ -130,8 +141,7 @@ export async function deleteSaleAction(formData: FormData) {
   for (const row of shares) {
     await db.delete(ledger).where(eq(ledger.id, row.id));
   }
-  revalidatePath("/admin", "layout");
-  redirect("/admin/sales");
+  revalidatePath("/admin", "layout");
 }
 
 /** Log stock movements: one row per item (repeated item_id/delta fields).
@@ -158,8 +168,7 @@ export async function adjustStockAction(formData: FormData) {
       actorName: qm.name,
     });
   }
-  revalidatePath("/admin", "layout");
-  redirect("/admin/stock");
+  revalidatePath("/admin", "layout");
 }
 
 /** Delete a manual stock move. Sale-linked moves go away via their sale instead. */
@@ -172,8 +181,7 @@ export async function deleteMoveAction(formData: FormData) {
   if (!m) throw new Error("Move not found");
   if (m.reason.startsWith("Sale (")) throw new Error("Sale moves can only be removed by voiding the sale");
   await db.delete(stockMoves).where(eq(stockMoves.id, id));
-  revalidatePath("/admin", "layout");
-  redirect("/admin/stock");
+  revalidatePath("/admin", "layout");
 }
 
 export async function addLedgerAction(formData: FormData) {
@@ -186,6 +194,30 @@ export async function addLedgerAction(formData: FormData) {
   const description = String(formData.get("description") || "");
   const member = String(formData.get("member") || qm.name);
   const db = await getDb();
+  // Contributions may carry item rows (valued in the form): append the summary
+  // and add the goods to stock automatically.
+  const contribIds = formData.getAll("contrib_item_id").map(String).filter(Boolean);
+  const contribQtys = formData.getAll("contrib_qty").map(String);
+  let fullDescription = description;
+  if (type === "contribution" && contribIds.length) {
+    const catalog = await getCatalogItems();
+    const summary = String(formData.get("description_auto") || "").trim();
+    if (summary) fullDescription = description ? `${description} (${summary})` : summary;
+    for (let n = 0; n < contribIds.length; n++) {
+      const qty = Number(contribQtys[n] || 0);
+      if (!(qty > 0)) continue;
+      const itemName = catalog.find((i) => i.id === contribIds[n])?.name || "goods";
+      await db.insert(stockMoves).values({
+        id: uid("sm"),
+        itemId: contribIds[n],
+        itemName,
+        delta: Math.round(qty),
+        reason: `Contribution by ${member}`,
+        actorDiscordId: qm.discordId,
+        actorName: qm.name,
+      });
+    }
+  }
   // Rent is always shared: an expense categorized as rent fans out into
   // equal per-member shares instead of one lump row.
   if (type === "expense" && category.trim().toLowerCase() === "rent") {
@@ -208,7 +240,7 @@ export async function addLedgerAction(formData: FormData) {
         });
       }
       revalidatePath("/admin", "layout");
-      redirect("/admin/ledger");
+      return;
     }
     // No roster yet (first entry ever): store the single row as-is.
   }
@@ -218,11 +250,11 @@ export async function addLedgerAction(formData: FormData) {
     member,
     amountGold: amount,
     category,
-    description,
+    description: fullDescription,
     actorDiscordId: qm.discordId,
   });
   revalidatePath("/admin", "layout");
-  redirect("/admin/ledger");
+
 }
 
 export async function updateLedgerAction(formData: FormData) {
@@ -243,8 +275,7 @@ export async function updateLedgerAction(formData: FormData) {
       description: String(formData.get("description") || ""),
     })
     .where(eq(ledger.id, id));
-  revalidatePath("/admin", "layout");
-  redirect("/admin/ledger");
+  revalidatePath("/admin", "layout");
 }
 
 export async function deleteLedgerAction(formData: FormData) {
@@ -252,7 +283,45 @@ export async function deleteLedgerAction(formData: FormData) {
   const db = await getDb();
   await db.delete(ledger).where(eq(ledger.id, String(formData.get("id"))));
   revalidatePath("/admin", "layout");
-  redirect("/admin/ledger");
+}
+
+/** Out-of-pocket purchase: credit the buyer what they're owed AND share the
+ *  cost across the roster. Net books effect zero; attribution correct. */
+export async function reimburseAction(formData: FormData) {
+  const qm = await quartermaster();
+  const member = String(formData.get("member") || qm.name).trim() || qm.name;
+  const amount = Math.abs(Number(formData.get("amount_gold") || 0));
+  if (!amount) throw new Error("Amount must be more than 0");
+  const category = String(formData.get("category") || "materials").trim() || "materials";
+  const description = String(formData.get("description") || "").trim();
+  const db = await getDb();
+  const existing = await db.select().from(ledger);
+  const nets = new Map<string, number>();
+  for (const e of existing) nets.set(e.member, (nets.get(e.member) || 0) + e.amountGold);
+  if (!nets.has(member)) nets.set(member, 0);
+  const roster = [...nets.keys()].sort();
+  await db.insert(ledger).values({
+    id: uid("lg"),
+    type: "contribution",
+    member,
+    amountGold: Math.round(amount * 100) / 100,
+    category,
+    description: `Out of pocket${description ? ` (${description})` : ""} — company owes ${member}`,
+    actorDiscordId: qm.discordId,
+  });
+  const shares = splitEvenly(amount, roster.length);
+  for (let i = 0; i < roster.length; i++) {
+    await db.insert(ledger).values({
+      id: uid("lg"),
+      type: "expense",
+      member: roster[i],
+      amountGold: -shares[i],
+      category,
+      description: `Shared ${category} cost${description ? ` (${description})` : ""} (share ${i + 1} of ${roster.length} of ${g(amount)}g)`,
+      actorDiscordId: qm.discordId,
+    });
+  }
+  revalidatePath("/admin", "layout");
 }
 
 // ---------- catalogue (DB-managed; the sheet is retired) ----------
@@ -377,8 +446,7 @@ export async function postNoteAction(formData: FormData) {  const qm = await qua
     authorDiscordId: qm.discordId,
     authorName: qm.name,
   });
-  revalidatePath('/admin', 'layout');
-  redirect('/admin/notes');
+  revalidatePath('/admin', 'layout');
 }
 
 export async function resolveNoteAction(formData: FormData) {
@@ -386,16 +454,14 @@ export async function resolveNoteAction(formData: FormData) {
   const db = await getDb();
   const done = String(formData.get('resolved') || 'false') === 'true';
   await db.update(notes).set({ resolved: !done }).where(eq(notes.id, String(formData.get('id'))));
-  revalidatePath('/admin', 'layout');
-  redirect('/admin/notes');
+  revalidatePath('/admin', 'layout');
 }
 
 export async function deleteNoteAction(formData: FormData) {
   await quartermaster();
   const db = await getDb();
   await db.delete(notes).where(eq(notes.id, String(formData.get('id'))));
-  revalidatePath('/admin', 'layout');
-  redirect('/admin/notes');
+  revalidatePath('/admin', 'layout');
 }
 
 /** One-click stock request from the dashboard (posts a stock-kind note). */
@@ -410,8 +476,7 @@ export async function requestRestockAction(formData: FormData) {
     authorDiscordId: qm.discordId,
     authorName: qm.name,
   });
-  revalidatePath("/admin", "layout");
-  redirect("/admin");
+  revalidatePath("/admin", "layout");
 }
 
 /** Shop open/closed toggle (salesperson on duty). Shows publicly in the hero. */
@@ -419,8 +484,7 @@ export async function setShopOpenAction(formData: FormData) {
   await quartermaster();
   await setShopOpen(String(formData.get('open')) === '1');
   revalidatePath('/', 'layout');
-  revalidatePath('/admin', 'layout');
-  redirect('/admin');
+  revalidatePath('/admin', 'layout');
 }
 
 /** Recipe lines for cost math. Accepts repeated material_item_id/qty rows. No

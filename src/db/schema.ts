@@ -36,6 +36,9 @@ export const sales = pgTable("sales", {
   soldByDiscordId: text("sold_by_discord_id").notNull().default(""),
   soldByName: text("sold_by_name").notNull().default(""),
   notes: text("notes").notNull().default(""),
+  status: text("status").notNull().default("pending"),
+  confirmedBy: text("confirmed_by").notNull().default(""),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
 });
 
 /** Every stock movement that isn't a sale: restocks, corrections, spoilage. */
@@ -89,3 +92,5 @@ export const itemIngredients = pgTable("item_ingredients", {
   qty: real("qty").notNull().default(1),
   actorDiscordId: text("actor_discord_id").notNull().default(""),
 });
+
+/** Sale lifecycle: pending = gold still with the salesperson, confirmed = deposited. */

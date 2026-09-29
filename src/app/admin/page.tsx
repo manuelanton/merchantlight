@@ -25,6 +25,8 @@ export default async function AdminHome() {
     hotMap.set(s.itemId, cur);
   }
   const hottest = [...hotMap.values()].sort((a, c) => c.qty - a.qty).slice(0, 5);
+  const pendingSales = b.salesRows.filter((s) => s.status !== "confirmed");
+  const pendingGold = pendingSales.reduce((a, s) => a + s.unitSalePrice * s.qty, 0);
 
   return (
     <div className="space-y-4">
@@ -71,7 +73,19 @@ export default async function AdminHome() {
           </ul>
           <Link href="/admin/notes" className="text-sm text-[#c9a227]">Open noticeboard →</Link>
         </div>
-        <div className="card p-4 md:col-span-2">
+        <div className="card p-4">
+          <h2 className="font-display text-lg">Awaiting deposit</h2>
+          {pendingSales.length ? (
+            <>
+              <p className="text-2xl text-[#e0bd4a] mt-1">{g(pendingGold)}g</p>
+              <p className="text-sm text-[#8a7c64]">{pendingSales.length} sale{pendingSales.length > 1 ? "s" : ""} still with their sellers.</p>
+            </>
+          ) : (
+            <p className="text-sm text-[#8a7c64] mt-1">Chest matches the books. ✓</p>
+          )}
+          <Link href="/admin/sales" className="text-sm text-[#c9a227]">Review sales →</Link>
+        </div>
+        <div className="card p-4 md:col-span-3">
           <div className="grid md:grid-cols-2 gap-4">
             <div>
               <h2 className="font-display text-lg">Hottest items</h2>

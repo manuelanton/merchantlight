@@ -49,20 +49,22 @@ export default function AddItemForm({
       {withRecipe && (
         <div className="space-y-2 border-t border-[#1c2b31] pt-3">
           {rows.map((r) => (
-            <div key={r.key} className="flex gap-2 items-center">
+            <div key={r.key} className="space-y-2 border-b border-[#1c2b31] pb-2">
               <select
-                name="material_item_id" className="input flex-1"
+                name="material_item_id" className="input w-full"
                 value={r.materialId} onChange={(e) => setRow(r.key, { materialId: e.target.value })}
                 aria-label="Material"
               >
                 {materials.map((m) => <option key={m.id} value={m.id}>{m.name}{m.cost ? ` (${m.cost}g)` : ""}</option>)}
               </select>
-              <input
-                name="qty" type="number" min={0.01} step="any" value={r.qty}
-                onChange={(e) => setRow(r.key, { qty: Number(e.target.value) })}
-                className="input w-24" aria-label="Quantity"
-              />
-              <button type="button" onClick={() => removeRow(r.key)} className="btn-ghost !px-2.5 shrink-0" title="Remove row">✕</button>
+              <div className="flex gap-2 items-center">
+                <input
+                  name="qty" type="number" min={0.01} step="any" value={r.qty}
+                  onChange={(e) => setRow(r.key, { qty: Number(e.target.value) })}
+                  className="input w-24" aria-label="Quantity"
+                />
+                <button type="button" onClick={() => removeRow(r.key)} className="btn-ghost !px-2.5 shrink-0" title="Remove row">✕</button>
+              </div>
             </div>
           ))}
           {materials.length > 0 ? (

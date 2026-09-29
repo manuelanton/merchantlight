@@ -1,6 +1,8 @@
-import { addLedgerAction, deleteLedgerAction, updateLedgerAction } from "@/lib/admin-actions";
+import { deleteLedgerAction, reimburseAction, updateLedgerAction } from "@/lib/admin-actions";
 import { getBooks } from "@/lib/books";
 import { g } from "@/lib/format";
+import { getCatalogue } from "@/lib/catalog";
+import LedgerAddForm from "@/components/LedgerAddForm";
 import MemberSelect from "@/components/MemberSelect";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +12,7 @@ const TYPES = ["contribution", "expense", "payout"] as const;
 
 export default async function LedgerPage() {
   const b = await getBooks();
+  const { items } = await getCatalogue();
   const bal = b.ledgerRows.reduce((a, e) => a + e.amountGold, 0);
 
   type Row = (typeof b.ledgerRows)[number];
@@ -90,24 +93,22 @@ export default async function LedgerPage() {
         <b className="text-[#e0bd4a]">{g(b.rentPaid)}g</b> (type <i>expense</i> + category <i>rent</i> splits evenly across members automatically).
       </p>
 
-      <form action={addLedgerAction} className="card p-5 space-y-3">
+      <LedgerAddForm
+        members={b.members}
+        items={items.filter((i) => i.active).map((i) => ({ id: i.id, name: i.name, cost: i.cost_value > 0 ? i.cost_value : i.sale_price }))}
+      />
+
+      <form action={reimburseAction} className="card p-5 space-y-3">
+        <h2 className="font-display text-lg">Paid out of pocket</h2>
+        <p className="text-xs text-[#8a7c64]">Credits the buyer what they&apos;re owed and shares the cost across members.</p>
         <div className="grid md:grid-cols-3 gap-3">
-          <MemberSelect members={b.members} name="member" label="Member" required />
-          <div><label className="lbl">Type</label>
-            <select name="type" className="input">
-              <option value="contribution">contribution (+)</option>
-              <option value="expense">expense (−)</option>
-              <option value="payout">payout (−)</option>
-            </select>
-          </div>
-          <div><label className="lbl">Amount (g)</label><input name="amount_gold" type="number" step="any" min={0} defaultValue={0} className="input" /></div>
+          <MemberSelect members={b.members} name="member" label="Who paid" required />
+          <div><label className="lbl">Amount (g) *</label><input name="amount_gold" type="number" min={0} step="any" required className="input" placeholder="65" /></div>
+          <div><label className="lbl">Category</label><input name="category" defaultValue="materials" className="input" /></div>
         </div>
-        <div className="grid md:grid-cols-3 gap-3">
-          <div><label className="lbl">Category</label><input name="category" className="input" placeholder="rent / materials / thread" /></div>
-          <div className="md:col-span-2"><label className="lbl">Description</label><input name="description" className="input" placeholder="e.g. Gallow's Rock rent, Morndas" /></div>
-        </div>
+        <div><label className="lbl">Note</label><input name="description" className="input" placeholder="e.g. iron bars, public smith outside Whiterun" /></div>
         <div className="flex justify-end">
-          <button className="btn-gold !py-2 !px-5 text-sm" type="submit">Add entry</button>
+          <button className="btn-gold !py-2 !px-5 text-sm" type="submit">Log reimbursement</button>
         </div>
       </form>
 
