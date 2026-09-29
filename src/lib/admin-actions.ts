@@ -30,7 +30,6 @@ export async function recordSaleAction(formData: FormData) {
   if (!ids.length) throw new Error("No items");
   const qtys = rowsOf(formData, "qty");
   const prices = rowsOf(formData, "unit_sale_price");
-  const cost = Number(formData.get("unit_cost") || 0);
   const location = String(formData.get("location") || "Gallow's Rock");
   const notes = String(formData.get("notes") || "");
   const seller = String(formData.get("seller") || qm.name).trim() || qm.name;
@@ -47,7 +46,7 @@ export async function recordSaleAction(formData: FormData) {
     if (!lines.length) return fallback;
     return effectiveCost(
       itemId,
-      catalog.map((m) => ({ id: m.id, cost_value: m.cost_value })),
+      catalog.map((m) => ({ id: m.id, cost_value: m.cost_value, sale_price: m.sale_price })),
       dbIngredients.map((r) => ({ itemId: r.itemId, materialItemId: r.materialItemId, qty: r.qty }))
     );
   };
@@ -56,8 +55,10 @@ export async function recordSaleAction(formData: FormData) {
     const price = Number(prices[n] || 0);
     const item = catalog.find((i) => i.id === ids[n]);
     const itemName = item?.name || "goods";
-    // Cost basis: live recipe cost wins; catalogue cost next; manual entry fills gaps.
-    const baseCost = item && item.cost_value > 0 ? item.cost_value : cost;
+    // Cost basis: live recipe cost wins; then manual cost; then the submitted
+    // value; unknown costs default to the sale price (zero assumed profit).
+    const submitted = Number(formData.get("unit_cost") || 0);
+    const baseCost = item && item.cost_value > 0 ? item.cost_value : submitted > 0 ? submitted : price;
     const itemCost = effCost(ids[n], baseCost);
     const saleId = uid("sl");
     await db.insert(sales).values({

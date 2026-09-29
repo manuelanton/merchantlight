@@ -55,8 +55,7 @@ export default async function AdminHome() {
           </table>
           {b.balances.length >= 2 && (
             <p className="text-xs text-[#8a7c64] mt-2">
-              Rent bills split automatically, and only sale <i>profit</i> splits — intake credits
-              already recognize each member&apos;s stock capital, so revenue is never paid out twice.
+              Rent bills split automatically, and only sale <i>profit</i> splits across members.
               Average: {g(ledgerBal / b.balances.length)}g each.
             </p>
           )}
@@ -72,34 +71,37 @@ export default async function AdminHome() {
           </ul>
           <Link href="/admin/notes" className="text-sm text-[#c9a227]">Open noticeboard →</Link>
         </div>
-        <div className="card p-4">
-          <h2 className="font-display text-lg">Hottest items</h2>
-          <ul className="text-sm mt-2 space-y-1">
-            {hottest.map((h, i) => (
-              <li key={h.name}>{i + 1}. <b>{h.name}</b> — {h.qty} sold · {g(h.revenue)}g</li>
-            ))}
-            {!hottest.length && <li className="text-[#8a7c64]">No sales yet.</li>}
-          </ul>
-          <Link href="/admin/sales" className="text-sm text-[#c9a227]">All sales →</Link>
-        </div>
-        <div className="card p-4">
-          <h2 className="font-display text-lg">Running low (≤ {LOW_AT})</h2>
-          <ul className="text-sm mt-2 space-y-1">
-            {lowStock.slice(0, 6).map((s) => (
-              <li key={s.name} className="flex items-center gap-2">
-                <span>{s.name} — {s.qty} left</span>
-                <form action={requestRestockAction} className="inline">
-                  <input type="hidden" name="title" value={`Restock: ${s.name}`} />
-                  <input type="hidden" name="body" value={`Only ${s.qty} left on hand.`} />
-                  <button className="btn-ghost !py-0.5 !px-2 text-xs" type="submit" title="Post a stock request to the noticeboard">Request</button>
-                </form>
-              </li>
-            ))}
-            {!lowStock.length && <li className="text-[#8a7c64]">Nothing running low.</li>}
-          </ul>
+        <div className="card p-4 md:col-span-2">
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <h2 className="font-display text-lg">Hottest items</h2>
+              <ul className="text-sm mt-2 space-y-1">
+                {hottest.map((h, i) => (
+                  <li key={h.name}>{i + 1}. <b>{h.name}</b> — {h.qty} sold · {g(h.revenue)}g</li>
+                ))}
+                {!hottest.length && <li className="text-[#8a7c64]">No sales yet.</li>}
+              </ul>
+            </div>
+            <div>
+              <h2 className="font-display text-lg">Running low (≤ {LOW_AT})</h2>
+              <ul className="text-sm mt-2 space-y-1">
+                {lowStock.slice(0, 6).map((s) => (
+                  <li key={s.name} className="flex items-center gap-2">
+                    <span>{s.name} — {s.qty} left</span>
+                    <form action={requestRestockAction} className="inline">
+                      <input type="hidden" name="title" value={`Restock: ${s.name}`} />
+                      <input type="hidden" name="body" value={`Only ${s.qty} left on hand.`} />
+                      <button className="btn-ghost !py-0.5 !px-2 text-xs" type="submit" title="Post a stock request to the noticeboard">Request</button>
+                    </form>
+                  </li>
+                ))}
+                {!lowStock.length && <li className="text-[#8a7c64]">Nothing running low.</li>}
+              </ul>
+            </div>
+          </div>
           <div className="mt-2 flex gap-3">
+            <Link href="/admin/sales" className="text-sm text-[#c9a227]">All sales →</Link>
             <Link href="/admin/stock" className="text-sm text-[#c9a227]">Manage stock →</Link>
-            <Link href="/admin/sales" className="text-sm text-[#c9a227]">Record a sale →</Link>
           </div>
         </div>
       </div>

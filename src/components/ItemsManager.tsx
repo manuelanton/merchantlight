@@ -62,15 +62,19 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
 
   const catName = (slug: string) => categories.find((c) => c.slug === slug)?.name || slug;
   const catIcon = (slug: string) => categories.find((c) => c.slug === slug)?.icon || "📦";
-  const matCost = (id: string) => items.find((i) => i.id === id)?.cost_value || 0;
+  const matCost = (id: string) => matUnit(id);
   const matName = (id: string, fallback: string) => items.find((i) => i.id === id)?.name || fallback;
 
   const costInputs = useMemo(() => ({
-    items: items.map((m) => ({ id: m.id, cost_value: m.cost_value })),
+    items: items.map((m) => ({ id: m.id, cost_value: m.cost_value, sale_price: m.sale_price })),
     ingredients: ingredients.map((r) => ({ itemId: r.itemId, materialItemId: r.materialItemId, qty: r.qty })),
   }), [items, ingredients]);
   const eff = (id: string) => effectiveCost(id, costInputs.items, costInputs.ingredients);
   const fromRecipe = (id: string) => hasRecipe(id, costInputs.ingredients);
+  const matUnit = (id: string) => {
+    const m = items.find((i) => i.id === id);
+    return m && m.cost_value > 0 ? m.cost_value : m?.sale_price || 0;
+  };
 
   return (
     <div className="space-y-4">
@@ -181,18 +185,18 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                         Materials: <b className="text-[#e0bd4a]">{g(cost)}g</b> · Sells: <b className="text-[#e0bd4a]">{g(i.sale_price)}g</b> ·{" "}
                         Margin: <b className={margin >= 0 ? "text-[#7fd08a]" : "text-[#e08a8a]"}>{g(margin)}g</b>
                       </p>
-                      {(() => {
-                        const lines = ingredients.filter((r) => r.itemId === i.id);
-                        const unknownCost = lines.some((r) => matCost(r.materialItemId) <= 0);
-                        return (
-                          <>
-                            {lines.length > 0 ? (
-                              <ul className="text-xs space-y-1">
-                                {lines.map((r) => {
-                                  const c = matCost(r.materialItemId);
-                                  return (
-                                  <li key={r.id} className="flex items-center gap-2">
-                                    <span className="flex-1">{matName(r.materialItemId, r.materialName)} × {g(r.qty)} ({c > 0 ? `${g(r.qty * c)}g` : "cost unknown"})</span>
+                        {(() => {
+                          const lines = ingredients.filter((r) => r.itemId === i.id);
+                          return (
+                            <>
+                              {lines.length > 0 ? (
+                                <ul className="text-xs space-y-1">
+                                  {lines.map((r) => {
+                                    const c = matUnit(r.materialItemId);
+                                    const assumed = c > 0 && !(items.find((m) => m.id === r.materialItemId)?.cost_value || 0 > 0);
+                                    return (
+                                    <li key={r.id} className="flex items-center gap-2">
+                                      <span className="flex-1">{matName(r.materialItemId, r.materialName)} × {g(r.qty)} ({g(r.qty * c)}g{assumed ? " = price" : ""})</span>
                                     <form action={deleteIngredientAction} className="inline">
                                       <input type="hidden" name="id" value={r.id} />
                                       <button className="btn-ghost !py-0 !px-1.5 text-xs" type="submit" title="Remove ingredient">✕</button>
@@ -204,7 +208,7 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                             ) : (
                               <p className="text-xs text-[#8a7c64]">No recipe yet — add the first ingredient below.</p>
                             )}
-                            {unknownCost && <p className="text-xs text-[#8a7c64]">Some costs unknown — fill them on the material.</p>}
+                            <p className="text-xs text-[#8a7c64]">Unknown costs count as sale price (zero assumed profit) — overwrite on the material when known.</p>
                             <IngredientForm
                               itemId={i.id}
                               materials={items.filter((m) => m.category_slug === "materials").map((m) => ({ id: m.id, name: m.name, cost: m.cost_value }))}
