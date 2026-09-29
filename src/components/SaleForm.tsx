@@ -81,8 +81,8 @@ export default function SaleForm({ items, categories, locations = DEFAULT_LOCATI
           <select name="item_id" className="input col-span-6 md:col-span-5" value={r.itemId} onChange={(e) => setRow(r.key, { itemId: e.target.value })} required aria-label="Item">
             {inCat(r.cat).map((i) => <option key={i.id} value={i.id}>{i.name} — {i.price}g</option>)}
           </select>
-          <input name="qty" type="number" min={1} value={r.qty} onChange={(e) => setRow(r.key, { qty: Number(e.target.value) })} className="input col-span-5 md:col-span-1" aria-label="Quantity" />
-          <input name="unit_sale_price" type="number" min={0} value={r.price} onChange={(e) => setRow(r.key, { price: Number(e.target.value) })} className="input col-span-5 md:col-span-2" aria-label="Price each" title="Base price auto-filled — edit for discounts" />
+          <input name="qty" type="number" step="any" min={1} value={r.qty} onChange={(e) => setRow(r.key, { qty: Number(e.target.value) })} className="input col-span-5 md:col-span-1" aria-label="Quantity" />
+          <input name="unit_sale_price" type="number" step="any" min={0} value={r.price} onChange={(e) => setRow(r.key, { price: Number(e.target.value) })} className="input col-span-5 md:col-span-2" aria-label="Price each" title="Base price auto-filled — edit for discounts" />
           <div className="col-span-2 md:col-span-1 flex md:justify-end">
             <button type="button" onClick={() => removeRow(r.key)} className="btn-ghost !px-3 w-10 shrink-0" title="Remove row">✕</button>
           </div>
@@ -93,7 +93,7 @@ export default function SaleForm({ items, categories, locations = DEFAULT_LOCATI
         <span className="text-sm text-[#8a7c64] ml-auto">Total: <b className="text-[#e0bd4a]">{total}g</b></span>
       </div>
       <div className="grid md:grid-cols-3 gap-3">
-        <div><label className="lbl">Cost each, if known (g)</label><input name="unit_cost" type="number" min={0} defaultValue={0} className="input" /></div>
+        <div><label className="lbl">Cost each, if known (g)</label><input name="unit_cost" type="number" step="any" min={0} defaultValue={0} className="input" /></div>
         <LocationSelect locations={locations} />
         <div><label className="lbl">Notes</label><input name="notes" className="input" placeholder="Haggled, bundle…" /></div>
       </div>

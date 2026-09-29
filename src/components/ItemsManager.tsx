@@ -146,8 +146,8 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                               {categories.map((cc) => <option key={cc.slug} value={cc.slug}>{cc.name}</option>)}
                             </select>
                           </div>
-                          <div><label className="lbl">Price</label><input name="sale_price" type="number" defaultValue={i.sale_price} className="input" /></div>
-                          <div><label className="lbl">Cost</label><input name="cost_value" type="number" defaultValue={i.cost_value} className="input" /></div>
+                          <div><label className="lbl">Price</label><input name="sale_price" type="number" step="any" defaultValue={i.sale_price} className="input" /></div>
+                          <div><label className="lbl">Cost</label><input name="cost_value" type="number" step="any" defaultValue={i.cost_value} className="input" /></div>
                           <div><label className="lbl">Description</label><input name="description" defaultValue={i.description} className="input" /></div>
                           <div><label className="lbl">Visible</label>
                             <select name="active" defaultValue={String(i.active)} className="input"><option value="true">Yes</option><option value="false">Hidden</option></select>

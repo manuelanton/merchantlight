@@ -38,8 +38,8 @@ export default function AddItemForm({
         <div><label className="lbl">Visible</label>
           <select name="active" className="input"><option value="true">Yes</option><option value="false">Hidden</option></select>
         </div>
-        <div><label className="lbl">Price (g)</label><input name="sale_price" type="number" min={0} defaultValue={0} className="input" /></div>
-        <div><label className="lbl">Cost (g, private)</label><input name="cost_value" type="number" min={0} defaultValue={0} className="input" /></div>
+        <div><label className="lbl">Price (g)</label><input name="sale_price" type="number" step="any" min={0} defaultValue={0} className="input" /></div>
+        <div><label className="lbl">Cost (g, private)</label><input name="cost_value" type="number" step="any" min={0} defaultValue={0} className="input" /></div>
         <div><label className="lbl">Description</label><input name="description" className="input" placeholder="Materials, bulk rates…" /></div>
       </div>
       <label className="flex items-center gap-2 text-sm cursor-pointer">

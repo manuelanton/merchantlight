@@ -100,7 +100,7 @@ export default async function LedgerPage() {
               <option value="payout">payout (−)</option>
             </select>
           </div>
-          <div><label className="lbl">Amount (g)</label><input name="amount_gold" type="number" min={0} defaultValue={0} className="input" /></div>
+          <div><label className="lbl">Amount (g)</label><input name="amount_gold" type="number" step="any" min={0} defaultValue={0} className="input" /></div>
         </div>
         <div className="grid md:grid-cols-3 gap-3">
           <div><label className="lbl">Category</label><input name="category" className="input" placeholder="rent / materials / thread" /></div>
@@ -174,7 +174,7 @@ export default async function LedgerPage() {
                           )}
                         </select>
                       </div>
-                      <div><label className="lbl">Amount (g)</label><input name="amount_gold" type="number" defaultValue={Math.abs(e.amountGold)} className="input" /></div>
+                      <div><label className="lbl">Amount (g)</label><input name="amount_gold" type="number" step="any" defaultValue={Math.abs(e.amountGold)} className="input" /></div>
                       <div><label className="lbl">Category</label><input name="category" defaultValue={e.category} className="input" /></div>
                       <div><label className="lbl">Description</label><input name="description" defaultValue={e.description} className="input" /></div>
                       <button className="btn-gold !py-1 w-full text-sm" type="submit">Save</button>
