@@ -68,7 +68,7 @@ body {
   color: var(--parchment);
 }
 .input:focus { outline: 2px solid var(--gold); border-color: var(--gold); }
-label.lbl { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: #b8a888; }
+label.lbl { display: block; margin-bottom: 0.25rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: #b8a888; }
 
 table.ledger { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
 table.ledger th { text-align: left; color: #d8a05a; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.08em; padding: 0.5rem; border-bottom: 1px solid #2b4149; }

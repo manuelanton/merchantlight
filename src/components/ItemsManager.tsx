@@ -161,7 +161,7 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                     </details>{" "}
                     <details className="inline-block">
                       <summary className="btn-ghost !py-1 !px-2 text-xs cursor-pointer list-none inline-block">Edit</summary>
-                      <form action={updateItemAction} className="mt-2 p-3 card space-y-2 min-w-[260px]">
+                      <form action={updateItemAction} className="mt-2 p-3 card space-y-2 min-w-[300px] max-w-[340px]">
                         <input type="hidden" name="id" value={i.id} />
                         <div><label className="lbl">Name</label><input name="name" defaultValue={i.name} className="input" /></div>
                         <div><label className="lbl">Category</label>
