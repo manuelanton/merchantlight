@@ -396,31 +396,35 @@ export async function setShopOpenAction(formData: FormData) {
   redirect('/admin');
 }
 
-/** Recipe lines for cost math. */
+/** Recipe lines for cost math. Accepts repeated material_item_id/qty rows. No
+ *  redirect — revalidation alone updates the list without a hard reload. */
 export async function addIngredientAction(formData: FormData) {
   const qm = await quartermaster();
-  const qty = Number(formData.get('qty') || 1);
-  if (!(qty > 0)) throw new Error('Quantity must be more than 0');
-  const materialId = String(formData.get('material_item_id'));
+  const materialIds = formData.getAll("material_item_id").map(String).filter(Boolean);
+  const qtys = formData.getAll("qty").map(String);
+  if (!materialIds.length) throw new Error("No ingredients");
+  const itemId = String(formData.get("item_id"));
   const catalog = await getCatalogItems();
-  const mat = catalog.find((i) => i.id === materialId);
   const db = await getDb();
-  await db.insert(itemIngredients).values({
-    id: uid('ig'),
-    itemId: String(formData.get('item_id')),
-    materialItemId: materialId,
-    materialName: mat?.name || 'material',
-    qty,
-    actorDiscordId: qm.discordId,
-  });
-  revalidatePath('/admin', 'layout');
-  redirect('/admin/items');
+  for (let n = 0; n < materialIds.length; n++) {
+    const qty = Number(qtys[n] || 1);
+    if (!(qty > 0)) continue;
+    const mat = catalog.find((i) => i.id === materialIds[n]);
+    await db.insert(itemIngredients).values({
+      id: uid("ig"),
+      itemId,
+      materialItemId: materialIds[n],
+      materialName: mat?.name || "material",
+      qty,
+      actorDiscordId: qm.discordId,
+    });
+  }
+  revalidatePath("/admin", "layout");
 }
 
 export async function deleteIngredientAction(formData: FormData) {
   await quartermaster();
   const db = await getDb();
-  await db.delete(itemIngredients).where(eq(itemIngredients.id, String(formData.get('id'))));
-  revalidatePath('/admin', 'layout');
-  redirect('/admin/items');
+  await db.delete(itemIngredients).where(eq(itemIngredients.id, String(formData.get("id"))));
+  revalidatePath("/admin", "layout");
 }

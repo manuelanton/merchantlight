@@ -2,6 +2,7 @@
 import { useMemo, useState } from "react";
 import { addIngredientAction, deleteIngredientAction, deleteItemAction, updateItemAction } from "@/lib/admin-actions";
 import { g } from "@/lib/format";
+import IngredientForm from "./IngredientForm";
 
 export interface ManagedItem {
   id: string;
@@ -142,18 +143,10 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                                 Margin: <b className={margin >= 0 ? "text-[#7fd08a]" : "text-[#e08a8a]"}>{g(margin)}g</b>
                                 {unknownCost && <span className="text-[#8a7c64]"> (some costs unknown — fill them on the material)</span>}
                               </p>
-                              <form action={addIngredientAction} className="space-y-2">
-                                <input type="hidden" name="item_id" value={i.id} />
-                                <div><label className="lbl">Material</label>
-                                  <select name="material_item_id" className="input">
-                                    {items.filter((m) => m.category_slug === "materials").map((m) => <option key={m.id} value={m.id}>{m.name}{m.cost_value ? ` (${g(m.cost_value)}g)` : ""}</option>)}
-                                  </select>
-                                </div>
-                                <div className="flex gap-2 items-end">
-                                  <div className="w-24"><label className="lbl">Qty</label><input name="qty" type="number" min={0.01} step="any" defaultValue={1} className="input" /></div>
-                                  <button className="btn-ghost !py-1 text-xs" type="submit">Add</button>
-                                </div>
-                              </form>
+                              <IngredientForm
+                                itemId={i.id}
+                                materials={items.filter((m) => m.category_slug === "materials").map((m) => ({ id: m.id, name: m.name, cost: m.cost_value }))}
+                              />
                             </>
                           );
                         })()}
