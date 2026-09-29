@@ -116,19 +116,23 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                           const lines = ingredients.filter((r) => r.itemId === i.id);
                           const cost = recipeCost(i.id);
                           const margin = Math.round((i.sale_price - cost) * 100) / 100;
+                          const unknownCost = lines.some((r) => matCost(r.materialItemId) <= 0);
                           return (
                             <>
                               {lines.length > 0 ? (
                                 <ul className="text-xs space-y-1">
-                                  {lines.map((r) => (
+                                  {lines.map((r) => {
+                                    const c = matCost(r.materialItemId);
+                                    return (
                                     <li key={r.id} className="flex items-center gap-2">
-                                      <span className="flex-1">{matName(r.materialItemId, r.materialName)} × {g(r.qty)} ({g(r.qty * matCost(r.materialItemId))}g)</span>
+                                      <span className="flex-1">{matName(r.materialItemId, r.materialName)} × {g(r.qty)} ({c > 0 ? `${g(r.qty * c)}g` : "cost unknown"})</span>
                                       <form action={deleteIngredientAction} className="inline">
                                         <input type="hidden" name="id" value={r.id} />
                                         <button className="btn-ghost !py-0 !px-1.5 text-xs" type="submit" title="Remove ingredient">✕</button>
                                       </form>
                                     </li>
-                                  ))}
+                                    );
+                                  })}
                                 </ul>
                               ) : (
                                 <p className="text-xs text-[#8a7c64]">No recipe yet.</p>
@@ -136,6 +140,7 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                               <p className="text-xs">
                                 Materials: <b className="text-[#e0bd4a]">{g(cost)}g</b> · Sells: <b className="text-[#e0bd4a]">{g(i.sale_price)}g</b> ·{" "}
                                 Margin: <b className={margin >= 0 ? "text-[#7fd08a]" : "text-[#e08a8a]"}>{g(margin)}g</b>
+                                {unknownCost && <span className="text-[#8a7c64]"> (some costs unknown — fill them on the material)</span>}
                               </p>
                               <form action={addIngredientAction} className="space-y-2">
                                 <input type="hidden" name="item_id" value={i.id} />
@@ -164,10 +169,8 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                             {categories.map((cc) => <option key={cc.slug} value={cc.slug}>{cc.name}</option>)}
                           </select>
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div><label className="lbl">Price</label><input name="sale_price" type="number" defaultValue={i.sale_price} className="input" /></div>
-                          <div><label className="lbl">Cost</label><input name="cost_value" type="number" defaultValue={i.cost_value} className="input" /></div>
-                        </div>
+                        <div><label className="lbl">Price</label><input name="sale_price" type="number" defaultValue={i.sale_price} className="input" /></div>
+                        <div><label className="lbl">Cost</label><input name="cost_value" type="number" defaultValue={i.cost_value} className="input" /></div>
                         <div><label className="lbl">Description</label><input name="description" defaultValue={i.description} className="input" /></div>
                         <div><label className="lbl">Visible</label>
                           <select name="active" defaultValue={String(i.active)} className="input"><option value="true">Yes</option><option value="false">Hidden</option></select>
