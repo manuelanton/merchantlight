@@ -16,6 +16,15 @@ export default async function AdminHome() {
   const ledgerBal = b.ledgerRows.reduce((a, e) => a + e.amountGold, 0);
   const openNotes = b.noteRows.filter((n) => !n.resolved);
   const lowStock = [...b.stockByItem.values()].filter((s) => s.qty > 0 && s.qty <= LOW_AT);
+  const hotMap = new Map<string, { name: string; qty: number; revenue: number }>();
+  for (const s of b.salesRows) {
+    const cur = hotMap.get(s.itemId) || { name: s.itemName, qty: 0, revenue: 0 };
+    cur.qty += s.qty;
+    cur.revenue += s.unitSalePrice * s.qty;
+    if (s.itemName) cur.name = s.itemName;
+    hotMap.set(s.itemId, cur);
+  }
+  const hottest = [...hotMap.values()].sort((a, c) => c.qty - a.qty).slice(0, 5);
 
   return (
     <div className="space-y-4">
@@ -62,6 +71,16 @@ export default async function AdminHome() {
             {!openNotes.length && <li className="text-[#8a7c64]">All quiet. Post news, requests, todos.</li>}
           </ul>
           <Link href="/admin/notes" className="text-sm text-[#c9a227]">Open noticeboard →</Link>
+        </div>
+        <div className="card p-4">
+          <h2 className="font-display text-lg">Hottest items</h2>
+          <ul className="text-sm mt-2 space-y-1">
+            {hottest.map((h, i) => (
+              <li key={h.name}>{i + 1}. <b>{h.name}</b> — {h.qty} sold · {g(h.revenue)}g</li>
+            ))}
+            {!hottest.length && <li className="text-[#8a7c64]">No sales yet.</li>}
+          </ul>
+          <Link href="/admin/sales" className="text-sm text-[#c9a227]">All sales →</Link>
         </div>
         <div className="card p-4">
           <h2 className="font-display text-lg">Running low (≤ {LOW_AT})</h2>
