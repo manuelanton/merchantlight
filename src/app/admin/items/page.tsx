@@ -1,6 +1,5 @@
 import {
   createCategoryAction,
-  createItemAction,
   deleteCategoryAction,
   renameCategoryAction,
 } from "@/lib/admin-actions";
@@ -8,6 +7,7 @@ import { getCatalogue } from "@/lib/catalog";
 import { getBooks } from "@/lib/books";
 import { getDb } from "@/db";
 import { itemIngredients } from "@/db/schema";
+import AddItemForm from "@/components/AddItemForm";
 import ItemsManager from "@/components/ItemsManager";
 
 export const dynamic = "force-dynamic";
@@ -27,22 +27,10 @@ export default async function ItemsPage() {
         Deleting an item is safe: sales and stock history keep its name.
       </p>
 
-      <form action={createItemAction} className="card p-5 space-y-3">
-        <h2 className="font-display text-lg">Add item</h2>
-        <div className="grid md:grid-cols-3 gap-3">
-          <div><label className="lbl">Name *</label><input name="name" required className="input" placeholder="Fine Leather Boots" /></div>
-          <div><label className="lbl">Category</label>
-            <select name="category_slug" className="input">{sorted.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}</select>
-          </div>
-          <div><label className="lbl">Visible</label>
-            <select name="active" className="input"><option value="true">Yes</option><option value="false">Hidden</option></select>
-          </div>
-          <div><label className="lbl">Price (g)</label><input name="sale_price" type="number" min={0} defaultValue={0} className="input" /></div>
-          <div><label className="lbl">Cost (g, private)</label><input name="cost_value" type="number" min={0} defaultValue={0} className="input" /></div>
-          <div><label className="lbl">Description</label><input name="description" className="input" placeholder="Materials, bulk rates…" /></div>
-        </div>
-        <button className="btn-gold" type="submit">Add item</button>
-      </form>
+      <AddItemForm
+        categories={sorted.map((c) => ({ slug: c.slug, name: c.name }))}
+        materials={items.filter((m) => m.category_slug === "materials").map((m) => ({ id: m.id, name: m.name, cost: m.cost_value }))}
+      />
 
       <ItemsManager
         items={items.map((i) => ({

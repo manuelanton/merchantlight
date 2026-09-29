@@ -7,6 +7,7 @@ import { getDb } from "@/db";
 import { categories, itemIngredients, items, ledger, notes, sales, stockMoves } from "@/db/schema";
 import { getCatalogItems } from "@/lib/catalog";
 import { g, splitEvenly } from "@/lib/format";
+import { effectiveCost } from "@/lib/cost";
 import { setShopOpen } from "@/lib/shop";
 
 async function quartermaster() {
@@ -40,13 +41,24 @@ export async function recordSaleAction(formData: FormData) {
   for (const e of existing) nets.set(e.member, (nets.get(e.member) || 0) + e.amountGold);
   const roster = [...nets.entries()].filter(([, v]) => v !== 0).map(([m]) => m).sort();
   const catalog = await getCatalogItems();
+  const dbIngredients = await db.select().from(itemIngredients);
+  const effCost = (itemId: string, fallback: number) => {
+    const lines = dbIngredients.filter((r) => r.itemId === itemId);
+    if (!lines.length) return fallback;
+    return effectiveCost(
+      itemId,
+      catalog.map((m) => ({ id: m.id, cost_value: m.cost_value })),
+      dbIngredients.map((r) => ({ itemId: r.itemId, materialItemId: r.materialItemId, qty: r.qty }))
+    );
+  };
   for (let n = 0; n < ids.length; n++) {
     const qty = Math.max(1, Number(qtys[n] || 1));
     const price = Number(prices[n] || 0);
     const item = catalog.find((i) => i.id === ids[n]);
     const itemName = item?.name || "goods";
-    // Cost basis: catalogue cost wins (stable); the manual field only fills gaps.
-    const itemCost = item && item.cost_value > 0 ? item.cost_value : cost;
+    // Cost basis: live recipe cost wins; catalogue cost next; manual entry fills gaps.
+    const baseCost = item && item.cost_value > 0 ? item.cost_value : cost;
+    const itemCost = effCost(ids[n], baseCost);
     const saleId = uid("sl");
     await db.insert(sales).values({
       id: saleId,
@@ -253,8 +265,9 @@ export async function createItemAction(formData: FormData) {
   const qm = await quartermaster();
   const name = String(formData.get("name") || "Unnamed").trim();
   const db = await getDb();
+  const itemId = `${slugify(name, `item-${Date.now()}`)}`;
   await db.insert(items).values({
-    id: `${slugify(name, `item-${Date.now()}`)}`,
+    id: itemId,
     name,
     categorySlug: String(formData.get("category_slug") || "trade-goods"),
     description: String(formData.get("description") || ""),
@@ -264,8 +277,26 @@ export async function createItemAction(formData: FormData) {
     createdByDiscordId: qm.discordId,
     createdByName: qm.name,
   });
+  // Optional recipe supplied inline with the new item.
+  const materialIds = formData.getAll("material_item_id").map(String).filter(Boolean);
+  const qtys = formData.getAll("qty").map(String);
+  if (materialIds.length) {
+    const catalog = await getCatalogItems();
+    for (let n = 0; n < materialIds.length; n++) {
+      const qty = Number(qtys[n] || 1);
+      if (!(qty > 0)) continue;
+      const mat = catalog.find((m) => m.id === materialIds[n]);
+      await db.insert(itemIngredients).values({
+        id: uid("ig"),
+        itemId,
+        materialItemId: materialIds[n],
+        materialName: mat?.name || "material",
+        qty,
+        actorDiscordId: qm.discordId,
+      });
+    }
+  }
   revalidatePath("/", "layout");
-  redirect("/admin/items");
 }
 
 export async function updateItemAction(formData: FormData) {
@@ -284,7 +315,6 @@ export async function updateItemAction(formData: FormData) {
     })
     .where(eq(items.id, String(formData.get("id"))));
   revalidatePath("/", "layout");
-  redirect("/admin/items");
 }
 
 export async function deleteItemAction(formData: FormData) {
@@ -293,7 +323,6 @@ export async function deleteItemAction(formData: FormData) {
   // Safe: sales + stock moves keep item-name snapshots, so history survives.
   await db.delete(items).where(eq(items.id, String(formData.get("id"))));
   revalidatePath("/", "layout");
-  redirect("/admin/items");
 }
 
 export async function createCategoryAction(formData: FormData) {
@@ -310,7 +339,6 @@ export async function createCategoryAction(formData: FormData) {
     sortOrder: maxSort + 1,
   });
   revalidatePath("/", "layout");
-  redirect("/admin/items");
 }
 
 export async function renameCategoryAction(formData: FormData) {
@@ -321,7 +349,6 @@ export async function renameCategoryAction(formData: FormData) {
     .set({ name: String(formData.get("name") || "").trim(), icon: String(formData.get("icon") || "") })
     .where(eq(categories.id, String(formData.get("id"))));
   revalidatePath("/", "layout");
-  redirect("/admin/items");
 }
 
 export async function deleteCategoryAction(formData: FormData) {
@@ -332,7 +359,6 @@ export async function deleteCategoryAction(formData: FormData) {
   if (used.length) throw new Error(`Category still holds ${used.length} item(s) — move or delete them first`);
   await db.delete(categories).where(eq(categories.id, id));
   revalidatePath("/", "layout");
-  redirect("/admin/items");
 }
 
 // ---------- noticeboard ----------
