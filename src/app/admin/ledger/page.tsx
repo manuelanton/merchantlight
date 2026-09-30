@@ -29,10 +29,12 @@ export default async function LedgerPage() {
   const groups = new Map<string, Group>();
   const groupOrder: string[] = [];
   const saleToken = (d: string) => d.match(/\[sale:([^\]]+)\]/)?.[1];
-  // Shared bills (rent splits, shared costs): same text modulo the share tag.
+  // Shared bills (rent splits, shared costs): same text modulo the share tag,
+  // with or without parentheses around it.
+  const SHARE_TAG = /:?\s*\(?share \d+ of \d+[^)]*\)?/i;
   const sharedBill = (d: string) => {
-    if (!/\(share \d+ of \d+/i.test(d)) return null;
-    return d.replace(/\(share \d+ of \d+[^)]*\)/i, "").trim();
+    if (!/share \d+ of \d+/i.test(d)) return null;
+    return d.replace(SHARE_TAG, "").trim();
   };
   const groupKeyFor = (e: Row): string | null => {
     if (e.type === "sale_income") {
@@ -48,7 +50,7 @@ export default async function LedgerPage() {
     }
     const first = rows[0]?.description || "";
     const total = first.match(/of ([\d.]+)g/i)?.[1];
-    const what = first.replace(/\s*\(share \d+ of \d+[^)]*\)\s*$/i, "").replace(/^(Shared|Rent split:?)\s*/i, "");
+    const what = first.replace(SHARE_TAG, "").replace(/^(Shared|Rent split:?)\s*/i, "").trim() || first.replace(SHARE_TAG, "").trim();
     return total ? `${what} — split of ${total}g` : what || "Shared cost";
   };
   for (const e of b.ledgerRows) {
