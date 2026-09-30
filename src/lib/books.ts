@@ -48,7 +48,10 @@ export async function getBooks(): Promise<Books> {
     .reduce((a, e) => a + e.amountGold, 0);
 
   const bal = new Map<string, number>();
-  for (const e of ledgerRows) bal.set(e.member, (bal.get(e.member) || 0) + e.amountGold);
+  for (const e of ledgerRows) {
+    if (!e.member.trim()) continue; // unattributed rows affect the total, not a member
+    bal.set(e.member, (bal.get(e.member) || 0) + e.amountGold);
+  }
   const balances = [...bal.entries()].sort((a, b) => b[1] - a[1]);
 
   // Roster: members with at least one nonzero entry. Zero-only placeholder rows don't dilute splits.
