@@ -112,7 +112,7 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
             {catIcon(slug)} {catName(slug)} <span className="text-sm text-[#8a7c64]">({list.length})</span>
           </div>
           <table className="ledger">
-            <thead><tr><th>Item</th><th>Price</th><th>Cost</th><th>Stock</th><th>Shown</th><th></th></tr></thead>
+            <thead><tr><th>Item</th><th>Price</th><th>Cost</th><th>Profit</th><th>Stock</th><th>Shown</th><th></th></tr></thead>
             <tbody>
               {list.map((i) => {
                 const cost = eff(i.id);
@@ -126,6 +126,9 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                   <td className="text-[#e0bd4a]">{i.sale_price}g</td>
                   <td title={recipe ? "From recipe — updates with material costs" : "Manual cost"}>
                     {g(cost)}g{recipe && <span className="text-[#8a7c64]"> ≈</span>}
+                  </td>
+                  <td className={i.sale_price - cost >= 0 ? "text-[#7fd08a]" : "text-[#e08a8a]"} title="Approximate — sale price minus cost">
+                    ≈{g(i.sale_price - cost)}g
                   </td>
                   <td>{stock[i.id] ?? 0}</td>
                   <td>{i.active ? "yes" : "no"}</td>
