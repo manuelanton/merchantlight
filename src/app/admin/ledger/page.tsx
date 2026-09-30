@@ -1,4 +1,4 @@
-import { deleteLedgerAction, reimburseAction, updateLedgerAction } from "@/lib/admin-actions";
+import { deleteLedgerAction, updateLedgerAction } from "@/lib/admin-actions";
 import { getBooks } from "@/lib/books";
 import { g } from "@/lib/format";
 import { getCatalogue } from "@/lib/catalog";
@@ -98,20 +98,6 @@ export default async function LedgerPage() {
         members={b.members}
         items={items.filter((i) => i.active).map((i) => ({ id: i.id, name: i.name, cost: i.cost_value > 0 ? i.cost_value : i.sale_price }))}
       />
-
-      <form action={reimburseAction} className="card p-5 space-y-3">
-        <h2 className="font-display text-lg">Paid out of pocket</h2>
-        <p className="text-xs text-[#8a7c64]">Credits what they&apos;re owed. Sharing happens later by itself — through profit splits (materials) or rent splits.</p>
-        <div className="grid md:grid-cols-3 gap-3">
-          <MemberSelect members={b.members} name="member" label="Who paid" required />
-          <div><label className="lbl">Amount (g) *</label><input name="amount_gold" type="number" min={0} step="any" required className="input" placeholder="65" /></div>
-          <div><label className="lbl">Category</label><input name="category" defaultValue="materials" className="input" /></div>
-        </div>
-        <div><label className="lbl">Note</label><input name="description" className="input" placeholder="e.g. iron bars, public smith outside Whiterun" /></div>
-        <div className="flex justify-end">
-          <button className="btn-gold !py-2 !px-5 text-sm" type="submit">Log reimbursement</button>
-        </div>
-      </form>
 
       <div className="card overflow-x-auto">
         <table className="ledger min-w-[820px]">

@@ -287,30 +287,6 @@ export async function deleteLedgerAction(formData: FormData) {
   revalidatePath("/admin", "layout");
 }
 
-/** Out-of-pocket purchase: credit the buyer what they're owed, nothing more.
- *  Sharing happens later automatically — through profit splits (materials that
- *  become saleable goods) or rent splits. Posting a shared cost here too would
- *  charge the materials twice. */
-export async function reimburseAction(formData: FormData) {
-  const qm = await quartermaster();
-  const member = String(formData.get("member") || qm.name).trim() || qm.name;
-  const amount = Math.abs(Number(formData.get("amount_gold") || 0));
-  if (!amount) throw new Error("Amount must be more than 0");
-  const category = String(formData.get("category") || "materials").trim() || "materials";
-  const description = String(formData.get("description") || "").trim();
-  const db = await getDb();
-  await db.insert(ledger).values({
-    id: uid("lg"),
-    type: "contribution",
-    member,
-    amountGold: Math.round(amount * 100) / 100,
-    category,
-    description: `Out of pocket${description ? ` (${description})` : ""} — company owes ${member}`,
-    actorDiscordId: qm.discordId,
-  });
-  revalidatePath("/admin", "layout");
-}
-
 // ---------- catalogue (DB-managed; the sheet is retired) ----------
 
 function slugify(s: string, fallback: string) {
