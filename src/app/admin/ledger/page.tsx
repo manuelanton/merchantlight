@@ -29,14 +29,18 @@ export default async function LedgerPage() {
   const groups = new Map<string, Group>();
   const groupOrder: string[] = [];
   const saleToken = (d: string) => d.match(/\[sale:([^\]]+)\]/)?.[1];
-  const shareTag = (d: string) => d.match(/\(share \d+ of (\d+)(?: of ([\d.]+)g)?\)/i);
+  // Shared bills (rent splits, shared costs): same text modulo the share tag.
+  const sharedBill = (d: string) => {
+    if (!/\(share \d+ of \d+/i.test(d)) return null;
+    return d.replace(/\(share \d+ of \d+[^)]*\)/i, "").trim();
+  };
   const groupKeyFor = (e: Row): string | null => {
     if (e.type === "sale_income") {
       const tok = saleToken(e.description);
       return tok ? `sale:${tok}` : null;
     }
-    if (shareTag(e.description)) return `shared:${String(e.timestamp)}`;
-    return null;
+    const bill = sharedBill(e.description);
+    return bill ? `shared:${bill}` : null;
   };
   const groupTitleFor = (kind: Group["kind"], rows: Row[]): string => {
     if (kind === "sale") {
@@ -67,8 +71,7 @@ export default async function LedgerPage() {
   // Interleave back into time order (rows come newest-first).
   const order = new Map<string, number>();
   b.ledgerRows.forEach((e, i) => {
-    const tok = e.type === "sale_income" ? e.description.match(/\[sale:([^\]]+)\]/)?.[1] : null;
-    const k = tok ? `sale:${tok}` : /\(share \d+ of \d+/i.test(e.description) ? `shared:${String(e.timestamp)}` : `row:${e.id}`;
+    const k = groupKeyFor(e) || `row:${e.id}`;
     if (!order.has(k)) order.set(k, i);
   });
   for (const gr of groups.values()) {
