@@ -97,7 +97,7 @@ export async function confirmSaleAction(formData: FormData) {
   const existing = await db.select().from(ledger);
   const nets = new Map<string, number>();
   for (const e of existing) nets.set(e.member, (nets.get(e.member) || 0) + e.amountGold);
-  const roster = [...nets.entries()].filter(([, v]) => v !== 0).map(([m]) => m).sort();
+  const roster = [...nets.keys()].sort();
   const profit = Math.round((s.unitSalePrice - s.unitCostSnapshot) * s.qty * 100) / 100;
   if (profit !== 0) {
     const who = roster.length ? roster : [s.soldByName];
@@ -188,6 +188,7 @@ export async function addLedgerAction(formData: FormData) {
   const qm = await quartermaster();
   const type = String(formData.get("type")) as "contribution" | "expense" | "payout" | "sale_income";
   let amount = Number(formData.get("amount_gold") || 0);
+  if (!amount) throw new Error("Amount must not be zero — every entry moves gold");
   if ((type === "expense" || type === "payout") && amount > 0) amount = -amount;
   if ((type === "contribution" || type === "sale_income") && amount < 0) amount = -amount;
   const category = String(formData.get("category") || "");
@@ -224,7 +225,7 @@ export async function addLedgerAction(formData: FormData) {
     const existing = await db.select().from(ledger);
     const nets = new Map<string, number>();
     for (const e of existing) nets.set(e.member, (nets.get(e.member) || 0) + e.amountGold);
-    const roster = [...nets.entries()].filter(([, v]) => v !== 0).map(([m]) => m).sort();
+    const roster = [...nets.keys()].sort();
     if (roster.length) {
       const total = Math.abs(amount);
       const shares = splitEvenly(total, roster.length);
@@ -262,6 +263,7 @@ export async function updateLedgerAction(formData: FormData) {
   const id = String(formData.get("id"));
   const type = String(formData.get("type")) as "contribution" | "expense" | "payout" | "sale_income";
   let amount = Number(formData.get("amount_gold") || 0);
+  if (!amount) throw new Error("Amount must not be zero — every entry moves gold");
   if ((type === "expense" || type === "payout") && amount > 0) amount = -amount;
   if ((type === "contribution" || type === "sale_income") && amount < 0) amount = -amount;
   const db = await getDb();
@@ -285,8 +287,10 @@ export async function deleteLedgerAction(formData: FormData) {
   revalidatePath("/admin", "layout");
 }
 
-/** Out-of-pocket purchase: credit the buyer what they're owed AND share the
- *  cost across the roster. Net books effect zero; attribution correct. */
+/** Out-of-pocket purchase: credit the buyer what they're owed, nothing more.
+ *  Sharing happens later automatically — through profit splits (materials that
+ *  become saleable goods) or rent splits. Posting a shared cost here too would
+ *  charge the materials twice. */
 export async function reimburseAction(formData: FormData) {
   const qm = await quartermaster();
   const member = String(formData.get("member") || qm.name).trim() || qm.name;
@@ -295,11 +299,6 @@ export async function reimburseAction(formData: FormData) {
   const category = String(formData.get("category") || "materials").trim() || "materials";
   const description = String(formData.get("description") || "").trim();
   const db = await getDb();
-  const existing = await db.select().from(ledger);
-  const nets = new Map<string, number>();
-  for (const e of existing) nets.set(e.member, (nets.get(e.member) || 0) + e.amountGold);
-  if (!nets.has(member)) nets.set(member, 0);
-  const roster = [...nets.keys()].sort();
   await db.insert(ledger).values({
     id: uid("lg"),
     type: "contribution",
@@ -309,18 +308,6 @@ export async function reimburseAction(formData: FormData) {
     description: `Out of pocket${description ? ` (${description})` : ""} — company owes ${member}`,
     actorDiscordId: qm.discordId,
   });
-  const shares = splitEvenly(amount, roster.length);
-  for (let i = 0; i < roster.length; i++) {
-    await db.insert(ledger).values({
-      id: uid("lg"),
-      type: "expense",
-      member: roster[i],
-      amountGold: -shares[i],
-      category,
-      description: `Shared ${category} cost${description ? ` (${description})` : ""} (share ${i + 1} of ${roster.length} of ${g(amount)}g)`,
-      actorDiscordId: qm.discordId,
-    });
-  }
   revalidatePath("/admin", "layout");
 }
 

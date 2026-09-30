@@ -15,7 +15,7 @@ export interface Books {
   balances: [string, number][];
   /** Everyone who ever touched the ledger. Newcomers appear with their first entry. */
   members: string[];
-  /** Split roster: members with nonzero net. Newcomers join future splits on their first nonzero entry; history never re-splits. */
+  /** Split roster: every registered member. Newcomers join future splits on their first entry; history never re-splits. */
   roster: string[];
 }
 
@@ -54,8 +54,9 @@ export async function getBooks(): Promise<Books> {
   }
   const balances = [...bal.entries()].sort((a, b) => b[1] - a[1]);
 
-  // Roster: members with at least one nonzero entry. Zero-only placeholder rows don't dilute splits.
-  const roster = [...bal.entries()].filter(([, v]) => v !== 0).map(([m]) => m).sort();
+  // Roster: every registered member splits (even at zero net — a zero row is how
+  // new members register). Ghost rows are prevented by rejecting zero amounts.
+  const roster = [...bal.keys()].sort();
 
   return { salesRows, moveRows, ledgerRows, noteRows, stockByItem, revenue, profit, rentPaid, balances, members: [...bal.keys()].sort(), roster };
 }

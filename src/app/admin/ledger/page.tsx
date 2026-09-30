@@ -18,60 +18,61 @@ export default async function LedgerPage() {
   type Row = (typeof b.ledgerRows)[number];
   interface Group {
     key: string;
-    kind: "sale" | "rent";
+    kind: "sale" | "shared";
     when: string;
     rows: Row[];
     total: number;
     title: string;
   }
-  // Collapse auto-posted split shares into one expandable row per sale / rent bill.
+  // Collapse auto-posted split shares into one expandable row per sale / bill.
   const singles: Row[] = [];
   const groups = new Map<string, Group>();
   const groupOrder: string[] = [];
   const saleToken = (d: string) => d.match(/\[sale:([^\]]+)\]/)?.[1];
-  const rentSplit = (d: string) => /Rent split/i.test(d);
+  const shareTag = (d: string) => d.match(/\(share \d+ of (\d+)(?: of ([\d.]+)g)?\)/i);
+  const groupKeyFor = (e: Row): string | null => {
+    if (e.type === "sale_income") {
+      const tok = saleToken(e.description);
+      return tok ? `sale:${tok}` : null;
+    }
+    if (shareTag(e.description)) return `shared:${String(e.timestamp)}`;
+    return null;
+  };
+  const groupTitleFor = (kind: Group["kind"], rows: Row[]): string => {
+    if (kind === "sale") {
+      return rows[0]?.description.replace(/\[sale:[^\]]+\]:\s*/, "").replace(/\s*\(share \d+ of \d+\)\s*$/, "") || "Sale";
+    }
+    const first = rows[0]?.description || "";
+    const total = first.match(/of ([\d.]+)g/i)?.[1];
+    const what = first.replace(/\s*\(share \d+ of \d+[^)]*\)\s*$/i, "").replace(/^(Shared|Rent split:?)\s*/i, "");
+    return total ? `${what} — split of ${total}g` : what || "Shared cost";
+  };
   for (const e of b.ledgerRows) {
-    const tok = saleToken(e.description);
-    if (e.type === "sale_income" && tok) {
-      const key = `sale:${tok}`;
-      if (!groups.has(key)) {
-        groups.set(key, { key, kind: "sale", when: String(e.timestamp), rows: [], total: 0, title: "" });
-        groupOrder.push(key);
-      }
-      const gr = groups.get(key)!;
-      gr.rows.push(e);
-      gr.total += e.amountGold;
+    const key = groupKeyFor(e);
+    if (!key) {
+      singles.push(e);
       continue;
     }
-    if (e.type === "expense" && e.category.toLowerCase() === "rent" && rentSplit(e.description)) {
-      const key = `rent:${String(e.timestamp)}`;
-      if (!groups.has(key)) {
-        const m = e.description.match(/of ([\d.]+)g/i);
-        groups.set(key, {
-          key, kind: "rent", when: String(e.timestamp), rows: [], total: 0,
-          title: `Rent split of ${m ? m[1] : "?"}g`,
-        });
-        groupOrder.push(key);
-      }
-      const gr = groups.get(key)!;
-      gr.rows.push(e);
-      gr.total += e.amountGold;
-      continue;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key, kind: key.startsWith("sale:") ? "sale" : "shared",
+        when: String(e.timestamp), rows: [], total: 0, title: "",
+      });
+      groupOrder.push(key);
     }
-    singles.push(e);
+    const gr = groups.get(key)!;
+    gr.rows.push(e);
+    gr.total += e.amountGold;
   }
   // Interleave back into time order (rows come newest-first).
   const order = new Map<string, number>();
   b.ledgerRows.forEach((e, i) => {
-    const tok = e.type === "sale_income" ? saleToken(e.description) : null;
-    const k = tok ? `sale:${tok}` : (e.type === "expense" && e.category.toLowerCase() === "rent" && rentSplit(e.description) ? `rent:${String(e.timestamp)}` : `row:${e.id}`);
+    const tok = e.type === "sale_income" ? e.description.match(/\[sale:([^\]]+)\]/)?.[1] : null;
+    const k = tok ? `sale:${tok}` : /\(share \d+ of \d+/i.test(e.description) ? `shared:${String(e.timestamp)}` : `row:${e.id}`;
     if (!order.has(k)) order.set(k, i);
   });
   for (const gr of groups.values()) {
-    if (!gr.title) {
-      const first = gr.rows[0]?.description.replace(/\[sale:[^\]]+\]:\s*/, "").replace(/\s*\(share \d+ of \d+\)\s*$/, "") || "Sale";
-      gr.title = first;
-    }
+    if (!gr.title) gr.title = groupTitleFor(gr.kind, gr.rows);
   }
   const feed: ({ t: "single"; row: Row } | { t: "group"; group: Group })[] = [
     ...singles.map((row) => ({ t: "single" as const, row })),
@@ -100,7 +101,7 @@ export default async function LedgerPage() {
 
       <form action={reimburseAction} className="card p-5 space-y-3">
         <h2 className="font-display text-lg">Paid out of pocket</h2>
-        <p className="text-xs text-[#8a7c64]">Credits the buyer what they&apos;re owed and shares the cost across members.</p>
+        <p className="text-xs text-[#8a7c64]">Credits what they&apos;re owed. Sharing happens later by itself — through profit splits (materials) or rent splits.</p>
         <div className="grid md:grid-cols-3 gap-3">
           <MemberSelect members={b.members} name="member" label="Who paid" required />
           <div><label className="lbl">Amount (g) *</label><input name="amount_gold" type="number" min={0} step="any" required className="input" placeholder="65" /></div>
@@ -123,10 +124,10 @@ export default async function LedgerPage() {
                 return (
                   <tr key={gr.key}>
                     <td className="text-xs">{new Date(gr.when).toLocaleString()}</td>
-                    <td>{gr.kind === "sale" ? "sale split" : "rent split"}</td>
+                    <td>{gr.kind === "sale" ? "sale split" : "shared"}</td>
                     <td className="text-[#8a7c64]">{gr.rows.length} members</td>
                     <td className={pos ? "text-[#7fd08a]" : "text-[#e08a8a]"}>{g(gr.total)}g</td>
-                    <td>{gr.kind === "sale" ? "sales" : "rent"}</td>
+                    <td>{gr.rows[0]?.category || ""}</td>
                     <td className="text-[#8a7c64]">
                       <details>
                         <summary className="cursor-pointer hover:text-[#e8dcc4]">{gr.title}</summary>
@@ -134,7 +135,7 @@ export default async function LedgerPage() {
                           {gr.rows.map((r) => (
                             <li key={r.id} className="flex items-center gap-2">
                               <span>{r.member}: {g(r.amountGold)}g</span>
-                              {gr.kind === "rent" && (
+                              {gr.kind === "shared" && (
                                 <form action={deleteLedgerAction} className="inline">
                                   <input type="hidden" name="id" value={r.id} />
                                   <button className="btn-ghost !py-0 !px-1.5 text-xs" type="submit" title="Delete this share">✕</button>
