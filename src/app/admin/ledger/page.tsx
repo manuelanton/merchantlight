@@ -42,7 +42,10 @@ export default async function LedgerPage() {
       return tok ? `sale:${tok}` : null;
     }
     const bill = sharedBill(e.description);
-    return bill ? `shared:${bill}` : null;
+    // Include the bill total: two different bills with the same wording must not merge.
+    if (!bill) return null;
+    const total = e.description.match(/of ([\d.]+)g/i)?.[1] || "?";
+    return `shared:${bill}::${total}`;
   };
   const groupTitleFor = (kind: Group["kind"], rows: Row[]): string => {
     if (kind === "sale") {
