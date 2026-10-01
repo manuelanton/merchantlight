@@ -3,6 +3,7 @@ import {
   collectUnitAction,
   deleteUnitAction,
   freeUnitAction,
+  renameUnitAction,
   rentUnitAction,
   setRateAction,
 } from "@/lib/admin-actions";
@@ -34,6 +35,14 @@ export default async function StoragePage() {
                 </span>
                 <span className="ml-auto text-[#e0bd4a]">{g(u.ratePerWeek)}g/wk</span>
               </div>
+              <details>
+                <summary className="text-xs text-[#c9a227] cursor-pointer hover:text-[#e8dcc4]">Rename unit</summary>
+                <form action={renameUnitAction} className="flex gap-2 mt-1">
+                  <input type="hidden" name="id" value={u.id} />
+                  <input name="label" defaultValue={u.label} required className="input !py-1 text-sm flex-1" />
+                  <button className="btn-ghost !py-1 text-xs whitespace-nowrap" type="submit">Save</button>
+                </form>
+              </details>
               {u.occupant ? (
                 <>
                   <p className="text-sm">Occupant: <b>{u.occupant}</b></p>

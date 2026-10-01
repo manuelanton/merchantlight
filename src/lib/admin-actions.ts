@@ -545,6 +545,15 @@ export async function setRateAction(formData: FormData) {
   revalidatePath("/admin", "layout");
 }
 
+export async function renameUnitAction(formData: FormData) {
+  await quartermaster();
+  const label = String(formData.get("label") || "").trim();
+  if (!label) throw new Error("Label cannot be empty");
+  const db = await getDb();
+  await db.update(storageUnits).set({ label }).where(eq(storageUnits.id, String(formData.get("id"))));
+  revalidatePath("/admin", "layout");
+}
+
 export async function addUnitAction(formData: FormData) {
   const qm = await quartermaster();
   const label = String(formData.get("label") || "").trim() || `Chest ${Date.now().toString(36)}`;
