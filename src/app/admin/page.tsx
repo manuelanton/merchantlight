@@ -3,6 +3,7 @@ import { requestRestockAction, setShopOpenAction } from "@/lib/admin-actions";
 import { getBooks } from "@/lib/books";
 import { g } from "@/lib/format";
 import { isShopOpen } from "@/lib/shop";
+import { getStorage } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ const KIND_ICON: Record<string, string> = { news: "📯", request: "🙏", todo:
 export default async function AdminHome() {
   const b = await getBooks();
   const open = await isShopOpen();
+  const st = await getStorage();
   const ledgerBal = b.ledgerRows.reduce((a, e) => a + e.amountGold, 0);
   const openNotes = b.noteRows.filter((n) => !n.resolved);
   const lowStock = [...b.stockByItem.values()].filter((s) => s.qty > 0 && s.qty <= LOW_AT);
@@ -43,11 +45,21 @@ export default async function AdminHome() {
           </button>
         </form>
       </div>
-      <div className="grid md:grid-cols-4 gap-4">
+      <div className="grid md:grid-cols-5 gap-4">
         <div className="card p-4"><div className="lbl">Revenue (sales)</div><div className="text-2xl text-[#e0bd4a]">{g(b.revenue)}g</div></div>
         <div className="card p-4"><div className="lbl">Profit (sales)</div><div className="text-2xl text-[#e0bd4a]">{g(b.profit)}g</div></div>
+        <div className="card p-4"><div className="lbl">Storage earned</div><div className="text-2xl text-[#e0bd4a]">{g(st.earned)}g</div></div>
         <div className="card p-4"><div className="lbl">Rent paid</div><div className="text-2xl text-[#e0bd4a]">{g(b.rentPaid)}g</div></div>
         <div className="card p-4"><div className="lbl">Ledger balance</div><div className="text-2xl text-[#e0bd4a]">{g(ledgerBal)}g</div></div>
+      </div>
+      <div className="card p-4 flex flex-wrap items-center gap-3">
+        <span className="font-display text-lg">Storage: {st.filled}/{st.units.length} filled</span>
+        {st.overdue.length > 0 ? (
+          <span className="badge badge-out">{st.overdue.length} past due: {st.overdue.slice(0, 4).map((u) => u.label).join(", ")}{st.overdue.length > 4 ? "…" : ""}</span>
+        ) : (
+          <span className="badge badge-in">All paid up</span>
+        )}
+        <Link href="/admin/storage" className="text-sm text-[#c9a227] ml-auto">Manage storage →</Link>
       </div>
       <div className="grid md:grid-cols-3 gap-4">
         <div className="card p-4">

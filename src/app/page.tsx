@@ -3,11 +3,12 @@ import Sigil from "@/components/Sigil";
 import { UPCOMING_SECTIONS, isSheetsConfigured } from "@/lib/sheets";
 import { getCatalogue } from "@/lib/catalog";
 import { isShopOpen } from "@/lib/shop";
+import { getStorage } from "@/lib/storage";
 
 export const revalidate = 60;
 
 export default async function Home() {
-  const [{ categories, items }, open] = await Promise.all([getCatalogue(), isShopOpen()]);
+  const [{ categories, items }, open, storage] = await Promise.all([getCatalogue(), isShopOpen(), getStorage()]);
   const sorted = [...categories].sort((a, b) => a.sort_order - b.sort_order);
   const active = items.filter((i) => i.active);
   const sections = sorted
@@ -78,7 +79,7 @@ export default async function Home() {
             Barrels outside our keep — 60g per week
           </p>
           <p className="mt-2 text-[#e0bd4a]">
-            Ask for availability
+            {storage.units.length ? (storage.free > 0 ? `${storage.free} of ${storage.units.length} free` : "Full right now") : "Ask for availability"}
             <span className="text-sm text-[#c9a227] ml-2">Visit us →</span>
           </p>
         </Link>

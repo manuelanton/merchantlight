@@ -94,3 +94,14 @@ export const itemIngredients = pgTable("item_ingredients", {
 });
 
 /** Sale lifecycle: pending = gold still with the salesperson, confirmed = deposited. */
+
+/** Rentable storage chests/barrels. Income posts straight to company coffers (unattributed). */
+export const storageUnits = pgTable("storage_units", {
+  id: text("id").primaryKey(),
+  label: text("label").notNull().default(""),
+  ratePerWeek: real("rate_per_week").notNull().default(60),
+  occupant: text("occupant").notNull().default(""),
+  occupiedSince: timestamp("occupied_since", { withTimezone: true }),
+  paidThrough: timestamp("paid_through", { withTimezone: true }),
+  active: boolean("active").notNull().default(true),
+});

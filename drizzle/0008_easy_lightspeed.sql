@@ -1,0 +1,1 @@
+ALTER TABLE "storage_units" ADD COLUMN "rate_per_week" real DEFAULT 60 NOT NULL;

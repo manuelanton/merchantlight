@@ -3,7 +3,7 @@ import { eq, like } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { auth, isQuartermaster } from "@/auth";
 import { getDb } from "@/db";
-import { categories, itemIngredients, items, ledger, notes, sales, stockMoves } from "@/db/schema";
+import { categories, itemIngredients, items, ledger, notes, sales, settings, stockMoves, storageUnits } from "@/db/schema";
 import { getCatalogItems } from "@/lib/catalog";
 import { g, splitEvenly } from "@/lib/format";
 import { effectiveCost } from "@/lib/cost";
@@ -480,5 +480,83 @@ export async function deleteIngredientAction(formData: FormData) {
   await quartermaster();
   const db = await getDb();
   await db.delete(itemIngredients).where(eq(itemIngredients.id, String(formData.get("id"))));
+  revalidatePath("/admin", "layout");
+}
+
+// ---------- storage rentals (barrels/chests outside the keep) ----------
+// Income posts straight to company coffers: unattributed (blank member) so it
+// never dilutes per-member splits. Balances only move on splits and manual rows.
+
+export async function rentUnitAction(formData: FormData) {
+  const qm = await quartermaster();
+  const id = String(formData.get("id"));
+  const occupant = String(formData.get("occupant") || "").trim();
+  if (!occupant) throw new Error("Name the occupant");
+  const db = await getDb();
+  await db.update(storageUnits).set({
+    occupant, occupiedSince: new Date(), paidThrough: new Date(),
+  }).where(eq(storageUnits.id, id));
+  void qm;
+  revalidatePath("/admin", "layout");
+}
+
+export async function collectUnitAction(formData: FormData) {
+  const qm = await quartermaster();
+  const id = String(formData.get("id"));
+  const db = await getDb();
+  const found = await db.select().from(storageUnits).where(eq(storageUnits.id, id)).limit(1);
+  const u = found[0];
+  if (!u || !u.occupant) throw new Error("Unit is empty");
+  const start = u.paidThrough && new Date(u.paidThrough) > new Date() ? new Date(u.paidThrough) : new Date();
+  const next = new Date(start.getTime() + 7 * 24 * 3600 * 1000);
+  await db.update(storageUnits).set({ paidThrough: next }).where(eq(storageUnits.id, id));
+  await db.insert(ledger).values({
+    id: uid("lg"),
+    type: "sale_income",
+    member: "",
+    amountGold: Math.round(u.ratePerWeek * 100) / 100,
+    category: "storage",
+    description: `Storage rent [unit:${u.id}]: ${u.label} × 1 week (${u.occupant})`,
+    actorDiscordId: qm.discordId,
+  });
+  revalidatePath("/admin", "layout");
+}
+
+export async function freeUnitAction(formData: FormData) {
+  await quartermaster();
+  const db = await getDb();
+  await db.update(storageUnits).set({ occupant: "", occupiedSince: null, paidThrough: null })
+    .where(eq(storageUnits.id, String(formData.get("id"))));
+  revalidatePath("/admin", "layout");
+}
+
+export async function setRateAction(formData: FormData) {
+  await quartermaster();
+  const rate = Number(formData.get("rate_per_week") || 0);
+  if (!(rate >= 0)) throw new Error("Rate must be 0 or more");
+  const db = await getDb();
+  await db.update(storageUnits).set({ ratePerWeek: rate }).where(eq(storageUnits.id, String(formData.get("id"))));
+  revalidatePath("/admin", "layout");
+}
+
+export async function addUnitAction(formData: FormData) {
+  const qm = await quartermaster();
+  const label = String(formData.get("label") || "").trim() || `Chest ${Date.now().toString(36)}`;
+  const db = await getDb();
+  await db.insert(storageUnits).values({
+    id: `unit-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+    label,
+    ratePerWeek: Number(formData.get("rate_per_week") || 60),
+  });
+  void qm;
+  revalidatePath("/admin", "layout");
+}
+
+export async function deleteUnitAction(formData: FormData) {
+  await quartermaster();
+  const db = await getDb();
+  const found = await db.select().from(storageUnits).where(eq(storageUnits.id, String(formData.get("id")))).limit(1);
+  if (found[0]?.occupant) throw new Error("Free the unit first");
+  await db.delete(storageUnits).where(eq(storageUnits.id, String(formData.get("id"))));
   revalidatePath("/admin", "layout");
 }
