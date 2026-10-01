@@ -72,6 +72,16 @@ export default async function Home() {
             )}
           </Link>
         ))}
+        <Link href="/visit" className="card p-5 hover:border-[#d97a1f] transition block">
+          <div className="font-display text-xl">🛢️ Storage</div>
+          <p className="text-sm text-[#b8a888] mt-1">
+            Barrels outside our keep — 60g per week
+          </p>
+          <p className="mt-2 text-[#e0bd4a]">
+            Ask for availability
+            <span className="text-sm text-[#c9a227] ml-2">Visit us →</span>
+          </p>
+        </Link>
       </section>
     </div>
   );

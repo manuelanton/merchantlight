@@ -24,6 +24,10 @@ export default function VisitPage() {
           find us in Windhelm or send word and we&apos;ll meet you on the road.
         </p>
         <p className="text-[#e0bd4a]">Always buying: ores &amp; charcoal — bring us your surplus.</p>
+        <p className="text-[#cbbfa5]">
+          Need space? We rent <b className="text-[#e8dcc4]">barrels outside the keep</b> for{" "}
+          <b className="text-[#e0bd4a]">60g per week</b> — send word to ask for availability.
+        </p>
         <p className="text-sm text-[#8a7c64]">All prices in gold (septims). Bulk rates marked where offered.</p>
       </div>
     </div>
