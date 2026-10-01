@@ -71,11 +71,14 @@ export default async function StoragePage() {
                   </div>
                 </>
               ) : (
-                <form action={rentUnitAction} className="flex gap-2">
-                  <input type="hidden" name="id" value={u.id} />
-                  <input name="occupant" required className="input !py-1 text-sm flex-1" placeholder="Occupant name…" />
-                  <button className="btn-gold !py-1 text-xs whitespace-nowrap" type="submit">Rent out</button>
-                </form>
+                <>
+                  <form action={rentUnitAction} className="flex gap-2">
+                    <input type="hidden" name="id" value={u.id} />
+                    <input name="occupant" required className="input !py-1 text-sm flex-1" placeholder="Occupant name…" />
+                    <button className="btn-gold !py-1 text-xs whitespace-nowrap" type="submit">Rent out</button>
+                  </form>
+                  <p className="text-xs text-[#8a7c64]">Collect appears here once occupied — nothing to collect from an empty chest.</p>
+                </>
               )}
             </div>
           );
