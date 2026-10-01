@@ -507,8 +507,14 @@ export async function collectUnitAction(formData: FormData) {
   const found = await db.select().from(storageUnits).where(eq(storageUnits.id, id)).limit(1);
   const u = found[0];
   if (!u || !u.occupant) throw new Error("Unit is empty");
-  const start = u.paidThrough && new Date(u.paidThrough) > new Date() ? new Date(u.paidThrough) : new Date();
-  const next = new Date(start.getTime() + 7 * 24 * 3600 * 1000);
+  const picked = String(formData.get("paid_from") || "");
+  const pickedDate = picked ? new Date(`${picked}T12:00:00`) : null;
+  const current = u.paidThrough ? new Date(u.paidThrough) : null;
+  const base =
+    pickedDate && !Number.isNaN(pickedDate.getTime()) ? pickedDate
+    : current && current > new Date() ? current
+    : new Date();
+  const next = new Date(base.getTime() + 7 * 24 * 3600 * 1000);
   await db.update(storageUnits).set({ paidThrough: next }).where(eq(storageUnits.id, id));
   await db.insert(ledger).values({
     id: uid("lg"),
@@ -516,7 +522,7 @@ export async function collectUnitAction(formData: FormData) {
     member: "",
     amountGold: Math.round(u.ratePerWeek * 100) / 100,
     category: "storage",
-    description: `Storage rent [unit:${u.id}]: ${u.label} × 1 week (${u.occupant})`,
+    description: `Storage rent [unit:${u.id}]: ${u.label} × 1 week (${u.occupant}) from ${base.toISOString().slice(0, 10)}`,
     actorDiscordId: qm.discordId,
   });
   revalidatePath("/admin", "layout");

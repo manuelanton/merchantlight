@@ -41,9 +41,17 @@ export default async function StoragePage() {
                     Paid through: {u.paidThrough ? new Date(u.paidThrough).toLocaleDateString() : "—"}
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    <form action={collectUnitAction}>
+                    <form action={collectUnitAction} className="flex flex-wrap gap-1 items-center">
                       <input type="hidden" name="id" value={u.id} />
-                      <button className="btn-gold !py-1 text-xs" type="submit" title="Log one week paid — extends paid-through 7 days">
+                      <input
+                        name="paid_from" type="date"
+                        defaultValue={(() => {
+                          const base = u.paidThrough && new Date(u.paidThrough) > new Date() ? new Date(u.paidThrough) : new Date();
+                          return base.toISOString().slice(0, 10);
+                        })()}
+                        className="input !w-auto !py-1 text-xs" title="Week start — defaults sensibly, adjust freely"
+                      />
+                      <button className="btn-gold !py-1 text-xs" type="submit" title="Log one week paid from the chosen date">
                         Collect {g(u.ratePerWeek)}g
                       </button>
                     </form>
