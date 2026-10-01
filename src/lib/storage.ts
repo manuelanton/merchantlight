@@ -24,15 +24,19 @@ export async function getStorage(): Promise<{
     db.select().from(storageUnits).orderBy(asc(storageUnits.label)),
     db.select().from(ledger),
   ]);
-  const units = unitRows.filter((u) => u.active).map((u) => ({
-    id: u.id,
-    label: u.label,
-    ratePerWeek: u.ratePerWeek,
-    occupant: u.occupant,
-    occupiedSince: u.occupiedSince,
-    paidThrough: u.paidThrough,
-    active: u.active,
-  }));
+  const units = unitRows
+    .filter((u) => u.active)
+    .map((u) => ({
+      id: u.id,
+      label: u.label,
+      ratePerWeek: u.ratePerWeek,
+      occupant: u.occupant,
+      occupiedSince: u.occupiedSince,
+      paidThrough: u.paidThrough,
+      active: u.active,
+    }))
+    // Natural sort so Chest 2 comes before Chest 10.
+    .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
   const now = Date.now();
   const filledUnits = units.filter((u) => u.occupant);
   const overdue = filledUnits.filter((u) => !u.paidThrough || new Date(u.paidThrough).getTime() < now);
