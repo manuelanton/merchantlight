@@ -28,9 +28,19 @@ export default function StockForm({ items, categories }: { items: CatalogOption[
       })
     );
   const removeRow = (key: number) => setRows((rs) => (rs.length > 1 ? rs.filter((r) => r.key !== key) : rs));
+  const [flash, setFlash] = useState("");
+
+  const save = async (fd: FormData) => {
+    await adjustStockAction(fd);
+    setRows([{ key: n + 1, cat: "", itemId: items[0]?.id || "", delta: 1 }]);
+    setN((x) => x + 2);
+    setFlash("Logged ✓");
+    setTimeout(() => setFlash(""), 3000);
+  };
 
   return (
-    <form action={adjustStockAction} className="card p-4 space-y-2">
+    <form action={save} className="card p-4 space-y-2">
+      {flash && <p className="text-sm text-[#7fd08a]">{flash}</p>}
       <div className="hidden md:grid grid-cols-12 gap-2 text-xs uppercase tracking-wider text-[#8a7c64]">
         <span className="col-span-3">Section</span>
         <span className="col-span-6">Item</span>
