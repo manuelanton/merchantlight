@@ -6,24 +6,34 @@ import MemberSelect from "./MemberSelect";
 export default function ContributionForm({
   members,
   items,
+  categories,
 }: {
   members: string[];
-  items: { id: string; name: string; cost: number }[];
+  items: { id: string; name: string; cost: number; category: string }[];
+  categories: { slug: string; name: string }[];
 }) {
   const [withItems, setWithItems] = useState(false);
-  const [rows, setRows] = useState([{ key: 0, itemId: items[0]?.id || "", qty: 1 }]);
+  const [rows, setRows] = useState([{ key: 0, cat: "", itemId: items[0]?.id || "", qty: 1 }]);
   const [n, setN] = useState(1);
   const [manual, setManual] = useState("0");
 
+  const inCat = (cat: string) => (cat ? items.filter((i) => i.category === cat) : items);
   const costOf = (id: string) => items.find((i) => i.id === id)?.cost || 0;
   const autoTotal = rows.reduce((a, r) => a + r.qty * costOf(r.itemId), 0);
 
   const addRow = () => {
-    setRows((r) => [...r, { key: n, itemId: items[0]?.id || "", qty: 1 }]);
+    setRows((r) => [...r, { key: n, cat: "", itemId: items[0]?.id || "", qty: 1 }]);
     setN((x) => x + 1);
   };
-  const setRow = (key: number, patch: Partial<{ itemId: string; qty: number }>) =>
-    setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  const setRow = (key: number, patch: Partial<{ cat: string; itemId: string; qty: number }>) =>
+    setRows((rs) =>
+      rs.map((r) => {
+        if (r.key !== key) return r;
+        const next = { ...r, ...patch };
+        if (patch.cat !== undefined) next.itemId = inCat(patch.cat)[0]?.id || "";
+        return next;
+      })
+    );
   const removeRow = (key: number) => setRows((rs) => rs.filter((r) => r.key !== key));
 
   const summary = rows
@@ -54,20 +64,30 @@ export default function ContributionForm({
       {withItems && (
         <div className="space-y-2 border-t border-[#1c2b31] pt-3">
           {rows.map((r) => (
-            <div key={r.key} className="flex gap-2 items-center">
+            <div key={r.key} className="space-y-2 border-b border-[#1c2b31] pb-2">
               <select
-                name="contrib_item_id" className="input flex-1"
-                value={r.itemId} onChange={(e) => setRow(r.key, { itemId: e.target.value })}
-                aria-label="Contributed item"
+                className="input w-full" value={r.cat}
+                onChange={(e) => setRow(r.key, { cat: e.target.value })}
+                aria-label="Section"
               >
-                {items.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.cost}g)</option>)}
+                <option value="">All sections</option>
+                {categories.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
               </select>
-              <input
-                name="contrib_qty" type="number" min={0.01} step="any" value={r.qty}
-                onChange={(e) => setRow(r.key, { qty: Number(e.target.value) })}
-                className="input w-24" aria-label="Quantity"
-              />
-              <button type="button" onClick={() => removeRow(r.key)} className="btn-ghost !px-2.5 shrink-0" title="Remove row">✕</button>
+              <div className="flex gap-2 items-center">
+                <select
+                  name="contrib_item_id" className="input flex-1"
+                  value={r.itemId} onChange={(e) => setRow(r.key, { itemId: e.target.value })}
+                  aria-label="Contributed item"
+                >
+                  {inCat(r.cat).map((m) => <option key={m.id} value={m.id}>{m.name} ({m.cost}g)</option>)}
+                </select>
+                <input
+                  name="contrib_qty" type="number" min={0.01} step="any" value={r.qty}
+                  onChange={(e) => setRow(r.key, { qty: Number(e.target.value) })}
+                  className="input w-24" aria-label="Quantity"
+                />
+                <button type="button" onClick={() => removeRow(r.key)} className="btn-ghost !px-2.5 shrink-0" title="Remove row">✕</button>
+              </div>
             </div>
           ))}
           <div className="flex items-center gap-3">

@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { adjustStockAction } from "@/lib/admin-actions";
 import type { CatalogOption, CategoryOption } from "./SaleForm";
-
 interface Row {
   key: number;
   cat: string;

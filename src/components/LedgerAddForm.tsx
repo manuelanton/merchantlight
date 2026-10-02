@@ -7,9 +7,11 @@ import MemberSelect from "./MemberSelect";
 export default function LedgerAddForm({
   members,
   items,
+  categories,
 }: {
   members: string[];
-  items: { id: string; name: string; cost: number }[];
+  items: { id: string; name: string; cost: number; category: string }[];
+  categories: { slug: string; name: string }[];
 }) {
   const [type, setType] = useState("contribution");
 
@@ -29,7 +31,7 @@ export default function LedgerAddForm({
       </div>
       {type === "contribution" ? (
         <>
-          <ContributionForm members={members} items={items} />
+          <ContributionForm members={members} items={items} categories={categories} />
           <div><label className="lbl">Description</label><input name="description" className="input" placeholder="e.g. opening stock from Cyllian" /></div>
         </>
       ) : (
