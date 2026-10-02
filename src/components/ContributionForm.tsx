@@ -64,28 +64,28 @@ export default function ContributionForm({
       {withItems && (
         <div className="space-y-2 border-t border-[#1c2b31] pt-3">
           {rows.map((r) => (
-            <div key={r.key} className="space-y-2 border-b border-[#1c2b31] pb-2">
+            <div key={r.key} className="grid grid-cols-12 gap-2 items-center border-b border-[#1c2b31] pb-2">
               <select
-                className="input w-full" value={r.cat}
+                className="input col-span-12 md:col-span-3" value={r.cat}
                 onChange={(e) => setRow(r.key, { cat: e.target.value })}
                 aria-label="Section"
               >
                 <option value="">All sections</option>
                 {categories.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
               </select>
-              <div className="flex gap-2 items-center">
-                <select
-                  name="contrib_item_id" className="input flex-1"
-                  value={r.itemId} onChange={(e) => setRow(r.key, { itemId: e.target.value })}
-                  aria-label="Contributed item"
-                >
-                  {inCat(r.cat).map((m) => <option key={m.id} value={m.id}>{m.name} ({m.cost}g)</option>)}
-                </select>
-                <input
-                  name="contrib_qty" type="number" min={0.01} step="any" value={r.qty}
-                  onChange={(e) => setRow(r.key, { qty: Number(e.target.value) })}
-                  className="input w-24" aria-label="Quantity"
-                />
+              <select
+                name="contrib_item_id" className="input col-span-9 md:col-span-6"
+                value={r.itemId} onChange={(e) => setRow(r.key, { itemId: e.target.value })}
+                aria-label="Contributed item"
+              >
+                {inCat(r.cat).map((m) => <option key={m.id} value={m.id}>{m.name} ({m.cost}g)</option>)}
+              </select>
+              <input
+                name="contrib_qty" type="number" min={0.01} step="any" value={r.qty}
+                onChange={(e) => setRow(r.key, { qty: Number(e.target.value) })}
+                className="input col-span-2 md:col-span-2" aria-label="Quantity"
+              />
+              <div className="col-span-1 md:col-span-1 flex md:justify-end">
                 <button type="button" onClick={() => removeRow(r.key)} className="btn-ghost !px-2.5 shrink-0" title="Remove row">✕</button>
               </div>
             </div>
