@@ -36,6 +36,7 @@ export default function GuidePage() {
         <p><b>Contributions</b> = value into the company (gold or goods — tick “value from items” and the goods land in stock too).</p>
         <p><b>Out of pocket</b> = also a contribution: if you paid the smith yourself, the company owes <i>you</i>. Log it as a contribution, not an expense.</p>
         <p><b>Expenses / payouts</b> = gold leaving a member. Rent (type expense + category rent) splits itself across everyone.</p>
+        <p><b>Company coffers</b> = pooled, unattributed gold (storage income lands here). Tick “pay from company coffers” on an expense to spend it without charging any member — e.g. rent paid from the pot.</p>
         <p>Positive balance = the company owes that member. Negative = they owe the company.</p>
       </Rule>
 

@@ -13,12 +13,14 @@ export default function LedgerAddForm({
   categories: { slug: string; name: string }[];
 }) {
   const [type, setType] = useState("contribution");
+  const [coffers, setCoffers] = useState(false);
   const [formKey, setFormKey] = useState(0);
   const [flash, setFlash] = useState("");
 
   const save = async (fd: FormData) => {
     await addLedgerAction(fd);
     setFormKey((k) => k + 1);
+    setCoffers(false);
     setFlash("Logged ✓");
     setTimeout(() => setFlash(""), 3000);
   };
@@ -44,11 +46,18 @@ export default function LedgerAddForm({
           <div><label className="lbl">Description</label><input name="description" className="input" placeholder="e.g. opening stock from Cyllian" /></div>
         </>
       ) : (
-        <div className="grid md:grid-cols-3 gap-3">
-          <MemberSelect members={members} name="member" label="Member" required />
-          <div><label className="lbl">Category</label><input name="category" className="input" placeholder="rent / materials / thread" /></div>
-          <div><label className="lbl">Description</label><input name="description" className="input" placeholder="e.g. Gallow's Rock rent, Morndas" /></div>
-        </div>
+        <>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" checked={coffers} onChange={(e) => setCoffers(e.target.checked)} className="accent-[#d97a1f]" />
+            Pay from company coffers (no member charged)
+          </label>
+          <div className="grid md:grid-cols-3 gap-3">
+            {!coffers && <MemberSelect members={members} name="member" label="Member" required />}
+            {coffers && <input type="hidden" name="from_coffers" value="1" />}
+            <div><label className="lbl">Category</label><input name="category" className="input" placeholder="rent / materials / thread" /></div>
+            <div><label className="lbl">Description</label><input name="description" className="input" placeholder="e.g. Gallow's Rock rent, Morndas" /></div>
+          </div>
+        </>
       )}
       <div className="flex justify-end">
         <button className="btn-gold !py-2 !px-5 text-sm" type="submit">Add entry</button>

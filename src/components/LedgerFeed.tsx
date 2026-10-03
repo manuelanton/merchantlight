@@ -127,6 +127,10 @@ export default function LedgerFeed({ feed, members }: { feed: FeedEntry[]; membe
                     <form action={updateLedgerAction} className="mt-2 p-3 card space-y-2 min-w-[240px]">
                       <input type="hidden" name="id" value={e.id} />
                       <div><MemberSelect members={members} name="member" defaultValue={e.member} label="Member" /></div>
+                      <label className="flex items-center gap-2 text-xs cursor-pointer">
+                        <input type="checkbox" name="from_coffers" value="1" defaultChecked={e.member === ""} className="accent-[#d97a1f]" />
+                        Company coffers (no member)
+                      </label>
                       <div><label className="lbl">Type</label>
                         <select name="type" defaultValue={e.type} className="input">
                           {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}

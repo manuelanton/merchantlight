@@ -193,7 +193,10 @@ export async function addLedgerAction(formData: FormData) {
   if ((type === "contribution" || type === "sale_income") && amount < 0) amount = -amount;
   const category = String(formData.get("category") || "");
   const description = String(formData.get("description") || "");
-  const member = String(formData.get("member") || qm.name);
+  // Company coffers: unattributed company money (e.g. storage income pool).
+  // A coffers expense charges nobody — it just leaves the pot.
+  const fromCoffers = String(formData.get("from_coffers") || "") === "1";
+  const member = fromCoffers ? "" : String(formData.get("member") || qm.name);
   const db = await getDb();
   // Contributions may carry item rows (valued in the form): append the summary
   // and add the goods to stock automatically.
@@ -220,8 +223,9 @@ export async function addLedgerAction(formData: FormData) {
     }
   }
   // Rent is always shared: an expense categorized as rent fans out into
-  // equal per-member shares instead of one lump row.
-  if (type === "expense" && category.trim().toLowerCase() === "rent") {
+  // equal per-member shares instead of one lump row — unless it comes
+  // straight from company coffers, which charges nobody.
+  if (type === "expense" && !fromCoffers && category.trim().toLowerCase() === "rent") {
     const existing = await db.select().from(ledger);
     const nets = new Map<string, number>();
     for (const e of existing) nets.set(e.member, (nets.get(e.member) || 0) + e.amountGold);
@@ -267,11 +271,12 @@ export async function updateLedgerAction(formData: FormData) {
   if ((type === "expense" || type === "payout") && amount > 0) amount = -amount;
   if ((type === "contribution" || type === "sale_income") && amount < 0) amount = -amount;
   const db = await getDb();
+  const fromCoffers = String(formData.get("from_coffers") || "") === "1";
   await db
     .update(ledger)
     .set({
       type,
-      member: String(formData.get("member") || qm.name),
+      member: fromCoffers ? "" : String(formData.get("member") || qm.name),
       amountGold: amount,
       category: String(formData.get("category") || ""),
       description: String(formData.get("description") || ""),
