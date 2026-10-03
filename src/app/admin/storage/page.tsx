@@ -73,19 +73,21 @@ export default async function StoragePage() {
                       <input name="rate_per_week" type="number" min={0} step="any" defaultValue={u.ratePerWeek} className="input !w-20 !py-1 text-xs" title="Weekly rate" />
                       <button className="btn-ghost !py-1 text-xs" type="submit" title="Set rate">✓</button>
                     </form>
-                    <form action={deleteUnitAction}>
-                      <input type="hidden" name="id" value={u.id} />
-                      <button className="btn-ghost !py-1 !px-2 text-xs" type="submit" title="Delete unit (must be empty)">✕</button>
-                    </form>
                   </div>
                 </>
               ) : (
                 <>
-                  <form action={rentUnitAction} className="flex gap-2">
-                    <input type="hidden" name="id" value={u.id} />
-                    <input name="occupant" required className="input !py-1 text-sm flex-1" placeholder="Occupant name…" />
-                    <button className="btn-gold !py-1 text-xs whitespace-nowrap" type="submit">Rent out</button>
-                  </form>
+                  <div className="flex gap-2">
+                    <form action={rentUnitAction} className="flex gap-2 flex-1">
+                      <input type="hidden" name="id" value={u.id} />
+                      <input name="occupant" required className="input !py-1 text-sm flex-1" placeholder="Occupant name…" />
+                      <button className="btn-gold !py-1 text-xs whitespace-nowrap" type="submit">Rent out</button>
+                    </form>
+                    <form action={deleteUnitAction}>
+                      <input type="hidden" name="id" value={u.id} />
+                      <button className="btn-ghost !py-1 !px-2 text-xs shrink-0" type="submit" title="Delete this empty unit">✕</button>
+                    </form>
+                  </div>
                   <p className="text-xs text-[#8a7c64]">Collect appears here once occupied — nothing to collect from an empty chest.</p>
                 </>
               )}

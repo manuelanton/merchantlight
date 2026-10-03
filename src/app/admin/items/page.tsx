@@ -68,10 +68,12 @@ export default async function ItemsPage() {
                     <button className="btn-gold !py-1 text-sm" type="submit">Save</button>
                   </form>
                 </details>
+                {n === 0 && (
                 <form action={deleteCategoryAction} className="inline-block">
                   <input type="hidden" name="id" value={c.id} />
-                  <button className="btn-ghost !py-1 !px-2 text-xs" type="submit" title={n ? `Holds ${n} items — empty it first` : "Delete section"}>✕</button>
+                  <button className="btn-ghost !py-1 !px-2 text-xs" type="submit" title="Delete section">✕</button>
                 </form>
+                )}
               </li>
             );
           })}
