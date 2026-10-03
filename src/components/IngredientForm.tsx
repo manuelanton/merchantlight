@@ -5,7 +5,7 @@ import { addIngredientAction } from "@/lib/admin-actions";
 interface Row {
   key: number;
   materialId: string;
-  qty: number;
+  qty: string;
 }
 
 export default function IngredientForm({
@@ -17,11 +17,11 @@ export default function IngredientForm({
   materials: { id: string; name: string; cost: number }[];
   onSaved?: () => void;
 }) {
-  const [rows, setRows] = useState<Row[]>([{ key: 0, materialId: materials[0]?.id || "", qty: 1 }]);
+  const [rows, setRows] = useState<Row[]>([{ key: 0, materialId: materials[0]?.id || "", qty: "1" }]);
   const [n, setN] = useState(1);
 
   const addRow = () => {
-    setRows((r) => [...r, { key: n, materialId: materials[0]?.id || "", qty: 1 }]);
+    setRows((r) => [...r, { key: n, materialId: materials[0]?.id || "", qty: "1" }]);
     setN((x) => x + 1);
   };
   const setRow = (key: number, patch: Partial<Row>) =>
@@ -32,7 +32,7 @@ export default function IngredientForm({
   const save = async (fd: FormData) => {
     await addIngredientAction(fd);
     const f = materials[0];
-    setRows([{ key: n + 1, materialId: f?.id || "", qty: 1 }]);
+    setRows([{ key: n + 1, materialId: f?.id || "", qty: "1" }]);
     setN((x) => x + 2);
     onSaved?.();
   };
@@ -54,7 +54,7 @@ export default function IngredientForm({
           <div className="flex gap-2 items-center">
             <input
               name="qty" type="number" min={0.01} step="any" value={r.qty}
-              onChange={(e) => setRow(r.key, { qty: Number(e.target.value) })}
+              onChange={(e) => setRow(r.key, { qty: e.target.value })}
               className="input w-24" aria-label="Quantity"
             />
             <button type="button" onClick={() => removeRow(r.key)} className="btn-ghost !px-2.5 shrink-0" title="Remove row">✕</button>

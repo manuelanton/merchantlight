@@ -13,28 +13,28 @@ export default function ContributionForm({
   categories: { slug: string; name: string }[];
 }) {
   const [withItems, setWithItems] = useState(false);
-  const [rows, setRows] = useState([{ key: 0, cat: "", itemId: items[0]?.id || "", qty: 1, value: -1 }]);
+  const [rows, setRows] = useState([{ key: 0, cat: "", itemId: items[0]?.id || "", qty: "1", value: "" }]);
   const [n, setN] = useState(1);
   const [manual, setManual] = useState("0");
 
   const inCat = (cat: string) => (cat ? items.filter((i) => i.category === cat) : items);
   const costOf = (id: string) => items.find((i) => i.id === id)?.cost || 0;
-  const rowValue = (r: { itemId: string; qty: number; value: number }) =>
-    (r.value >= 0 ? r.value : costOf(r.itemId));
-  const autoTotal = rows.reduce((a, r) => a + r.qty * rowValue(r), 0);
+  const rowValue = (r: { itemId: string; qty: string; value: string }) =>
+    (r.value !== "" ? Number(r.value) || 0 : costOf(r.itemId));
+  const autoTotal = rows.reduce((a, r) => a + (Number(r.qty) || 0) * rowValue(r), 0);
 
   const addRow = () => {
-    setRows((r) => [...r, { key: n, cat: "", itemId: items[0]?.id || "", qty: 1, value: -1 }]);
+    setRows((r) => [...r, { key: n, cat: "", itemId: items[0]?.id || "", qty: "1", value: "" }]);
     setN((x) => x + 1);
   };
-  const setRow = (key: number, patch: Partial<{ cat: string; itemId: string; qty: number; value: number }>) =>
+  const setRow = (key: number, patch: Partial<{ cat: string; itemId: string; qty: string; value: string }>) =>
     setRows((rs) =>
       rs.map((r) => {
         if (r.key !== key) return r;
         const next = { ...r, ...patch };
         if (patch.cat !== undefined || patch.itemId !== undefined) {
           // Follow the catalogue unless the user typed an explicit override.
-          if (patch.value === undefined) next.value = -1;
+          if (patch.value === undefined) next.value = "";
           if (patch.cat !== undefined) next.itemId = inCat(patch.cat)[0]?.id || "";
         }
         return next;
@@ -43,7 +43,7 @@ export default function ContributionForm({
   const removeRow = (key: number) => setRows((rs) => rs.filter((r) => r.key !== key));
 
   const summary = rows
-    .filter((r) => r.itemId && r.qty > 0)
+    .filter((r) => r.itemId && (Number(r.qty) || 0) > 0)
     .map((r) => `${items.find((i) => i.id === r.itemId)?.name || "goods"} × ${r.qty}`)
     .join(", ");
 
@@ -88,12 +88,12 @@ export default function ContributionForm({
               </select>
               <input
                 name="contrib_qty" type="number" min={0.01} step="any" value={r.qty}
-                onChange={(e) => setRow(r.key, { qty: Number(e.target.value) })}
+                onChange={(e) => setRow(r.key, { qty: e.target.value })}
                 className="input col-span-6 md:col-span-2" aria-label="Quantity"
               />
               <input
-                type="number" min={0} step="any" value={r.value >= 0 ? r.value : costOf(r.itemId)}
-                onChange={(e) => setRow(r.key, { value: Number(e.target.value) })}
+                type="number" min={0} step="any" value={r.value !== "" ? r.value : costOf(r.itemId)}
+                onChange={(e) => setRow(r.key, { value: e.target.value })}
                 className="input col-span-4 md:col-span-1" aria-label="Value each (g)"
                 title="Value each — autofills from cost, editable"
               />

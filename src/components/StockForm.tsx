@@ -6,16 +6,16 @@ interface Row {
   key: number;
   cat: string;
   itemId: string;
-  delta: number;
+  delta: string;
 }
 
 export default function StockForm({ items, categories }: { items: CatalogOption[]; categories: CategoryOption[] }) {
   const inCat = (cat: string) => (cat ? items.filter((i) => i.category === cat) : items);
-  const [rows, setRows] = useState<Row[]>([{ key: 0, cat: "", itemId: items[0]?.id || "", delta: 1 }]);
+  const [rows, setRows] = useState<Row[]>([{ key: 0, cat: "", itemId: items[0]?.id || "", delta: "1" }]);
   const [n, setN] = useState(1);
 
   const addRow = () => {
-    setRows((r) => [...r, { key: n, cat: "", itemId: items[0]?.id || "", delta: 1 }]);
+    setRows((r) => [...r, { key: n, cat: "", itemId: items[0]?.id || "", delta: "1" }]);
     setN((x) => x + 1);
   };
   const setRow = (key: number, patch: Partial<Row>) =>
@@ -32,7 +32,7 @@ export default function StockForm({ items, categories }: { items: CatalogOption[
 
   const save = async (fd: FormData) => {
     await adjustStockAction(fd);
-    setRows([{ key: n + 1, cat: "", itemId: items[0]?.id || "", delta: 1 }]);
+    setRows([{ key: n + 1, cat: "", itemId: items[0]?.id || "", delta: "1" }]);
     setN((x) => x + 2);
     setFlash("Logged ✓");
     setTimeout(() => setFlash(""), 3000);
@@ -60,7 +60,7 @@ export default function StockForm({ items, categories }: { items: CatalogOption[
           <select name="item_id" className="input col-span-6 md:col-span-6" value={r.itemId} onChange={(e) => setRow(r.key, { itemId: e.target.value })} required aria-label="Item">
             {inCat(r.cat).map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
           </select>
-          <input name="delta" type="number" step="any" value={r.delta} onChange={(e) => setRow(r.key, { delta: Number(e.target.value) })} className="input col-span-10 md:col-span-2" aria-label="Amount" title="Positive adds stock; negative only for corrections" required />
+          <input name="delta" type="number" step="any" value={r.delta} onChange={(e) => setRow(r.key, { delta: e.target.value })} className="input col-span-10 md:col-span-2" aria-label="Amount" title="Positive adds stock; negative only for corrections" required />
           <div className="col-span-2 md:col-span-1 flex md:justify-end">
             <button type="button" onClick={() => removeRow(r.key)} className="btn-ghost !px-3 w-10 shrink-0" title="Remove row">✕</button>
           </div>

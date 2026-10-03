@@ -19,8 +19,8 @@ interface Row {
   key: number;
   cat: string; // "" = all categories
   itemId: string;
-  qty: number;
-  price: number;
+  qty: string;
+  price: string;
 }
 
 const DEFAULT_LOCATIONS = ["Gallow's Rock", "Windhelm", "Darkwater Crossing", "Whiterun", "Winterhold"];
@@ -28,15 +28,16 @@ const DEFAULT_LOCATIONS = ["Gallow's Rock", "Windhelm", "Darkwater Crossing", "W
 export default function SaleForm({ items, categories, locations = DEFAULT_LOCATIONS }: { items: CatalogOption[]; categories: CategoryOption[]; locations?: string[] }) {
   const inCat = (cat: string) => (cat ? items.filter((i) => i.category === cat) : items);
   const firstOf = (cat: string) => inCat(cat)[0];
+  const priceStr = (id: string) => String(items.find((i) => i.id === id)?.price ?? 0);
   const [rows, setRows] = useState<Row[]>(() => {
     const f = firstOf("");
-    return [{ key: 0, cat: "", itemId: f?.id || "", qty: 1, price: f?.price || 0 }];
+    return [{ key: 0, cat: "", itemId: f?.id || "", qty: "1", price: String(f?.price ?? 0) }];
   });
   const [n, setN] = useState(1);
 
   const addRow = () => {
     const f = firstOf("");
-    setRows((r) => [...r, { key: n, cat: "", itemId: f?.id || "", qty: 1, price: f?.price || 0 }]);
+    setRows((r) => [...r, { key: n, cat: "", itemId: f?.id || "", qty: "1", price: String(f?.price ?? 0) }]);
     setN((x) => x + 1);
   };
   const setRow = (key: number, patch: Partial<Row>) =>
@@ -48,16 +49,16 @@ export default function SaleForm({ items, categories, locations = DEFAULT_LOCATI
           // Category changed: jump to its first item + base price.
           const f = firstOf(patch.cat);
           next.itemId = f?.id || "";
-          next.price = f?.price || 0;
+          next.price = String(f?.price ?? 0);
         } else if (patch.itemId !== undefined && patch.price === undefined) {
-          next.price = items.find((i) => i.id === patch.itemId)?.price || 0;
+          next.price = priceStr(patch.itemId);
         }
         return next;
       })
     );
   const removeRow = (key: number) => setRows((rs) => (rs.length > 1 ? rs.filter((r) => r.key !== key) : rs));
 
-  const total = rows.reduce((a, r) => a + r.qty * r.price, 0);
+  const total = rows.reduce((a, r) => a + (Number(r.qty) || 0) * (Number(r.price) || 0), 0);
 
   return (
     <form action={recordSaleAction} className="card p-4 space-y-2">
@@ -81,8 +82,8 @@ export default function SaleForm({ items, categories, locations = DEFAULT_LOCATI
           <select name="item_id" className="input col-span-6 md:col-span-5" value={r.itemId} onChange={(e) => setRow(r.key, { itemId: e.target.value })} required aria-label="Item">
             {inCat(r.cat).map((i) => <option key={i.id} value={i.id}>{i.name} — {i.price}g</option>)}
           </select>
-          <input name="qty" type="number" step="any" min={1} value={r.qty} onChange={(e) => setRow(r.key, { qty: Number(e.target.value) })} className="input col-span-5 md:col-span-1" aria-label="Quantity" />
-          <input name="unit_sale_price" type="number" step="any" min={0} value={r.price} onChange={(e) => setRow(r.key, { price: Number(e.target.value) })} className="input col-span-5 md:col-span-2" aria-label="Price each" title="Base price auto-filled — edit for discounts" />
+          <input name="qty" type="number" step="any" min={1} value={r.qty} onChange={(e) => setRow(r.key, { qty: e.target.value })} className="input col-span-5 md:col-span-1" aria-label="Quantity" />
+          <input name="unit_sale_price" type="number" step="any" min={0} value={r.price} onChange={(e) => setRow(r.key, { price: e.target.value })} className="input col-span-5 md:col-span-2" aria-label="Price each" title="Base price auto-filled — edit for discounts" />
           <div className="col-span-2 md:col-span-1 flex md:justify-end">
             <button type="button" onClick={() => removeRow(r.key)} className="btn-ghost !px-3 w-10 shrink-0" title="Remove row">✕</button>
           </div>

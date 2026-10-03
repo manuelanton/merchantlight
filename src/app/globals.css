@@ -33,6 +33,10 @@ body {
   font-weight: 700;
 }
 
+/* Component classes live in the components layer so Tailwind utilities
+   (widths, spacing) always win over them. Unlayered CSS would override
+   utilities like w-24 and squeeze/balloon form fields. */
+@layer components {
 .card {
   background: linear-gradient(180deg, #1d1a16 0%, #12181b 100%);
   border: 1px solid #2b4149;
@@ -80,3 +84,4 @@ table.ledger td { padding: 0.55rem 0.5rem; border-bottom: 1px solid #1c2b31; }
 .badge-in { background: linear-gradient(180deg, #eda93f, #9a4d12); border-color: #d97a1f; color: #17100a; font-weight: 700; }
 /* Snuffed lantern: dim outline = closed, still legible. */
 .badge-out { background: transparent; border-color: #5a4a33; color: #a89a7d; }
+}
