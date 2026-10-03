@@ -13,24 +13,30 @@ export default function ContributionForm({
   categories: { slug: string; name: string }[];
 }) {
   const [withItems, setWithItems] = useState(false);
-  const [rows, setRows] = useState([{ key: 0, cat: "", itemId: items[0]?.id || "", qty: 1 }]);
+  const [rows, setRows] = useState([{ key: 0, cat: "", itemId: items[0]?.id || "", qty: 1, value: -1 }]);
   const [n, setN] = useState(1);
   const [manual, setManual] = useState("0");
 
   const inCat = (cat: string) => (cat ? items.filter((i) => i.category === cat) : items);
   const costOf = (id: string) => items.find((i) => i.id === id)?.cost || 0;
-  const autoTotal = rows.reduce((a, r) => a + r.qty * costOf(r.itemId), 0);
+  const rowValue = (r: { itemId: string; qty: number; value: number }) =>
+    (r.value >= 0 ? r.value : costOf(r.itemId));
+  const autoTotal = rows.reduce((a, r) => a + r.qty * rowValue(r), 0);
 
   const addRow = () => {
-    setRows((r) => [...r, { key: n, cat: "", itemId: items[0]?.id || "", qty: 1 }]);
+    setRows((r) => [...r, { key: n, cat: "", itemId: items[0]?.id || "", qty: 1, value: -1 }]);
     setN((x) => x + 1);
   };
-  const setRow = (key: number, patch: Partial<{ cat: string; itemId: string; qty: number }>) =>
+  const setRow = (key: number, patch: Partial<{ cat: string; itemId: string; qty: number; value: number }>) =>
     setRows((rs) =>
       rs.map((r) => {
         if (r.key !== key) return r;
         const next = { ...r, ...patch };
-        if (patch.cat !== undefined) next.itemId = inCat(patch.cat)[0]?.id || "";
+        if (patch.cat !== undefined || patch.itemId !== undefined) {
+          // Follow the catalogue unless the user typed an explicit override.
+          if (patch.value === undefined) next.value = -1;
+          if (patch.cat !== undefined) next.itemId = inCat(patch.cat)[0]?.id || "";
+        }
         return next;
       })
     );
@@ -74,7 +80,7 @@ export default function ContributionForm({
                 {categories.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
               </select>
               <select
-                name="contrib_item_id" className="input col-span-9 md:col-span-6"
+                name="contrib_item_id" className="input col-span-12 md:col-span-5"
                 value={r.itemId} onChange={(e) => setRow(r.key, { itemId: e.target.value })}
                 aria-label="Contributed item"
               >
@@ -83,9 +89,15 @@ export default function ContributionForm({
               <input
                 name="contrib_qty" type="number" min={0.01} step="any" value={r.qty}
                 onChange={(e) => setRow(r.key, { qty: Number(e.target.value) })}
-                className="input col-span-2 md:col-span-2" aria-label="Quantity"
+                className="input col-span-6 md:col-span-2" aria-label="Quantity"
               />
-              <div className="col-span-1 md:col-span-1 flex md:justify-end">
+              <input
+                type="number" min={0} step="any" value={r.value >= 0 ? r.value : costOf(r.itemId)}
+                onChange={(e) => setRow(r.key, { value: Number(e.target.value) })}
+                className="input col-span-4 md:col-span-1" aria-label="Value each (g)"
+                title="Value each — autofills from cost, editable"
+              />
+              <div className="col-span-2 md:col-span-1 flex md:justify-end">
                 <button type="button" onClick={() => removeRow(r.key)} className="btn-ghost !px-2.5 shrink-0" title="Remove row">✕</button>
               </div>
             </div>

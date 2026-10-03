@@ -3,7 +3,6 @@ import { useState } from "react";
 import { addLedgerAction } from "@/lib/admin-actions";
 import ContributionForm from "./ContributionForm";
 import MemberSelect from "./MemberSelect";
-
 export default function LedgerAddForm({
   members,
   items,
@@ -14,9 +13,19 @@ export default function LedgerAddForm({
   categories: { slug: string; name: string }[];
 }) {
   const [type, setType] = useState("contribution");
+  const [formKey, setFormKey] = useState(0);
+  const [flash, setFlash] = useState("");
+
+  const save = async (fd: FormData) => {
+    await addLedgerAction(fd);
+    setFormKey((k) => k + 1);
+    setFlash("Logged ✓");
+    setTimeout(() => setFlash(""), 3000);
+  };
 
   return (
-    <form action={addLedgerAction} className="card p-5 space-y-3">
+    <form action={save} key={formKey} className="card p-5 space-y-3">
+      {flash && <p className="text-sm text-[#7fd08a]">{flash}</p>}
       <div className="grid md:grid-cols-3 gap-3">
         <div><label className="lbl">Type</label>
           <select name="type" value={type} onChange={(e) => setType(e.target.value)} className="input">

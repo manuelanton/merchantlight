@@ -50,6 +50,8 @@ body {
   border: 1px solid var(--ember-deep);
 }
 .btn-gold:hover { filter: brightness(1.1); }
+.btn-gold, .btn-ghost { transition: transform 0.08s ease, filter 0.08s ease, background 0.08s ease; }
+.btn-gold:active, .btn-ghost:active { transform: scale(0.96); filter: brightness(1.15); }
 
 .btn-ghost {
   border: 1px solid #5a4a33;

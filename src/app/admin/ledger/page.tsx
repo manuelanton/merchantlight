@@ -100,7 +100,7 @@ export default async function LedgerPage() {
 
       <LedgerAddForm
         members={b.members}
-        items={items.filter((i) => i.active).map((i) => ({ id: i.id, name: i.name, cost: i.cost_value > 0 ? i.cost_value : i.sale_price, category: i.category_slug }))}
+        items={items.filter((i) => i.active).map((i) => ({ id: i.id, name: i.name, cost: i.cost_value, category: i.category_slug }))}
         categories={categories.map((c) => ({ slug: c.slug, name: c.name }))}
       />
 
