@@ -1,6 +1,9 @@
 import { getBooks } from "@/lib/books";
 import { g } from "@/lib/format";
 import { getCatalogue } from "@/lib/catalog";
+import { effectiveCost, hasRecipe } from "@/lib/cost";
+import { getDb } from "@/db";
+import { itemIngredients } from "@/db/schema";
 import LedgerAddForm from "@/components/LedgerAddForm";
 import LedgerFeed, { type FeedEntry } from "@/components/LedgerFeed";
 
@@ -9,6 +12,12 @@ export const dynamic = "force-dynamic";
 export default async function LedgerPage() {
   const b = await getBooks();
   const { categories, items } = await getCatalogue();
+  const db = await getDb();
+  const ingredientRows = await db.select().from(itemIngredients);
+  const costInputs = {
+    items: items.map((m) => ({ id: m.id, cost_value: m.cost_value, sale_price: m.sale_price })),
+    ingredients: ingredientRows.map((r) => ({ itemId: r.itemId, materialItemId: r.materialItemId, qty: r.qty })),
+  };
   const bal = b.ledgerRows.reduce((a, e) => a + e.amountGold, 0);
 
   type Row = (typeof b.ledgerRows)[number];
@@ -100,7 +109,12 @@ export default async function LedgerPage() {
 
       <LedgerAddForm
         members={b.members}
-        items={items.filter((i) => i.active).map((i) => ({ id: i.id, name: i.name, cost: i.cost_value, category: i.category_slug }))}
+        items={items.filter((i) => i.active).map((i) => ({
+          id: i.id, name: i.name,
+          // Donations value at cost (recipe, else manual) — never price.
+          cost: hasRecipe(i.id, costInputs.ingredients) ? effectiveCost(i.id, costInputs.items, costInputs.ingredients) : (i.cost_value || 0),
+          category: i.category_slug,
+        }))}
         categories={categories.map((c) => ({ slug: c.slug, name: c.name }))}
       />
 
