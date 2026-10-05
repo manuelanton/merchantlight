@@ -292,6 +292,29 @@ export async function deleteLedgerAction(formData: FormData) {
   revalidatePath("/admin", "layout");
 }
 
+/** Set the ledger balance directly: posts one unattributed adjustment for the
+ *  difference, so no member is distorted. */
+export async function adjustBalanceAction(formData: FormData) {
+  await quartermaster();
+  const target = Number(formData.get("target_gold"));
+  if (!Number.isFinite(target)) throw new Error("Enter a target balance");
+  const db = await getDb();
+  const rows = await db.select().from(ledger);
+  const current = rows.reduce((a, e) => a + e.amountGold, 0);
+  const diff = Math.round((target - current) * 100) / 100;
+  if (!diff) throw new Error("Balance is already there — nothing to adjust");
+  await db.insert(ledger).values({
+    id: uid("lg"),
+    type: diff > 0 ? "contribution" : "expense",
+    member: "",
+    amountGold: diff,
+    category: "adjustment",
+    description: `Balance adjustment to ${target}g (was ${Math.round(current * 100) / 100}g)`,
+    actorDiscordId: "",
+  });
+  revalidatePath("/admin", "layout");
+}
+
 // ---------- catalogue (DB-managed; the sheet is retired) ----------
 
 function slugify(s: string, fallback: string) {

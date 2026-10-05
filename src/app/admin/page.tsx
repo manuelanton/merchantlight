@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requestRestockAction, setShopOpenAction } from "@/lib/admin-actions";
+import { adjustBalanceAction, requestRestockAction, setShopOpenAction } from "@/lib/admin-actions";
 import { getBooks } from "@/lib/books";
 import { g } from "@/lib/format";
 import { isShopOpen } from "@/lib/shop";
@@ -50,7 +50,15 @@ export default async function AdminHome() {
         <div className="card p-4"><div className="lbl">Profit (sales)</div><div className="text-2xl text-[#e0bd4a]">{g(b.profit)}g</div></div>
         <div className="card p-4"><div className="lbl">Storage earned</div><div className="text-2xl text-[#e0bd4a]">{g(st.earned)}g</div></div>
         <div className="card p-4"><div className="lbl">Rent paid</div><div className="text-2xl text-[#e0bd4a]">{g(b.rentPaid)}g</div></div>
-        <div className="card p-4"><div className="lbl">Ledger balance</div><div className="text-2xl text-[#e0bd4a]">{g(ledgerBal)}g</div></div>
+        <div className="card p-4"><div className="lbl">Ledger balance</div><div className="text-2xl text-[#e0bd4a]">{g(ledgerBal)}g</div>
+          <details className="mt-1">
+            <summary className="text-xs text-[#c9a227] cursor-pointer hover:text-[#e8dcc4]">Adjust…</summary>
+            <form action={adjustBalanceAction} className="flex gap-2 mt-2 items-center">
+              <input name="target_gold" type="number" step="any" defaultValue={Math.round(ledgerBal * 100) / 100} className="input !py-1 text-sm" aria-label="Target balance" />
+              <button className="btn-ghost !py-1 text-xs whitespace-nowrap" type="submit" title="Posts one unattributed adjustment for the difference">Set</button>
+            </form>
+          </details>
+        </div>
       </div>
       <div className="card p-4 flex flex-wrap items-center gap-3">
         <span className="font-display text-lg">Storage: {st.filled}/{st.units.length} filled</span>
