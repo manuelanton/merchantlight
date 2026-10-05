@@ -4,6 +4,8 @@ import { getCatalogue } from "@/lib/catalog";
 import { effectiveCost, hasRecipe } from "@/lib/cost";
 import { getDb } from "@/db";
 import { itemIngredients } from "@/db/schema";
+import { getMembers } from "@/lib/members";
+import { addMemberAction, setMemberActiveAction } from "@/lib/admin-actions";
 import LedgerAddForm from "@/components/LedgerAddForm";
 import LedgerFeed, { type FeedEntry } from "@/components/LedgerFeed";
 
@@ -13,6 +15,7 @@ export default async function LedgerPage() {
   const b = await getBooks();
   const { categories, items } = await getCatalogue();
   const db = await getDb();
+  const allMembers = await getMembers();
   const ingredientRows = await db.select().from(itemIngredients);
   const costInputs = {
     items: items.map((m) => ({ id: m.id, cost_value: m.cost_value, sale_price: m.sale_price })),
@@ -117,6 +120,29 @@ export default async function LedgerPage() {
         }))}
         categories={categories.map((c) => ({ slug: c.slug, name: c.name }))}
       />
+
+      <div className="card p-5 space-y-3">
+        <h2 className="font-display text-lg">Members</h2>
+        <p className="text-xs text-[#8a7c64]">Splits go to active members only. Deactivating keeps history untouched.</p>
+        <form action={addMemberAction} className="flex gap-2">
+          <input name="name" required className="input flex-1" placeholder="New member name…" />
+          <button className="btn-gold !py-2 text-sm whitespace-nowrap" type="submit">Add member</button>
+        </form>
+        <ul className="space-y-1 text-sm">
+          {allMembers.map((m) => (
+            <li key={m.id} className="flex items-center gap-2">
+              <span className={m.active ? "" : "text-[#8a7c64] line-through"}>{m.name}</span>
+              <form action={setMemberActiveAction} className="inline ml-auto">
+                <input type="hidden" name="id" value={m.id} />
+                <input type="hidden" name="active" value={m.active ? "false" : "true"} />
+                <button className="btn-ghost !py-0.5 !px-2 text-xs" type="submit">
+                  {m.active ? "Deactivate" : "Reactivate"}
+                </button>
+              </form>
+            </li>
+          ))}
+        </ul>
+      </div>
 
       <LedgerFeed
         feed={feed.map((entry): FeedEntry => {

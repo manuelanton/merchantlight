@@ -105,3 +105,11 @@ export const storageUnits = pgTable("storage_units", {
   paidThrough: timestamp("paid_through", { withTimezone: true }),
   active: boolean("active").notNull().default(true),
 });
+
+/** Explicit member roster. Splits use active members; history keeps old names as text. */
+export const members = pgTable("members", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  active: boolean("active").notNull().default(true),
+  joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
+});

@@ -3,8 +3,9 @@ import { eq, like } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { auth, isQuartermaster } from "@/auth";
 import { getDb } from "@/db";
-import { categories, itemIngredients, items, ledger, notes, sales, settings, stockMoves, storageUnits } from "@/db/schema";
+import { categories, itemIngredients, items, ledger, members, notes, sales, settings, stockMoves, storageUnits } from "@/db/schema";
 import { getCatalogItems } from "@/lib/catalog";
+import { getRoster } from "@/lib/members";
 import { g, splitEvenly } from "@/lib/format";
 import { effectiveCost } from "@/lib/cost";
 import { setShopOpen } from "@/lib/shop";
@@ -94,10 +95,7 @@ export async function confirmSaleAction(formData: FormData) {
   const s = found[0];
   if (!s) throw new Error("Sale not found");
   if (s.status === "confirmed") throw new Error("Already confirmed");
-  const existing = await db.select().from(ledger);
-  const nets = new Map<string, number>();
-  for (const e of existing) nets.set(e.member, (nets.get(e.member) || 0) + e.amountGold);
-  const roster = [...nets.keys()].sort();
+  const roster = await getRoster();
   const profit = Math.round((s.unitSalePrice - s.unitCostSnapshot) * s.qty * 100) / 100;
   if (profit !== 0) {
     const who = roster.length ? roster : [s.soldByName];
@@ -226,10 +224,7 @@ export async function addLedgerAction(formData: FormData) {
   // equal per-member shares instead of one lump row — unless it comes
   // straight from company coffers, which charges nobody.
   if (type === "expense" && !fromCoffers && category.trim().toLowerCase() === "rent") {
-    const existing = await db.select().from(ledger);
-    const nets = new Map<string, number>();
-    for (const e of existing) nets.set(e.member, (nets.get(e.member) || 0) + e.amountGold);
-    const roster = [...nets.keys()].sort();
+    const roster = await getRoster();
     if (roster.length) {
       const total = Math.abs(amount);
       const shares = splitEvenly(total, roster.length);
@@ -601,5 +596,29 @@ export async function deleteUnitAction(formData: FormData) {
   const found = await db.select().from(storageUnits).where(eq(storageUnits.id, String(formData.get("id")))).limit(1);
   if (found[0]?.occupant) throw new Error("Free the unit first");
   await db.delete(storageUnits).where(eq(storageUnits.id, String(formData.get("id"))));
+  revalidatePath("/admin", "layout");
+}
+
+// ---------- members (explicit roster; splits use active members) ----------
+
+export async function addMemberAction(formData: FormData) {
+  await quartermaster();
+  const name = String(formData.get("name") || "").trim();
+  if (!name) throw new Error("Name the member");
+  const db = await getDb();
+  await db.insert(members).values({
+    id: `mb-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+    name,
+    active: true,
+  }).onConflictDoNothing({ target: members.name });
+  revalidatePath("/admin", "layout");
+}
+
+export async function setMemberActiveAction(formData: FormData) {
+  await quartermaster();
+  const db = await getDb();
+  await db.update(members)
+    .set({ active: String(formData.get("active")) === "true" })
+    .where(eq(members.id, String(formData.get("id"))));
   revalidatePath("/admin", "layout");
 }

@@ -2,6 +2,7 @@ import { desc } from "drizzle-orm";
 import { auth, isQuartermaster } from "@/auth";
 import { getDb } from "@/db";
 import { ledger, notes, sales, stockMoves } from "@/db/schema";
+import { getMembers } from "@/lib/members";
 
 export interface Books {
   salesRows: (typeof sales.$inferSelect)[];
@@ -13,9 +14,9 @@ export interface Books {
   profit: number;
   rentPaid: number;
   balances: [string, number][];
-  /** Everyone who ever touched the ledger. Newcomers appear with their first entry. */
+  /** Members for pickers = active registered members. */
   members: string[];
-  /** Split roster: every registered member. Newcomers join future splits on their first entry; history never re-splits. */
+  /** Split roster = active registered members. */
   roster: string[];
 }
 
@@ -54,9 +55,10 @@ export async function getBooks(): Promise<Books> {
   }
   const balances = [...bal.entries()].sort((a, b) => b[1] - a[1]);
 
-  // Roster: every registered member splits (even at zero net — a zero row is how
-  // new members register). Ghost rows are prevented by rejecting zero amounts.
-  const roster = [...bal.keys()].sort();
+  const memberRows = await getMembers();
+  const activeMembers = memberRows.filter((m) => m.active).map((m) => m.name);
+  // Roster = active registered members. History is untouched by roster changes.
+  const roster = activeMembers;
 
-  return { salesRows, moveRows, ledgerRows, noteRows, stockByItem, revenue, profit, rentPaid, balances, members: [...bal.keys()].sort(), roster };
+  return { salesRows, moveRows, ledgerRows, noteRows, stockByItem, revenue, profit, rentPaid, balances, members: activeMembers, roster };
 }
