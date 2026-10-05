@@ -6,6 +6,7 @@ import { getDb } from "@/db";
 import { itemIngredients } from "@/db/schema";
 import { getMembers } from "@/lib/members";
 import { addMemberAction, setMemberActiveAction } from "@/lib/admin-actions";
+import Collapsible from "@/components/Collapsible";
 import LedgerAddForm from "@/components/LedgerAddForm";
 import LedgerFeed, { type FeedEntry } from "@/components/LedgerFeed";
 
@@ -121,8 +122,7 @@ export default async function LedgerPage() {
         categories={categories.map((c) => ({ slug: c.slug, name: c.name }))}
       />
 
-      <div className="card p-5 space-y-3">
-        <h2 className="font-display text-lg">Members</h2>
+      <Collapsible title="Members">
         <p className="text-xs text-[#8a7c64]">Splits go to active members only. Deactivating keeps history untouched.</p>
         <form action={addMemberAction} className="flex gap-2">
           <input name="name" required className="input flex-1" placeholder="New member name…" />
@@ -142,7 +142,7 @@ export default async function LedgerPage() {
             </li>
           ))}
         </ul>
-      </div>
+      </Collapsible>
 
       <LedgerFeed
         feed={feed.map((entry): FeedEntry => {

@@ -1,5 +1,6 @@
 import { deleteNoteAction, postNoteAction, resolveNoteAction } from "@/lib/admin-actions";
 import { getBooks } from "@/lib/books";
+import Collapsible from "@/components/Collapsible";
 
 export const dynamic = "force-dynamic";
 
@@ -24,8 +25,7 @@ export default async function NotesPage() {
         Logistics notes for quartermasters — news, requests, to-dos, stock calls. Keeps it out of chat.
       </p>
 
-      <form action={postNoteAction} className="card p-5 space-y-3">
-        <h2 className="font-display text-lg">Post a note</h2>
+      <Collapsible title="Post a note" defaultOpen action={postNoteAction}>
         <div className="grid md:grid-cols-4 gap-3">
           <div><label className="lbl">Kind</label>
             <select name="kind" className="input">
@@ -38,7 +38,7 @@ export default async function NotesPage() {
         <div className="flex justify-end">
           <button className="btn-gold !py-2 !px-5 text-sm" type="submit">Post note</button>
         </div>
-      </form>
+      </Collapsible>
 
       <div className="space-y-3">
         <h2 className="font-display text-lg">Open ({open.length})</h2>

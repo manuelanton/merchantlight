@@ -8,6 +8,7 @@ import { getBooks } from "@/lib/books";
 import { getDb } from "@/db";
 import { itemIngredients } from "@/db/schema";
 import AddItemForm from "@/components/AddItemForm";
+import Collapsible from "@/components/Collapsible";
 import ItemsManager from "@/components/ItemsManager";
 
 export const dynamic = "force-dynamic";
@@ -27,10 +28,12 @@ export default async function ItemsPage() {
         Deleting an item is safe: sales and stock history keep its name.
       </p>
 
-      <AddItemForm
-        categories={sorted.map((c) => ({ slug: c.slug, name: c.name }))}
-        materials={items.filter((m) => m.category_slug === "materials").map((m) => ({ id: m.id, name: m.name, cost: m.cost_value }))}
-      />
+      <Collapsible title="Add item" defaultOpen>
+        <AddItemForm
+          categories={sorted.map((c) => ({ slug: c.slug, name: c.name }))}
+          materials={items.filter((m) => m.category_slug === "materials").map((m) => ({ id: m.id, name: m.name, cost: m.cost_value }))}
+        />
+      </Collapsible>
 
       <ItemsManager
         items={items.map((i) => ({
@@ -46,8 +49,7 @@ export default async function ItemsPage() {
         }))}
       />
 
-      <div className="card p-5 space-y-4">
-        <h2 className="font-display text-lg">Categories</h2>
+      <Collapsible title="Categories">
         <form action={createCategoryAction} className="flex flex-wrap gap-2 items-end">
           <div><label className="lbl">New section name *</label><input name="name" required className="input !w-auto" placeholder="Enchantments" /></div>
           <div><label className="lbl">Icon</label><input name="icon" defaultValue="📦" className="input !w-20" /></div>
@@ -78,7 +80,7 @@ export default async function ItemsPage() {
             );
           })}
         </ul>
-      </div>
+      </Collapsible>
     </div>
   );
 }
