@@ -8,7 +8,7 @@ import { getStorage } from "@/lib/storage";
 export const revalidate = 60;
 
 export default async function Home() {
-  const [{ categories, items }, open, storage] = await Promise.all([getCatalogue(), isShopOpen(), getStorage()]);
+  const [{ categories, items }, open, storage] = await Promise.all([getCatalogue(), isShopOpen(), getStorage("Darkwater Crossing")]);
   const sorted = [...categories].sort((a, b) => a.sort_order - b.sort_order);
   const active = items.filter((i) => i.active);
   const sections = sorted
@@ -36,7 +36,7 @@ export default async function Home() {
           <h1 className="font-display text-3xl md:text-4xl">Merchantlight Company</h1>
           <p className="mt-2">
             {open ? (
-              <span className="badge badge-in">● Open now — salesperson at Gallow&apos;s Rock</span>
+              <span className="badge badge-in">● Open now — salesperson at the Darkwater store</span>
             ) : (
               <span className="badge badge-out">○ Currently closed — send word and we&apos;ll arrange it</span>
             )}
@@ -73,16 +73,30 @@ export default async function Home() {
             )}
           </Link>
         ))}
-        <Link href="/visit" className="card p-5 hover:border-[#d97a1f] transition block">
+        <Link href="#find-us" className="card p-5 hover:border-[#d97a1f] transition block">
           <div className="font-display text-xl">🛢️ Storage</div>
           <p className="text-sm text-[#b8a888] mt-1">
-            Barrels outside our keep — 60g per week
+            Barrels at the Darkwater store — 60g per week
           </p>
           <p className="mt-2 text-[#e0bd4a]">
             {storage.units.length ? (storage.free > 0 ? `${storage.free} of ${storage.units.length} free` : "Full right now") : "Ask for availability"}
             <span className="text-sm text-[#c9a227] ml-2">Visit us →</span>
           </p>
         </Link>
+      </section>
+
+      <section id="find-us" className="card overflow-hidden scroll-mt-24">
+        <img src="/darkwater-shop.jpg" alt="The Merchantlight general store in Darkwater Crossing" className="w-full h-auto block" />
+        <div className="p-6 md:p-8 space-y-2">
+          <h2 className="font-display text-2xl">Visit us</h2>
+          <p className="text-[#cbbfa5] max-w-2xl">
+            You&apos;ll find us at the <b className="text-[#e8dcc4]">general store in Darkwater Crossing, Eastmarch</b> —
+            look for the lantern sign. Can&apos;t make the trip? We arrange{" "}
+            <b className="text-[#e8dcc4]">deliveries within Eastmarch</b> — find us in town or send word and we&apos;ll meet you on the road.
+          </p>
+          <p className="text-[#e0bd4a]">Always buying: ores &amp; charcoal — bring us your surplus.</p>
+          <p className="text-sm text-[#8a7c64]">All prices in gold (septims). Bulk rates marked where offered.</p>
+        </div>
       </section>
     </div>
   );

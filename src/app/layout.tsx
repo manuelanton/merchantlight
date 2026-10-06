@@ -4,8 +4,8 @@ import { backofficeEnabled } from "@/lib/flags";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Merchantlight Company — Gallow's Rock, Eastmarch",
-  description: "Catalogue of the Merchantlight Company (Keizaal) — outfitters based in Gallow's Rock, Eastmarch. Deliveries arranged.",
+  title: "Merchantlight Company — Darkwater Crossing general store, Eastmarch",
+  description: "Catalogue of the Merchantlight Company (Keizaal) — outfitters at the Darkwater Crossing general store, Eastmarch. Deliveries arranged.",
   icons: { icon: "/logo.png" },
 };
 
@@ -32,19 +32,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </Link>
             <nav className="ml-auto flex gap-3 text-sm">
               <Link className="hover:text-[#c9a227]" href="/#sections">Catalogue</Link>
-              <Link className="hover:text-[#c9a227]" href="/visit">Visit us</Link>
+              <Link className="hover:text-[#c9a227]" href="/#find-us">Visit us</Link>
               {backofficeEnabled() && (
                 <Link className="hover:text-[#c9a227]" href="/admin">Quartermaster</Link>
               )}
             </nav>
           </div>
         </header>
+        <div className="bg-gradient-to-r from-[#9a4d12] via-[#d97a1f] to-[#9a4d12] text-[#17100a] text-center text-sm font-bold px-4 py-2">
+          We&apos;ve moved — find us at the general store in Darkwater Crossing! <Link href="/#find-us" className="underline">Visit us →</Link>
+        </div>
         <main className="max-w-6xl w-full mx-auto px-4 py-6 flex-1">{children}</main>
         <footer className="mt-8 border-t-2 border-[#d97a1f]/60 bg-[#0e1518]/95">
           <div className="max-w-6xl mx-auto px-4 py-6 text-center space-y-1">
             <p className="font-display text-[#e8dcc4]">Merchantlight Company</p>
             <p className="text-sm text-[#8a7c64]">
-              Based in Gallow&apos;s Rock, Eastmarch · Prices in gold · Deliveries arranged within Eastmarch
+              Based at the Darkwater Crossing general store, Eastmarch · Prices in gold · Deliveries arranged within Eastmarch
             </p>
           </div>
         </footer>

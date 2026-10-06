@@ -10,9 +10,12 @@ export interface StorageUnit {
   occupiedSince: Date | string | null;
   paidThrough: Date | string | null;
   active: boolean;
+  location: string;
+  kind: string;
+  secured: boolean;
 }
 
-export async function getStorage(): Promise<{
+export async function getStorage(site?: string): Promise<{
   units: StorageUnit[];
   filled: number;
   free: number;
@@ -25,7 +28,7 @@ export async function getStorage(): Promise<{
     db.select().from(ledger),
   ]);
   const units = unitRows
-    .filter((u) => u.active)
+    .filter((u) => u.active && (!site || u.location === site))
     .map((u) => ({
       id: u.id,
       label: u.label,
@@ -34,14 +37,18 @@ export async function getStorage(): Promise<{
       occupiedSince: u.occupiedSince,
       paidThrough: u.paidThrough,
       active: u.active,
+      location: u.location,
+      kind: u.kind,
+      secured: u.secured,
     }))
-    // Natural sort so Chest 2 comes before Chest 10.
+    // Natural sort so unit 2 comes before unit 10.
     .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
+  const rentals = units.filter((u) => u.kind !== "internal");
   const now = Date.now();
-  const filledUnits = units.filter((u) => u.occupant);
+  const filledUnits = rentals.filter((u) => u.occupant);
   const overdue = filledUnits.filter((u) => !u.paidThrough || new Date(u.paidThrough).getTime() < now);
   const earned = ledgerRows
     .filter((e) => e.type === "sale_income" && e.category.toLowerCase() === "storage")
     .reduce((a, e) => a + e.amountGold, 0);
-  return { units, filled: filledUnits.length, free: units.length - filledUnits.length, overdue, earned };
+  return { units, filled: filledUnits.length, free: rentals.length - filledUnits.length, overdue, earned };
 }

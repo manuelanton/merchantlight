@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { adjustBalanceAction, requestRestockAction, setShopOpenAction } from "@/lib/admin-actions";
+import { adjustBalanceAction, requestRestockAction, setShopOpenAction, sweepCashAction } from "@/lib/admin-actions";
 import { getBooks } from "@/lib/books";
 import { g } from "@/lib/format";
 import { isShopOpen } from "@/lib/shop";
+import { getCash } from "@/lib/cash";
 import { getStorage } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,8 @@ export default async function AdminHome() {
   const b = await getBooks();
   const open = await isShopOpen();
   const st = await getStorage();
+  const cash = await getCash();
+  const lockbox = cash.pots.find((p) => p.name === "Lockbox")?.balance || 0;
   const ledgerBal = b.ledgerRows.reduce((a, e) => a + e.amountGold, 0);
   const openNotes = b.noteRows.filter((n) => !n.resolved);
   const lowStock = [...b.stockByItem.values()].filter((s) => s.qty > 0 && s.qty <= LOW_AT);
@@ -61,7 +64,17 @@ export default async function AdminHome() {
         </div>
       </div>
       <div className="card p-4 flex flex-wrap items-center gap-3">
-        <span className="font-display text-lg">Storage: {st.filled}/{st.units.length} filled</span>
+        <span className="font-display text-lg">Cash:</span>
+        {cash.pots.map((p) => (
+          <span key={p.name} className="text-sm">{p.name} <b className="text-[#e0bd4a]">{g(p.balance)}g</b></span>
+        ))}
+        <form action={sweepCashAction} className="flex gap-2 items-center ml-auto">
+          <input name="amount_gold" type="number" min={0} step="any" defaultValue={lockbox > 0 ? lockbox : ""} placeholder="Amount" className="input !w-28 !py-1 text-sm" title="End-of-day: move gold from lockbox to safe" />
+          <button className="btn-gold !py-1 text-xs whitespace-nowrap" type="submit" title="Move gold from the register lockbox to the safe">Sweep to safe →</button>
+        </form>
+      </div>
+      <div className="card p-4 flex flex-wrap items-center gap-3">
+        <span className="font-display text-lg">Storage: {st.filled}/{st.units.filter((u) => u.kind !== "internal").length} filled</span>
         {st.overdue.length > 0 ? (
           <span className="badge badge-out">{st.overdue.length} past due: {st.overdue.slice(0, 4).map((u) => u.label).join(", ")}{st.overdue.length > 4 ? "…" : ""}</span>
         ) : (

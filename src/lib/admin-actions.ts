@@ -3,7 +3,7 @@ import { eq, like } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { auth, isQuartermaster } from "@/auth";
 import { getDb } from "@/db";
-import { categories, itemIngredients, items, ledger, members, notes, sales, settings, stockMoves, storageUnits } from "@/db/schema";
+import { categories, cashMoves, cashPots, itemIngredients, items, ledger, members, notes, sales, settings, stockMoves, storageUnits } from "@/db/schema";
 import { getCatalogItems } from "@/lib/catalog";
 import { getRoster } from "@/lib/members";
 import { g, splitEvenly } from "@/lib/format";
@@ -32,7 +32,7 @@ export async function recordSaleAction(formData: FormData) {
   if (!ids.length) throw new Error("No items");
   const qtys = rowsOf(formData, "qty");
   const prices = rowsOf(formData, "unit_sale_price");
-  const location = String(formData.get("location") || "Gallow's Rock");
+  const location = String(formData.get("location") || "Darkwater Crossing");
   const notes = String(formData.get("notes") || "");
   const seller = String(formData.get("seller") || qm.name).trim() || qm.name;
   const db = await getDb();
@@ -113,6 +113,18 @@ export async function confirmSaleAction(formData: FormData) {
     }
   }
   await db.update(sales).set({ status: "confirmed", confirmedBy: qm.name, confirmedAt: new Date() }).where(eq(sales.id, id));
+  // Cash lands in the register lockbox (physical gold ≠ profit shares).
+  const revenue = Math.round(s.unitSalePrice * s.qty * 100) / 100;
+  if (revenue !== 0) {
+    await db.insert(cashMoves).values({
+      id: uid("cm"),
+      pot: "Lockbox",
+      delta: revenue,
+      reason: `Sale ${s.itemName} × ${s.qty} at ${s.location}`,
+      actorDiscordId: qm.discordId,
+      actorName: qm.name,
+    });
+  }
   revalidatePath("/admin", "layout");
 }
 
@@ -620,5 +632,31 @@ export async function setMemberActiveAction(formData: FormData) {
   await db.update(members)
     .set({ active: String(formData.get("active")) === "true" })
     .where(eq(members.id, String(formData.get("id"))));
+  revalidatePath("/admin", "layout");
+}
+
+/** End-of-day sweep: move gold from the register lockbox to the safe. */
+export async function sweepCashAction(formData: FormData) {
+  const qm = await quartermaster();
+  const amount = Math.round(Number(formData.get("amount_gold") || 0) * 100) / 100;
+  if (!(amount > 0)) throw new Error("Amount must be more than 0");
+  const db = await getDb();
+  const stamp = uid("cm").slice(0, 20);
+  await db.insert(cashMoves).values({
+    id: `${stamp}-out`,
+    pot: "Lockbox",
+    delta: -amount,
+    reason: `End-of-day sweep to Safe`,
+    actorDiscordId: qm.discordId,
+    actorName: qm.name,
+  });
+  await db.insert(cashMoves).values({
+    id: `${stamp}-in`,
+    pot: "Safe",
+    delta: amount,
+    reason: `End-of-day sweep from Lockbox`,
+    actorDiscordId: qm.discordId,
+    actorName: qm.name,
+  });
   revalidatePath("/admin", "layout");
 }

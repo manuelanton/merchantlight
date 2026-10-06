@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function SalesPage() {
   const [{ categories, items }, books] = await Promise.all([getCatalogue(), getBooks()]);
   const live = items.filter((i) => i.active);
-  const knownLocations = ["Gallow's Rock", "Windhelm", "Darkwater Crossing", "Whiterun", "Winterhold"];
+  const knownLocations = ["Darkwater Crossing", "Windhelm", "Darkwater Crossing", "Whiterun", "Winterhold"];
   for (const s of books.salesRows) {
     if (s.location && !knownLocations.includes(s.location)) knownLocations.push(s.location);
   }

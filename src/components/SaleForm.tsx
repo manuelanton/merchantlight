@@ -23,7 +23,7 @@ interface Row {
   price: string;
 }
 
-const DEFAULT_LOCATIONS = ["Gallow's Rock", "Windhelm", "Darkwater Crossing", "Whiterun", "Winterhold"];
+const DEFAULT_LOCATIONS = ["Darkwater Crossing", "Windhelm", "Darkwater Crossing", "Whiterun", "Winterhold"];
 
 export default function SaleForm({ items, categories, locations = DEFAULT_LOCATIONS }: { items: CatalogOption[]; categories: CategoryOption[]; locations?: string[] }) {
   const inCat = (cat: string) => (cat ? items.filter((i) => i.category === cat) : items);
