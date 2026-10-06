@@ -63,16 +63,16 @@ export default async function AdminHome() {
           </details>
         </div>
       </div>
-      <div className="card p-4 flex flex-wrap items-center gap-3">
+      <div className="card px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2">
         <span className="font-display text-lg">Cash:</span>
         {cash.pots.map((p) => (
           <span key={p.name} className="text-sm" title={p.name === "Lockbox" ? "Confirmed sales land here" : "Swept end-of-day funds"}>
             {p.name} <b className="text-[#e0bd4a]">{g(p.balance)}g</b>
           </span>
         ))}
-        <span className="text-xs text-[#8a7c64]">Confirmed sales land in the lockbox; sweep moves the day&apos;s take to the safe. To put starting gold in, use Adjust below.</span>
+        <span className="text-xs text-[#8a7c64]">Sales land in the lockbox; sweep moves the take to the safe. Starting gold via Adjust below.</span>
         <form action={sweepCashAction} className="flex gap-2 items-center ml-auto">
-          <input name="amount_gold" type="number" min={0} step="any" defaultValue={lockbox > 0 ? lockbox : ""} placeholder="Amount" className="input !w-28 !py-1 text-sm" title="End-of-day: move gold from lockbox to safe" />
+          <input name="amount_gold" type="number" min={0} step="any" defaultValue={lockbox > 0 ? lockbox : ""} placeholder="Amount" className="input !w-24 !py-1 text-sm" title="End-of-day: move gold from lockbox to safe" />
           <button className="btn-gold !py-1 text-xs whitespace-nowrap" type="submit" title="Move gold from the register lockbox to the safe">Sweep to safe →</button>
         </form>
       </div>
