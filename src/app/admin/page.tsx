@@ -66,8 +66,11 @@ export default async function AdminHome() {
       <div className="card p-4 flex flex-wrap items-center gap-3">
         <span className="font-display text-lg">Cash:</span>
         {cash.pots.map((p) => (
-          <span key={p.name} className="text-sm">{p.name} <b className="text-[#e0bd4a]">{g(p.balance)}g</b></span>
+          <span key={p.name} className="text-sm" title={p.name === "Lockbox" ? "Confirmed sales land here" : "Swept end-of-day funds"}>
+            {p.name} <b className="text-[#e0bd4a]">{g(p.balance)}g</b>
+          </span>
         ))}
+        <span className="text-xs text-[#8a7c64]">Confirmed sales land in the lockbox; sweep moves the day&apos;s take to the safe.</span>
         <form action={sweepCashAction} className="flex gap-2 items-center ml-auto">
           <input name="amount_gold" type="number" min={0} step="any" defaultValue={lockbox > 0 ? lockbox : ""} placeholder="Amount" className="input !w-28 !py-1 text-sm" title="End-of-day: move gold from lockbox to safe" />
           <button className="btn-gold !py-1 text-xs whitespace-nowrap" type="submit" title="Move gold from the register lockbox to the safe">Sweep to safe →</button>

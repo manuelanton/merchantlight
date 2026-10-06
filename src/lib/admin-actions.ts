@@ -128,7 +128,47 @@ export async function confirmSaleAction(formData: FormData) {
   revalidatePath("/admin", "layout");
 }
 
-/** Delete a sale + reverse its postings (stock back, split shares removed). */
+/** Confirm every pending sale at once (end-of-shift): posts all profit splits + lockbox cash. */
+export async function confirmAllSalesAction() {
+  const qm = await quartermaster();
+  const db = await getDb();
+  const pending = await db.select().from(sales).where(eq(sales.status, "pending"));
+  const existing = await db.select().from(ledger);
+  const nets = new Map<string, number>();
+  for (const e of existing) nets.set(e.member, (nets.get(e.member) || 0) + e.amountGold);
+  const roster = [...nets.keys()].sort();
+  for (const s of pending) {
+    const profit = Math.round((s.unitSalePrice - s.unitCostSnapshot) * s.qty * 100) / 100;
+    if (profit !== 0) {
+      const who = roster.length ? roster : [s.soldByName];
+      const shares = splitEvenly(profit, who.length);
+      for (let i = 0; i < who.length; i++) {
+        await db.insert(ledger).values({
+          id: uid("lg"),
+          type: "sale_income",
+          member: who[i],
+          amountGold: shares[i],
+          category: "sales",
+          description: `Sale profit split [sale:${s.id}]: ${s.itemName} × ${s.qty} at ${s.location} (${g(s.unitSalePrice)}g − ${g(s.unitCostSnapshot)}g cost)${s.notes ? ` — ${s.notes}` : ""} (share ${i + 1} of ${who.length})`,
+          actorDiscordId: qm.discordId,
+        });
+      }
+    }
+    const revenue = Math.round(s.unitSalePrice * s.qty * 100) / 100;
+    if (revenue !== 0) {
+      await db.insert(cashMoves).values({
+        id: uid("cm"),
+        pot: "Lockbox",
+        delta: revenue,
+        reason: `Sale ${s.itemName} × ${s.qty} at ${s.location}`,
+        actorDiscordId: qm.discordId,
+        actorName: qm.name,
+      });
+    }
+    await db.update(sales).set({ status: "confirmed", confirmedBy: qm.name, confirmedAt: new Date() }).where(eq(sales.id, s.id));
+  }
+  revalidatePath("/admin", "layout");
+}
 export async function deleteSaleAction(formData: FormData) {
   const qm = await quartermaster();
   const id = String(formData.get("id"));
@@ -571,34 +611,36 @@ export async function freeUnitAction(formData: FormData) {
   revalidatePath("/admin", "layout");
 }
 
-export async function setRateAction(formData: FormData) {
-  await quartermaster();
-  const rate = Number(formData.get("rate_per_week") || 0);
-  if (!(rate >= 0)) throw new Error("Rate must be 0 or more");
-  const db = await getDb();
-  await db.update(storageUnits).set({ ratePerWeek: rate }).where(eq(storageUnits.id, String(formData.get("id"))));
-  revalidatePath("/admin", "layout");
-}
-
-export async function renameUnitAction(formData: FormData) {
-  await quartermaster();
-  const label = String(formData.get("label") || "").trim();
-  if (!label) throw new Error("Label cannot be empty");
-  const db = await getDb();
-  await db.update(storageUnits).set({ label }).where(eq(storageUnits.id, String(formData.get("id"))));
-  revalidatePath("/admin", "layout");
-}
-
 export async function addUnitAction(formData: FormData) {
   const qm = await quartermaster();
   const label = String(formData.get("label") || "").trim() || `Chest ${Date.now().toString(36)}`;
+  const location = String(formData.get("location") || "").trim() || "Darkwater Crossing";
   const db = await getDb();
   await db.insert(storageUnits).values({
     id: `unit-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
     label,
     ratePerWeek: Number(formData.get("rate_per_week") || 60),
+    location,
   });
   void qm;
+  revalidatePath("/admin", "layout");
+}
+
+export async function updateUnitAction(formData: FormData) {
+  await quartermaster();
+  const rate = Number(formData.get("rate_per_week") || 0);
+  if (!(rate >= 0)) throw new Error("Rate must be 0 or more");
+  const label = String(formData.get("label") || "").trim();
+  if (!label) throw new Error("Label cannot be empty");
+  const location = String(formData.get("location") || "").trim() || "Darkwater Crossing";
+  const db = await getDb();
+  await db.update(storageUnits).set({
+    label,
+    ratePerWeek: rate,
+    location,
+    kind: String(formData.get("kind") || "rental"),
+    secured: String(formData.get("secured") || "") === "1",
+  }).where(eq(storageUnits.id, String(formData.get("id"))));
   revalidatePath("/admin", "layout");
 }
 

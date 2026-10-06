@@ -3,9 +3,8 @@ import {
   collectUnitAction,
   deleteUnitAction,
   freeUnitAction,
-  renameUnitAction,
   rentUnitAction,
-  setRateAction,
+  updateUnitAction,
 } from "@/lib/admin-actions";
 import { getStorage, type StorageUnit } from "@/lib/storage";
 import { g } from "@/lib/format";
@@ -29,11 +28,23 @@ function UnitCard({ u }: { u: StorageUnit }) {
         {!internal && <span className="ml-auto text-[#e0bd4a]">{g(u.ratePerWeek)}g/wk</span>}
       </div>
       <details>
-        <summary className="text-xs text-[#c9a227] cursor-pointer hover:text-[#e8dcc4]">Rename unit</summary>
-        <form action={renameUnitAction} className="flex gap-2 mt-1">
+        <summary className="text-xs text-[#c9a227] cursor-pointer hover:text-[#e8dcc4]">Edit unit (label, rate, site, kind, security)</summary>
+        <form action={updateUnitAction} className="grid md:grid-cols-3 gap-2 mt-1">
           <input type="hidden" name="id" value={u.id} />
-          <input name="label" defaultValue={u.label} required className="input !py-1 text-sm flex-1" />
-          <button className="btn-ghost !py-1 text-xs whitespace-nowrap" type="submit">Save</button>
+          <div><label className="lbl">Label</label><input name="label" defaultValue={u.label} required className="input !py-1 text-sm" /></div>
+          <div><label className="lbl">Rate/wk (g)</label><input name="rate_per_week" type="number" min={0} step="any" defaultValue={u.ratePerWeek} className="input !py-1 text-sm" /></div>
+          <div><label className="lbl">Site</label><input name="location" defaultValue={u.location} required className="input !py-1 text-sm" placeholder="Darkwater Crossing" /></div>
+          <div><label className="lbl">Kind</label>
+            <select name="kind" defaultValue={u.kind} className="input !py-1 text-sm">
+              <option value="rental">Rental</option>
+              <option value="internal">Internal</option>
+            </select>
+          </div>
+          <label className="flex items-center gap-2 text-xs cursor-pointer md:col-span-2">
+            <input type="checkbox" name="secured" value="1" defaultChecked={u.secured} className="accent-[#d97a1f]" />
+            Secured (behind a locked door — only the Safe is)
+          </label>
+          <div className="md:col-span-3"><button className="btn-ghost !py-1 text-xs" type="submit">Save unit</button></div>
         </form>
       </details>
       {internal ? (
@@ -61,16 +72,11 @@ function UnitCard({ u }: { u: StorageUnit }) {
                 Collect {g(u.ratePerWeek)}g
               </button>
             </form>
-            <form action={freeUnitAction}>
-              <input type="hidden" name="id" value={u.id} />
-              <button className="btn-ghost !py-1 text-xs" type="submit">Free up</button>
-            </form>
-            <form action={setRateAction} className="flex gap-1 items-center ml-auto">
-              <input type="hidden" name="id" value={u.id} />
-              <input name="rate_per_week" type="number" min={0} step="any" defaultValue={u.ratePerWeek} className="input !w-20 !py-1 text-xs" title="Weekly rate" />
-              <button className="btn-ghost !py-1 text-xs" type="submit" title="Set rate">✓</button>
-            </form>
-          </div>
+                    <form action={freeUnitAction}>
+                      <input type="hidden" name="id" value={u.id} />
+                      <button className="btn-ghost !py-1 text-xs" type="submit">Free up</button>
+                    </form>
+                  </div>
         </>
       ) : (
         <>

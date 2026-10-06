@@ -1,5 +1,5 @@
 import { getCatalogue } from "@/lib/catalog";
-import { confirmSaleAction, deleteSaleAction } from "@/lib/admin-actions";
+import { confirmAllSalesAction, confirmSaleAction, deleteSaleAction } from "@/lib/admin-actions";
 import { getBooks } from "@/lib/books";
 import { g } from "@/lib/format";
 import SaleForm from "@/components/SaleForm";
@@ -28,7 +28,12 @@ export default async function SalesPage() {
 
       {pending.length > 0 && (
         <div className="card p-4">
-          <h2 className="font-display text-lg">Awaiting deposit ({pending.length})</h2>
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="font-display text-lg">Awaiting deposit ({pending.length})</h2>
+            <form action={confirmAllSalesAction} className="ml-auto">
+              <button className="btn-gold !py-1 text-xs" type="submit" title="Confirm every pending sale at once">Confirm all ✓</button>
+            </form>
+          </div>
           <table className="ledger mt-2">
             <thead><tr><th>Item</th><th>Qty</th><th>Total</th><th>By</th><th></th></tr></thead>
             <tbody>

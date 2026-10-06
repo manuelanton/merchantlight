@@ -76,10 +76,10 @@ export default async function Home() {
         <Link href="#find-us" className="card p-5 hover:border-[#d97a1f] transition block">
           <div className="font-display text-xl">🛢️ Storage</div>
           <p className="text-sm text-[#b8a888] mt-1">
-            Barrels at the Darkwater store — 60g per week
+            Barrels at our shop — ask about storage on offer
           </p>
           <p className="mt-2 text-[#e0bd4a]">
-            {storage.units.length ? (storage.free > 0 ? `${storage.free} of ${storage.units.length} free` : "Full right now") : "Ask for availability"}
+            {storage.units.length ? (storage.free > 0 ? "Space available" : "Full right now") : "Ask for availability"}
             <span className="text-sm text-[#c9a227] ml-2">Visit us →</span>
           </p>
         </Link>
@@ -93,6 +93,9 @@ export default async function Home() {
             You&apos;ll find us at the <b className="text-[#e8dcc4]">general store in Darkwater Crossing, Eastmarch</b> —
             look for the lantern sign. Can&apos;t make the trip? We arrange{" "}
             <b className="text-[#e8dcc4]">deliveries within Eastmarch</b> — find us in town or send word and we&apos;ll meet you on the road.
+          </p>
+          <p className="text-[#cbbfa5] max-w-2xl">
+            Need space? Ask about <b className="text-[#e8dcc4]">barrel storage</b> at our shop.
           </p>
           <p className="text-[#e0bd4a]">Always buying: ores &amp; charcoal — bring us your surplus.</p>
           <p className="text-sm text-[#8a7c64]">All prices in gold (septims). Bulk rates marked where offered.</p>

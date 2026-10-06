@@ -48,6 +48,40 @@ export default function GuidePage() {
         logging anything, check the tables — most duplicates come from logging twice, not from the app.
       </p>
 
+      <h2 className="font-display text-2xl pt-2">Step-by-step flows</h2>
+
+      <div className="grid md:grid-cols-2 gap-4">
+      <Flow title="Adding stock" steps={[
+        "Stock page → pick section, item, amount (+ for in, − only to correct).",
+        "New goods? Add the item on the Items page first (name + price; cost can wait).",
+        "Donated goods go through a contribution instead, so the donor is credited.",
+        "Done — counts update everywhere within a minute.",
+      ]} />
+
+      <Flow title="Paying rent" steps={[
+        "Ledger → type expense, category rent, amount, note (e.g. 2 days).",
+        "Saving splits it evenly across all active members automatically.",
+        "Paid from pooled chest gold? Tick “pay from company coffers” — nobody is charged.",
+        "Someone fronted it? Log it as their contribution instead, so they're owed.",
+      ]} />
+
+      <Flow title="Making a sale" steps={[
+        "Sales → + Add item per line (section filter narrows the list). Price autofills; edit for discounts.",
+        "Submit → sale lands pending, stock drops at once.",
+        "When the gold reaches the chest, hit Confirm ✓ — profit splits post to everyone.",
+        "End of day: Sweep lockbox → safe on the dashboard, then Close shop.",
+      ]} />
+
+      <Flow title="End of day" steps={[
+        "Confirm all pending sales (or Confirm all ✓) so the day's profit posts.",
+        "Check the lockbox total on the dashboard against the register.",
+        "Sweep the day's take lockbox → safe.",
+        "Toggle the shop Closed.",
+      ]} />
+      </div>
+
+      <h2 className="font-display text-2xl pt-2">The rules behind them</h2>
+
       <Rule title="1 · Recording a sale">
         <p>Use <b>+ Add item</b> for multi-item deals — one submission per customer, so the ledger groups it as one split.</p>
         <p>Sales land <b>pending</b>: stock drops at once, gold splits only when someone hits <b>Confirm ✓</b> after the gold reaches the chest.</p>
@@ -97,29 +131,6 @@ export default function GuidePage() {
         <p>Use the <Link href="/admin/notes" className="text-[#c9a227]">noticeboard</Link> for stock calls and to-dos instead of chat — low stock even has one-click Request buttons on the dashboard.</p>
         <p>Toggle the shop <b>open</b> on the dashboard only while someone is actually minding the store.</p>
       </Rule>
-
-      <h2 className="font-display text-2xl pt-2">Step-by-step flows</h2>
-
-      <Flow title="Adding stock" steps={[
-        "Stock page → pick section, item, amount (+ for in, − only to correct).",
-        "New goods? Add the item on the Items page first (name + price; cost can wait).",
-        "Donated goods go through a contribution instead, so the donor is credited.",
-        "Done — counts update everywhere within a minute.",
-      ]} />
-
-      <Flow title="Paying rent" steps={[
-        "Ledger → type expense, category rent, amount, note (e.g. 2 days).",
-        "Saving splits it evenly across all active members automatically.",
-        "Paid from pooled chest gold? Tick “pay from company coffers” — nobody is charged.",
-        "Someone fronted it? Log it as their contribution instead, so they're owed.",
-      ]} />
-
-      <Flow title="Making a sale" steps={[
-        "Sales → + Add item per line (section filter narrows the list). Price autofills; edit for discounts.",
-        "Submit → sale lands pending, stock drops at once.",
-        "When the gold reaches the chest, hit Confirm ✓ — profit splits post to everyone.",
-        "End of day: Sweep lockbox → safe on the dashboard, then Close shop.",
-      ]} />
 
       <h2 className="font-display text-2xl pt-2">Quick answers</h2>
 
