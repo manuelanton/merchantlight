@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { adjustBalanceAction, requestRestockAction, setShopOpenAction, sweepCashAction } from "@/lib/admin-actions";
+import { adjustBalanceAction, adjustCashAction, requestRestockAction, setShopOpenAction, sweepCashAction } from "@/lib/admin-actions";
 import { getBooks } from "@/lib/books";
 import { g } from "@/lib/format";
 import { isShopOpen } from "@/lib/shop";
@@ -70,12 +70,24 @@ export default async function AdminHome() {
             {p.name} <b className="text-[#e0bd4a]">{g(p.balance)}g</b>
           </span>
         ))}
-        <span className="text-xs text-[#8a7c64]">Confirmed sales land in the lockbox; sweep moves the day&apos;s take to the safe.</span>
+        <span className="text-xs text-[#8a7c64]">Confirmed sales land in the lockbox; sweep moves the day&apos;s take to the safe. To put starting gold in, use Adjust below.</span>
         <form action={sweepCashAction} className="flex gap-2 items-center ml-auto">
           <input name="amount_gold" type="number" min={0} step="any" defaultValue={lockbox > 0 ? lockbox : ""} placeholder="Amount" className="input !w-28 !py-1 text-sm" title="End-of-day: move gold from lockbox to safe" />
           <button className="btn-gold !py-1 text-xs whitespace-nowrap" type="submit" title="Move gold from the register lockbox to the safe">Sweep to safe →</button>
         </form>
       </div>
+      <details>
+        <summary className="text-xs text-[#c9a227] cursor-pointer hover:text-[#e8dcc4]">Adjust cash manually (starting float, found gold, corrections)…</summary>
+        <form action={adjustCashAction} className="card p-4 mt-2 flex flex-wrap gap-2 items-center">
+          <select name="pot" className="input !w-auto !py-1 text-sm" defaultValue="Lockbox">
+            <option>Lockbox</option>
+            <option>Safe</option>
+          </select>
+          <input name="amount_gold" type="number" step="any" placeholder="+/- amount" className="input !w-32 !py-1 text-sm" title="Positive adds, negative removes" />
+          <input name="reason" className="input !py-1 text-sm flex-1" placeholder="Reason — e.g. opening float" />
+          <button className="btn-ghost !py-1 text-xs whitespace-nowrap" type="submit">Log cash</button>
+        </form>
+      </details>
       <div className="card p-4 flex flex-wrap items-center gap-3">
         <span className="font-display text-lg">Storage: {st.filled}/{st.units.filter((u) => u.kind !== "internal").length} filled</span>
         {st.overdue.length > 0 ? (

@@ -191,9 +191,23 @@ export async function deleteSaleAction(formData: FormData) {
   for (const row of shares) {
     await db.delete(ledger).where(eq(ledger.id, row.id));
   }
-  revalidatePath("/admin", "layout");
-}
+  // If the sale was confirmed, its cash already landed in the lockbox — take it back out.
+  if (s.status === "confirmed") {
+    const revenue = Math.round(s.unitSalePrice * s.qty * 100) / 100;
+    if (revenue !== 0) {
+      await db.insert(cashMoves).values({
+        id: uid("cm"),
+        pot: "Lockbox",
+        delta: -revenue,
+        reason: `Void confirmed sale ${s.itemName} × ${s.qty}`,
+        actorDiscordId: qm.discordId,
+        actorName: qm.name,
+      });
+    }
+  }
+  revalidatePath("/admin", "layout");
 
+}
 /** Log stock movements: one row per item (repeated item_id/delta fields).
  *  Stock goes to the shared pot — no individual credit. Sale profits split evenly. */
 export async function adjustStockAction(formData: FormData) {
@@ -683,6 +697,11 @@ export async function sweepCashAction(formData: FormData) {
   const amount = Math.round(Number(formData.get("amount_gold") || 0) * 100) / 100;
   if (!(amount > 0)) throw new Error("Amount must be more than 0");
   const db = await getDb();
+  const moves = await db.select().from(cashMoves);
+  const lockbox = moves.filter((m) => m.pot === "Lockbox").reduce((a, m) => a + m.delta, 0);
+  if (amount - lockbox > 0.005) {
+    throw new Error(`Only ${Math.round(lockbox * 100) / 100}g in the lockbox — can't sweep ${amount}g`);
+  }
   const stamp = uid("cm").slice(0, 20);
   await db.insert(cashMoves).values({
     id: `${stamp}-out`,
@@ -697,6 +716,26 @@ export async function sweepCashAction(formData: FormData) {
     pot: "Safe",
     delta: amount,
     reason: `End-of-day sweep from Lockbox`,
+    actorDiscordId: qm.discordId,
+    actorName: qm.name,
+  });
+  revalidatePath("/admin", "layout");
+}
+
+/** Manual cash adjustment: starting float, found gold, corrections. Positive adds, negative removes. */
+export async function adjustCashAction(formData: FormData) {
+  const qm = await quartermaster();
+  const pot = String(formData.get("pot") || "Lockbox");
+  if (pot !== "Lockbox" && pot !== "Safe") throw new Error("Unknown pot");
+  const amount = Math.round(Number(formData.get("amount_gold") || 0) * 100) / 100;
+  if (!amount) throw new Error("Amount must not be zero");
+  const reason = String(formData.get("reason") || "Manual adjustment").trim() || "Manual adjustment";
+  const db = await getDb();
+  await db.insert(cashMoves).values({
+    id: uid("cm"),
+    pot,
+    delta: amount,
+    reason,
     actorDiscordId: qm.discordId,
     actorName: qm.name,
   });

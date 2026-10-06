@@ -1,13 +1,13 @@
 import Link from "next/link";
+import Collapsible from "@/components/Collapsible";
 
 export const dynamic = "force-dynamic";
 
-function Rule({ title, children }: { title: string; children: React.ReactNode }) {
+function Rule({ title, open = false, children }: { title: string; open?: boolean; children: React.ReactNode }) {
   return (
-    <div className="card p-4 space-y-1">
-      <h2 className="font-display text-lg">{title}</h2>
+    <Collapsible title={title} defaultOpen={open}>
       <div className="text-sm text-[#b8a888] space-y-1">{children}</div>
-    </div>
+    </Collapsible>
   );
 }
 
@@ -41,7 +41,7 @@ function Faq({ q, children }: { q: string; children: React.ReactNode }) {
 
 export default function GuidePage() {
   return (
-    <div className="space-y-4 max-w-3xl">
+    <div className="space-y-4">
       <h1 className="font-display text-3xl">Quartermaster guide</h1>
       <p className="text-sm text-[#8a7c64]">
         One rule above all: <b className="text-[#e8dcc4]">one real event = one entry.</b> Before
@@ -50,7 +50,7 @@ export default function GuidePage() {
 
       <h2 className="font-display text-2xl pt-2">Step-by-step flows</h2>
 
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
       <Flow title="Adding stock" steps={[
         "Stock page → pick section, item, amount (+ for in, − only to correct).",
         "New goods? Add the item on the Items page first (name + price; cost can wait).",
