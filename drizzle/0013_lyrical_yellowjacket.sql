@@ -1,0 +1,1 @@
+ALTER TABLE "items" ADD COLUMN "inherit_parent" boolean DEFAULT true NOT NULL;

@@ -85,7 +85,7 @@ export default function GuidePage() {
       <Rule title="1 · Recording a sale">
         <p>Use <b>+ Add item</b> for multi-item deals — one submission per customer, so the ledger groups it as one split.</p>
         <p>Sales land <b>pending</b>: stock drops at once, gold splits only when someone hits <b>Confirm ✓</b> after the gold reaches the chest.</p>
-        <p>Price autofills from the catalogue — edit it for discounts. Cost autofills from recipe → manual cost → price.</p>
+        <p>Price autofills from the catalogue — edit it for discounts. Cost autofills from recipe → manual cost → price (variants follow their parent when inherit is on).</p>
       </Rule>
 
       <Rule title="2 · Stock in, stock out">
@@ -115,9 +115,11 @@ export default function GuidePage() {
         <p>Fix a duplicate with the row&apos;s <b>Edit</b> button (ledger, items) — don&apos;t add compensating rows.</p>
       </Rule>
 
-      <Rule title="6 · Costs, recipes, margins">
+      <Rule title="6 · Costs, recipes, margins, variants">
         <p>Unknown cost counts as sale price (zero assumed profit) — fill real material costs for honest margins.</p>
         <p>An item with a recipe prices itself from live material costs; changing a material reprices every recipe using it.</p>
+        <p>Variants (↳) inherit price/cost/recipe from their parent by default (⟡) — untick inherit to price one-off. Use + Variant, re-home in Edit.</p>
+        <p>Buying: blank low warns at 2; blank buy pays cost; blank cap uses tiered default (&lt;1g → 500, &lt;2g → 250, else 10).</p>
         <p>Only <i>profit</i> ever splits. Sale revenue is never paid out whole — that would pay the materials twice.</p>
       </Rule>
 

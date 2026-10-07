@@ -24,6 +24,7 @@ export const items = pgTable("items", {
   createdByName: text("created_by_name").notNull().default(""),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   parentId: text("parent_id"),
+  inheritParent: boolean("inherit_parent").notNull().default(true),
 });
 
 /** One recorded sale. Prices snapshotted so later catalogue edits don't rewrite history. */

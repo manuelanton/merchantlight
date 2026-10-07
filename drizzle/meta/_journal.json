@@ -92,6 +92,13 @@
       "when": 1791396471990,
       "tag": "0012_ordinary_galactus",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791398739997,
+      "tag": "0013_lyrical_yellowjacket",
+      "breakpoints": true
     }
   ]
 }

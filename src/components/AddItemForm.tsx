@@ -40,6 +40,9 @@ export default function AddItemForm({
         <div><label className="lbl">Price (g)</label><input name="sale_price" type="number" step="any" min={0} defaultValue={0} className="input" /></div>
         <div><label className="lbl">Cost (g, private)</label><input name="cost_value" type="number" step="any" min={0} defaultValue={0} className="input" /></div>
         <div><label className="lbl">Description</label><input name="description" className="input" placeholder="Materials, bulk rates…" /></div>
+        <div><label className="lbl">Low at</label><input name="low_threshold" type="number" min={0} step="any" className="input" placeholder="auto (2)" title="Warn when stock hits this — blank uses the default (2)" /></div>
+        <div><label className="lbl">Buy price (g)</label><input name="buy_price" type="number" min={0} step="any" className="input" placeholder="cost if blank" title="What we pay suppliers — blank falls back to cost" /></div>
+        <div><label className="lbl">Max stock</label><input name="max_stock" type="number" min={0} step="1" className="input" placeholder="auto cap" title="Don't buy past this — blank uses tiered default (<1g→500, <2g→250, else 10)" /></div>
       </div>
       <label className="flex items-center gap-2 text-sm cursor-pointer">
         <input type="checkbox" checked={withRecipe} onChange={(e) => setWithRecipe(e.target.checked)} className="accent-[#d97a1f]" />

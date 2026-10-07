@@ -6,10 +6,9 @@ import { isShopOpen } from "@/lib/shop";
 import { getCash } from "@/lib/cash";
 import { getCatalogue } from "@/lib/catalog";
 import { getStorage } from "@/lib/storage";
+import { effectiveThreshold } from "@/lib/defaults";
 
 export const dynamic = "force-dynamic";
-
-const DEFAULT_LOW_AT = 2;
 
 const KIND_ICON: Record<string, string> = { news: "📯", request: "🙏", todo: "☑️", stock: "📦" };
 
@@ -20,7 +19,7 @@ export default async function AdminHome() {
   const cash = await getCash();
   const lockbox = cash.pots.find((p) => p.name === "Lockbox")?.balance || 0;
   const { items } = await getCatalogue();
-  const thresholdFor = (id: string) => items.find((i) => i.id === id)?.low_threshold ?? DEFAULT_LOW_AT;
+  const thresholdFor = (id: string) => effectiveThreshold(items.find((i) => i.id === id)?.low_threshold);
   const lowStock = [...b.stockByParent.entries()]
     .filter(([, s]) => s.qty > 0)
     .map(([id, s]) => ({ ...s, threshold: thresholdFor(id) }))

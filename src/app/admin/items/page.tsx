@@ -7,6 +7,8 @@ import { getCatalogue } from "@/lib/catalog";
 import { getBooks } from "@/lib/books";
 import { getDb } from "@/db";
 import { itemIngredients } from "@/db/schema";
+import { effectiveCost } from "@/lib/cost";
+import { effectiveMaxStock, unitValue } from "@/lib/defaults";
 import AddItemForm from "@/components/AddItemForm";
 import Collapsible from "@/components/Collapsible";
 import ItemsManager from "@/components/ItemsManager";
@@ -20,6 +22,9 @@ export default async function ItemsPage() {
   for (const [id, s] of books.stockByItem) stock[id] = s.qty;
   for (const [id, s] of books.stockByParent) stock[id] = s.qty;
   const ingredientRows = await db.select().from(itemIngredients);
+  const costItems = items.map((m) => ({ id: m.id, cost_value: m.cost_value, sale_price: m.sale_price, parent_id: m.parent_id ?? null, inherit_parent: m.inherit_parent ?? true }));
+  const costIngs = ingredientRows.map((r) => ({ itemId: r.itemId, materialItemId: r.materialItemId, qty: r.qty }));
+  const effCost = (id: string) => effectiveCost(id, costItems, costIngs);
 
   return (
     <div className="space-y-6">
@@ -44,6 +49,7 @@ export default async function ItemsPage() {
           low_threshold: i.low_threshold ?? null,
           buy_price: i.buy_price, max_stock: i.max_stock ?? null,
           parent_id: i.parent_id ?? null,
+          inherit_parent: i.inherit_parent ?? true,
         }))}
         categories={sorted.map((c) => ({ slug: c.slug, name: c.name, icon: c.icon }))}
         stock={stock}
@@ -54,20 +60,24 @@ export default async function ItemsPage() {
       />
 
       <Collapsible title="Buying guide (materials)">
-        <p className="text-xs text-[#8a7c64]">What we pay suppliers, and when to stop buying. Edit buy price / cap in each row&apos;s Edit form.</p>
+        <p className="text-xs text-[#8a7c64]">What we pay suppliers, and when to stop buying. Edit buy price / cap in each row&apos;s Edit form. Blank buy falls back to cost; blank cap uses tiered default (&lt;1g → 500, &lt;2g → 250, else 10).</p>
         <table className="ledger mt-2">
           <thead><tr><th>Material</th><th>We pay</th><th>On hand</th><th>Cap</th><th>Status</th></tr></thead>
           <tbody>
             {items.filter((i) => i.category_slug === "materials").sort((a, b) => a.name.localeCompare(b.name)).map((m) => {
               const onHand = stock[m.id] ?? 0;
-              const cap = m.max_stock ?? null;
-              const full = cap !== null && onHand >= cap;
+              const cost = effCost(m.id);
+              const wePay = m.buy_price > 0 ? m.buy_price : cost;
+              const val = unitValue({ buy_price: m.buy_price, cost_value: cost, sale_price: m.sale_price });
+              const cap = effectiveMaxStock(m.max_stock, val);
+              const auto = m.max_stock == null;
+              const full = onHand >= cap;
               return (
                 <tr key={m.id}>
                   <td><b>{m.name}</b></td>
-                  <td className="text-[#e0bd4a]">{m.buy_price > 0 ? `${m.buy_price}g` : "—"}</td>
+                  <td className="text-[#e0bd4a]">{wePay > 0 ? `${wePay}g` : "—"}</td>
                   <td>{onHand}</td>
-                  <td>{cap ?? "—"}</td>
+                  <td>{cap}{auto && <span className="text-[#8a7c64]"> auto</span>}</td>
                   <td className={full ? "text-[#e08a8a]" : "text-[#7fd08a]"}>{full ? "Full — don't buy" : "Buying"}</td>
                 </tr>
               );

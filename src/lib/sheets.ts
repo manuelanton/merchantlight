@@ -218,6 +218,8 @@ export async function getItems(): Promise<Item[]> {
       sale_price: num(pick(r, "saleprice", "price", "sell", "sellprice", "gold", "priceg")),
       cost_value: num(pick(r, "costvalue", "cost", "buycost", "ourcost", "wholesale")),
       stock: num(pick(r, "stock", "qty", "quantity", "amount", "instock", "count", "onhand")),
+      parent_id: null,
+      inherit_parent: true,
       low_threshold: null,
       buy_price: 0,
       max_stock: null,

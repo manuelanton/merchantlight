@@ -1,7 +1,7 @@
 import { getBooks } from "@/lib/books";
 import { g } from "@/lib/format";
 import { getCatalogue } from "@/lib/catalog";
-import { effectiveCost, hasRecipe } from "@/lib/cost";
+import { effectiveCost, hasRecipe, inheritedManualCost } from "@/lib/cost";
 import { getDb } from "@/db";
 import { itemIngredients } from "@/db/schema";
 import { getMembers } from "@/lib/members";
@@ -19,7 +19,7 @@ export default async function LedgerPage() {
   const allMembers = await getMembers();
   const ingredientRows = await db.select().from(itemIngredients);
   const costInputs = {
-    items: items.map((m) => ({ id: m.id, cost_value: m.cost_value, sale_price: m.sale_price })),
+    items: items.map((m) => ({ id: m.id, cost_value: m.cost_value, sale_price: m.sale_price, parent_id: m.parent_id ?? null, inherit_parent: m.inherit_parent ?? true })),
     ingredients: ingredientRows.map((r) => ({ itemId: r.itemId, materialItemId: r.materialItemId, qty: r.qty })),
   };
   const bal = b.ledgerRows.reduce((a, e) => a + e.amountGold, 0);
@@ -115,8 +115,8 @@ export default async function LedgerPage() {
         members={b.members}
         items={items.filter((i) => i.active).map((i) => ({
           id: i.id, name: i.name,
-          // Donations value at cost (recipe, else manual) — never price.
-          cost: hasRecipe(i.id, costInputs.ingredients) ? effectiveCost(i.id, costInputs.items, costInputs.ingredients) : (i.cost_value || 0),
+          // Donations value at cost (recipe, else manual) — never price. Follows variant inheritance.
+          cost: hasRecipe(i.id, costInputs.ingredients, costInputs.items) ? effectiveCost(i.id, costInputs.items, costInputs.ingredients) : (inheritedManualCost(i.id, costInputs.items) || 0),
           category: i.category_slug,
         }))}
         categories={categories.map((c) => ({ slug: c.slug, name: c.name }))}

@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { addIngredientAction, createVariantAction, deleteIngredientAction, deleteItemAction, updateItemAction } from "@/lib/admin-actions";
 import { g } from "@/lib/format";
 import { effectiveCost, hasRecipe } from "@/lib/cost";
+import { defaultMaxStock, unitValue } from "@/lib/defaults";
 import IngredientForm from "./IngredientForm";
 
 export interface ManagedItem {
@@ -17,6 +18,7 @@ export interface ManagedItem {
   buy_price: number;
   max_stock: number | null;
   parent_id: string | null;
+  inherit_parent: boolean;
 }
 
 export interface ManagedCategory {
@@ -66,19 +68,15 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
 
   const catName = (slug: string) => categories.find((c) => c.slug === slug)?.name || slug;
   const catIcon = (slug: string) => categories.find((c) => c.slug === slug)?.icon || "📦";
-  const matCost = (id: string) => matUnit(id);
   const matName = (id: string, fallback: string) => items.find((i) => i.id === id)?.name || fallback;
 
   const costInputs = useMemo(() => ({
-    items: items.map((m) => ({ id: m.id, cost_value: m.cost_value, sale_price: m.sale_price })),
+    items: items.map((m) => ({ id: m.id, cost_value: m.cost_value, sale_price: m.sale_price, parent_id: m.parent_id, inherit_parent: m.inherit_parent })),
     ingredients: ingredients.map((r) => ({ itemId: r.itemId, materialItemId: r.materialItemId, qty: r.qty })),
   }), [items, ingredients]);
   const eff = (id: string) => effectiveCost(id, costInputs.items, costInputs.ingredients);
-  const fromRecipe = (id: string) => hasRecipe(id, costInputs.ingredients);
-  const matUnit = (id: string) => {
-    const m = items.find((i) => i.id === id);
-    return m && m.cost_value > 0 ? m.cost_value : m?.sale_price || 0;
-  };
+  const fromRecipe = (id: string) => hasRecipe(id, costInputs.ingredients, costInputs.items);
+  const matUnit = (id: string) => effectiveCost(id, costInputs.items, costInputs.ingredients);
 
   return (
     <div className="space-y-4">
@@ -111,11 +109,12 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
       </div>
 
       {byCat.map(([slug, list]) => (
-        <div key={slug} className="card overflow-hidden">
+        <div key={slug} className="card overflow-visible">
           <div className="p-3 border-b border-[#1c2b31] font-display text-lg">
             {catIcon(slug)} {catName(slug)} <span className="text-sm text-[#8a7c64]">({list.length})</span>
           </div>
-          <table className="ledger">
+          <div className="overflow-x-auto">
+          <table className="ledger w-full">
             <thead><tr><th>Item</th><th>Price</th><th>Cost</th><th>Profit</th><th>Stock</th><th>Shown</th><th></th></tr></thead>
             <tbody>
               {list.flatMap((i) => {
@@ -128,10 +127,15 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                 const recipe = fromRecipe(i.id);
                 const margin = Math.round((i.sale_price - cost) * 100) / 100;
                 const expanded = openRecipe === i.id;
+                const kidCount = list.filter((k) => k.parent_id === i.id).length;
+                const isParent = kidCount > 0;
+                const unitVal = unitValue({ buy_price: i.buy_price, cost_value: cost, sale_price: i.sale_price });
+                const autoCap = defaultMaxStock(unitVal);
+                const candidates = items.filter((m) => !m.parent_id && m.id !== i.id && m.category_slug === i.category_slug);
                 return (
                 <>
                 <tr key={i.id}>
-                  <td><b>{isVariant ? `↳ ${i.name}` : i.name}</b>{!isVariant && list.some((k) => k.parent_id === i.id) && <span className="text-xs text-[#8a7c64]"> ({list.filter((k) => k.parent_id === i.id).length} variants)</span>}</td>
+                  <td><b>{isVariant ? `↳ ${i.name}` : i.name}</b>{!isVariant && isParent && <span className="text-xs text-[#8a7c64]"> ({kidCount} variants)</span>}{isVariant && i.inherit_parent && <span className="text-xs text-[#8a7c64]" title="Follows parent price/cost/recipe"> ⟡</span>}</td>
                   <td className="text-[#e0bd4a]">{i.sale_price}g</td>
                   <td title={recipe ? "From recipe — updates with material costs" : "Manual cost"}>
                     {g(cost)}g{recipe && <span className="text-[#8a7c64]"> ≈</span>}
@@ -154,17 +158,18 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                         </button>
                       )}
                       {!isVariant && (
-                        <details className="inline-block">
+                        <details className="relative inline-block" onToggle={(e) => { if (!(e.target as HTMLDetailsElement).open) return; setOpenEdit(null); }}>
                           <summary className="btn-ghost !py-1 !px-2 text-xs cursor-pointer list-none inline-block" title="Add a named variant (same price/cost, tracked separately)">+ Variant</summary>
-                          <form action={createVariantAction} className="mt-2 p-3 card space-y-2 min-w-[240px]">
+                          <form action={createVariantAction} className="absolute right-0 z-20 mt-2 p-3 card space-y-2 w-72">
                             <input type="hidden" name="parent_id" value={i.id} />
                             <div><label className="lbl">Variant name</label><input name="name" required className="input" placeholder="e.g. Common Clothes (blue)" /></div>
+                            <p className="text-xs text-[#8a7c64]">Copies price/cost, inherits live after that.</p>
                             <button className="btn-gold !py-1 w-full text-sm" type="submit">Add variant</button>
                           </form>
                         </details>
                       )}
                       <details
-                        className="inline-block"
+                        className="relative inline-block"
                         open={openEdit === i.id}
                         onToggle={(e) => setOpenEdit((e.target as HTMLDetailsElement).open ? i.id : null)}
                       >
@@ -174,7 +179,7 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                             await updateItemAction(fd);
                             setOpenEdit(null);
                           }}
-                          className="mt-2 p-3 card space-y-2 min-w-[300px] max-w-[340px]"
+                          className="absolute right-0 z-20 mt-2 p-3 card space-y-2 w-80 max-w-[90vw]"
                         >
                           <input type="hidden" name="id" value={i.id} />
                           <div><label className="lbl">Name</label><input name="name" defaultValue={i.name} className="input" /></div>
@@ -187,10 +192,26 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                           <div><label className="lbl">Cost</label><input name="cost_value" type="number" step="any" defaultValue={i.cost_value} className="input" /></div>
                           <div><label className="lbl">Description</label><input name="description" defaultValue={i.description} className="input" /></div>
                         <div className="grid grid-cols-3 gap-2">
-                          <div><label className="lbl">Low at</label><input name="low_threshold" type="number" min={0} step="any" defaultValue={i.low_threshold ?? ""} placeholder="auto (2)" className="input" title="Warn when stock hits this — blank uses the default" /></div>
-                          <div><label className="lbl">Buy price</label><input name="buy_price" type="number" min={0} step="any" defaultValue={i.buy_price} className="input" title="What we pay suppliers per unit" /></div>
-                          <div><label className="lbl">Max stock</label><input name="max_stock" type="number" min={0} step="1" defaultValue={i.max_stock ?? ""} placeholder="no cap" className="input" title="Don't buy past this" /></div>
+                          <div><label className="lbl">Low at</label><input name="low_threshold" type="number" min={0} step="any" defaultValue={i.low_threshold ?? ""} placeholder="auto (2)" className="input" title="Warn when stock hits this — blank uses the default (2)" /></div>
+                          <div><label className="lbl">Buy price</label><input name="buy_price" type="number" min={0} step="any" defaultValue={i.buy_price || ""} placeholder={cost > 0 ? `${g(cost)}g (cost)` : "0"} className="input" title="What we pay suppliers per unit — blank falls back to cost" /></div>
+                          <div><label className="lbl">Max stock</label><input name="max_stock" type="number" min={0} step="1" defaultValue={i.max_stock ?? ""} placeholder={`auto (${autoCap})`} className="input" title={`Don't buy past this — blank uses tiered default (${autoCap})`} /></div>
                         </div>
+                          {isParent ? (
+                            <p className="text-xs text-[#8a7c64]">Has {kidCount} variant(s) — delete or re-home them first to make this a variant.</p>
+                          ) : (
+                            <>
+                              <div><label className="lbl">Parent (variant of)</label>
+                                <select name="parent_id" defaultValue={i.parent_id ?? ""} className="input">
+                                  <option value="">None (top-level)</option>
+                                  {candidates.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                                </select>
+                              </div>
+                              <label className="flex items-center gap-2 text-xs text-[#b8a888] cursor-pointer">
+                                <input type="checkbox" name="inherit_parent" defaultChecked={i.inherit_parent ?? true} className="accent-[#d97a1f]" />
+                                Inherit price/cost/recipe from parent
+                              </label>
+                            </>
+                          )}
                           <div><label className="lbl">Visible</label>
                             <select name="active" defaultValue={String(i.active)} className="input"><option value="true">Yes</option><option value="false">Hidden</option></select>
                           </div>
@@ -206,7 +227,7 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                 </tr>
                 {expanded && (
                 <tr key={`${i.id}-recipe`}>
-                  <td colSpan={6} className="!p-0">
+                  <td colSpan={7} className="!p-0">
                     <div className="m-3 p-4 card space-y-3">
                       <p className="text-xs">
                         Materials: <b className="text-[#e0bd4a]">{g(cost)}g</b> · Sells: <b className="text-[#e0bd4a]">{g(i.sale_price)}g</b> ·{" "}
@@ -220,7 +241,7 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                                 <ul className="text-xs space-y-1">
                                   {lines.map((r) => {
                                     const c = matUnit(r.materialItemId);
-                                    const assumed = c > 0 && !(items.find((m) => m.id === r.materialItemId)?.cost_value || 0 > 0);
+                                    const assumed = c > 0 && !((items.find((m) => m.id === r.materialItemId)?.cost_value || 0) > 0);
                                     return (
                                     <li key={r.id} className="flex items-center gap-2">
                                       <span className="flex-1">{matName(r.materialItemId, r.materialName)} × {g(r.qty)} ({g(r.qty * c)}g{assumed ? " = price" : ""})</span>
@@ -253,6 +274,7 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
               })}
             </tbody>
           </table>
+          </div>
         </div>
       ))}
       {!byCat.length && <p className="text-sm text-[#8a7c64]">No items match — clear the search or re-enable sections.</p>}

@@ -388,6 +388,8 @@ export async function createItemAction(formData: FormData) {
   const name = String(formData.get("name") || "Unnamed").trim();
   const db = await getDb();
   const itemId = `${slugify(name, `item-${Date.now()}`)}`;
+  const lowRaw = String(formData.get("low_threshold") || "").trim();
+  const maxRaw = String(formData.get("max_stock") || "").trim();
   await db.insert(items).values({
     id: itemId,
     name,
@@ -396,6 +398,11 @@ export async function createItemAction(formData: FormData) {
     salePrice: Number(formData.get("sale_price") || 0),
     costValue: Number(formData.get("cost_value") || 0),
     active: String(formData.get("active") || "true") === "true",
+    lowThreshold: lowRaw === "" ? null : Math.max(0, Number(lowRaw) || 0),
+    buyPrice: Number(formData.get("buy_price") || 0),
+    maxStock: maxRaw === "" ? null : Math.max(0, Number(maxRaw) || 0),
+    parentId: null,
+    inheritParent: true,
     createdByDiscordId: qm.discordId,
     createdByName: qm.name,
   });
@@ -424,8 +431,23 @@ export async function createItemAction(formData: FormData) {
 export async function updateItemAction(formData: FormData) {
   await quartermaster();
   const db = await getDb();
+  const id = String(formData.get("id"));
   const lowRaw = String(formData.get("low_threshold") || "").trim();
   const maxRaw = String(formData.get("max_stock") || "").trim();
+  const parentRaw = String(formData.get("parent_id") || "").trim();
+  const parentId = parentRaw === "" ? null : parentRaw;
+  const inheritParent = String(formData.get("inherit_parent") || "") === "on";
+  if (parentId === id) throw new Error("An item cannot be its own parent");
+  if (parentId) {
+    const [parentRows, kidRows] = await Promise.all([
+      db.select().from(items).where(eq(items.id, parentId)).limit(1),
+      db.select({ id: items.id }).from(items).where(eq(items.parentId, id)),
+    ]);
+    const parent = parentRows[0];
+    if (!parent) throw new Error("Parent not found");
+    if (parent.parentId) throw new Error("Cannot nest variants — pick a top-level item");
+    if (kidRows.length) throw new Error(`Has ${kidRows.length} variant(s) — delete or re-home them first`);
+  }
   await db
     .update(items)
     .set({
@@ -438,9 +460,11 @@ export async function updateItemAction(formData: FormData) {
       lowThreshold: lowRaw === "" ? null : Math.max(0, Number(lowRaw) || 0),
       buyPrice: Number(formData.get("buy_price") || 0),
       maxStock: maxRaw === "" ? null : Math.max(0, Number(maxRaw) || 0),
+      parentId,
+      inheritParent: parentId ? inheritParent : true,
       updatedAt: new Date(),
     })
-    .where(eq(items.id, String(formData.get("id"))));
+    .where(eq(items.id, id));
   revalidatePath("/", "layout");
 }
 
@@ -478,6 +502,7 @@ export async function createVariantAction(formData: FormData) {
     buyPrice: parent.buyPrice,
     maxStock: parent.maxStock,
     parentId: parent.id,
+    inheritParent: true,
     createdByDiscordId: qm.discordId,
     createdByName: qm.name,
   });
