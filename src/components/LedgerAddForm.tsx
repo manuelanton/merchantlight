@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { addLedgerAction } from "@/lib/admin-actions";
+import { SHOP } from "@/shop/config";
 import ContributionForm from "./ContributionForm";
 import MemberSelect from "./MemberSelect";
 export default function LedgerAddForm({
@@ -55,7 +56,7 @@ export default function LedgerAddForm({
             {!coffers && <MemberSelect members={members} name="member" label="Member" required />}
             {coffers && <input type="hidden" name="from_coffers" value="1" />}
             <div><label className="lbl">Category</label><input name="category" className="input" placeholder="rent / materials / thread" /></div>
-            <div><label className="lbl">Description</label><input name="description" className="input" placeholder="e.g. Darkwater Crossing rent, Morndas" /></div>
+            <div><label className="lbl">Description</label><input name="description" className="input" placeholder={`e.g. ${SHOP.homeLocation} rent, Morndas`} /></div>
           </div>
         </>
       )}

@@ -1,4 +1,6 @@
 import { boolean, integer, pgTable, real, text, timestamp } from "drizzle-orm/pg-core";
+// Relative import: drizzle-kit evaluates this file outside the Next alias map.
+import { SHOP } from "../shop/config";
 /** Catalogue sections. Managed in /admin/items once migrated off the sheet. */
 export const categories = pgTable("categories", {
   id: text("id").primaryKey(),
@@ -37,7 +39,7 @@ export const sales = pgTable("sales", {
   unitSalePrice: real("unit_sale_price").notNull(),
   unitCostSnapshot: real("unit_cost_snapshot").notNull().default(0),
   totalProfit: real("total_profit").notNull().default(0),
-  location: text("location").notNull().default("Darkwater Crossing"),
+  location: text("location").notNull().default(SHOP.defaultLocation),
   soldByDiscordId: text("sold_by_discord_id").notNull().default(""),
   soldByName: text("sold_by_name").notNull().default(""),
   notes: text("notes").notNull().default(""),
@@ -109,7 +111,7 @@ export const storageUnits = pgTable("storage_units", {
   occupiedSince: timestamp("occupied_since", { withTimezone: true }),
   paidThrough: timestamp("paid_through", { withTimezone: true }),
   active: boolean("active").notNull().default(true),
-  location: text("location").notNull().default("Darkwater Crossing"),
+  location: text("location").notNull().default(SHOP.defaultLocation),
   kind: text("kind").notNull().default("rental"),
   secured: boolean("secured").notNull().default(false),
 });

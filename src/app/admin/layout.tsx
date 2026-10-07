@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth, isQuartermaster, signIn, signOut } from "@/auth";
 import { backofficeEnabled } from "@/lib/flags";
+import { SHOP } from "@/shop/config";
 import CopyId from "@/components/CopyId";
 
 // Books must never prerender: auth + data are per-request.
@@ -15,7 +16,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!session?.user) {
     return (
       <div className="max-w-md space-y-4">
-        <h1 className="font-display text-3xl">Quartermaster books</h1>
+        <h1 className="font-display text-3xl">{SHOP.roleName} books</h1>
         <p className="text-sm text-[#8a7c64]">
           Sign in with Discord to open the company books. No passwords, no new accounts.
         </p>
@@ -39,10 +40,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!isQuartermaster(discordId)) {
     return (
       <div className="max-w-md space-y-4">
-        <h1 className="font-display text-3xl">Not a quartermaster</h1>
+        <h1 className="font-display text-3xl">Not a {SHOP.roleName.toLowerCase()}</h1>
         <p className="text-sm text-[#b8a888]">
           Signed in as <b>{session.user.name}</b> ({discordId || "unknown id"}), but that Discord
-          account isn&apos;t on the quartermaster list. Send this ID to whoever runs the books:
+          account isn&apos;t on the {SHOP.roleName.toLowerCase()} list. Send this ID to whoever runs the books:
         </p>
         <p className="flex items-center gap-2">
           <code className="text-sm text-[#e0bd4a] break-all">{discordId}</code>
@@ -64,17 +65,23 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="space-y-4">
       <div className="card p-3 flex flex-wrap items-center gap-3 text-sm">
         <span className="text-[#8a7c64]">
-          Quartermaster: <b className="text-[#e8dcc4]">{session.user.name}</b>
+          {SHOP.roleName}: <b className="text-[#e8dcc4]">{session.user.name}</b>
         </span>
         <nav className="flex flex-wrap gap-3 ml-auto">
           <Link href="/admin" className="hover:text-[#c9a227]">Dashboard</Link>
           <Link href="/admin/items" className="hover:text-[#c9a227]">Items</Link>
           <Link href="/admin/sales" className="hover:text-[#c9a227]">Sales</Link>
           <Link href="/admin/stock" className="hover:text-[#c9a227]">Stock</Link>
-          <Link href="/admin/storage" className="hover:text-[#c9a227]">Storage</Link>
+          {SHOP.features.storage && (
+            <Link href="/admin/storage" className="hover:text-[#c9a227]">Storage</Link>
+          )}
           <Link href="/admin/ledger" className="hover:text-[#c9a227]">Ledger</Link>
-          <Link href="/admin/notes" className="hover:text-[#c9a227]">Board</Link>
-          <Link href="/admin/guide" className="hover:text-[#c9a227]">Guide</Link>
+          {SHOP.features.notes && (
+            <Link href="/admin/notes" className="hover:text-[#c9a227]">Board</Link>
+          )}
+          {SHOP.features.guide && (
+            <Link href="/admin/guide" className="hover:text-[#c9a227]">Guide</Link>
+          )}
         </nav>
         <form
           action={async () => {

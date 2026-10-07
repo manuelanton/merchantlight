@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getCatalogue } from "@/lib/catalog";
+import { SHOP } from "@/shop/config";
 
 export const revalidate = 60;
 
@@ -20,9 +21,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
         <div className="card p-8 text-center space-y-2">
           <p className="font-display text-xl text-[#e0bd4a] tracking-widest">✨ SOON TO COME ✨</p>
           <p className="text-[#b8a888] text-sm max-w-md mx-auto">
-            Our enchanter is still setting up the arcane table. Send word in Windhelm
-            or visit us in Darkwater Crossing and we&apos;ll tell you when the first
-            enchantments are ready.
+            {SHOP.emptyCategoryBody}
           </p>
         </div>
       </div>
@@ -37,7 +36,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
           <span>{cat.name}</span>
         </h1>
         <p className="text-sm text-[#8a7c64] mt-1">
-          {list.length} goods · Based at the Darkwater Crossing general store — deliveries within Eastmarch.
+          {list.length} goods · {SHOP.categoryFooter}
         </p>
       </div>
       <div className="card overflow-hidden px-2 py-1">

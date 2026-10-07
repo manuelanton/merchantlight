@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Collapsible from "@/components/Collapsible";
+import { SHOP } from "@/shop/config";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,7 @@ function Faq({ q, children }: { q: string; children: React.ReactNode }) {
 export default function GuidePage() {
   return (
     <div className="space-y-4">
-      <h1 className="font-display text-3xl">Quartermaster guide</h1>
+      <h1 className="font-display text-3xl">{SHOP.roleName} guide</h1>
       <p className="text-sm text-[#8a7c64]">
         One rule above all: <b className="text-[#e8dcc4]">one real event = one entry.</b> Before
         logging anything, check the tables — most duplicates come from logging twice, not from the app.

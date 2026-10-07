@@ -9,12 +9,13 @@ import { getRoster } from "@/lib/members";
 import { g, splitEvenly } from "@/lib/format";
 import { effectiveCost } from "@/lib/cost";
 import { setShopOpen } from "@/lib/shop";
+import { SHOP } from "@/shop/config";
 
 async function quartermaster() {
   const session = await auth();
   const discordId = (session as unknown as { discordId?: string } | null)?.discordId;
   if (!session?.user || !isQuartermaster(discordId)) throw new Error("UNAUTHORIZED");
-  return { name: session.user.name || "Quartermaster", discordId: discordId! };
+  return { name: session.user.name || SHOP.roleName, discordId: discordId! };
 }
 
 const uid = (p: string) => `${p}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
@@ -32,7 +33,7 @@ export async function recordSaleAction(formData: FormData) {
   if (!ids.length) throw new Error("No items");
   const qtys = rowsOf(formData, "qty");
   const prices = rowsOf(formData, "unit_sale_price");
-  const location = String(formData.get("location") || "Darkwater Crossing");
+  const location = String(formData.get("location") || SHOP.defaultLocation);
   const notes = String(formData.get("notes") || "");
   const seller = String(formData.get("seller") || qm.name).trim() || qm.name;
   const db = await getDb();
@@ -690,7 +691,7 @@ export async function freeUnitAction(formData: FormData) {
 export async function addUnitAction(formData: FormData) {
   const qm = await quartermaster();
   const label = String(formData.get("label") || "").trim() || `Chest ${Date.now().toString(36)}`;
-  const location = String(formData.get("location") || "").trim() || "Darkwater Crossing";
+  const location = String(formData.get("location") || "").trim() || SHOP.defaultLocation;
   const db = await getDb();
   await db.insert(storageUnits).values({
     id: `unit-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
@@ -708,7 +709,7 @@ export async function updateUnitAction(formData: FormData) {
   if (!(rate >= 0)) throw new Error("Rate must be 0 or more");
   const label = String(formData.get("label") || "").trim();
   if (!label) throw new Error("Label cannot be empty");
-  const location = String(formData.get("location") || "").trim() || "Darkwater Crossing";
+  const location = String(formData.get("location") || "").trim() || SHOP.defaultLocation;
   const db = await getDb();
   await db.update(storageUnits).set({
     label,

@@ -8,6 +8,7 @@ import {
 } from "@/lib/admin-actions";
 import { getStorage, type StorageUnit } from "@/lib/storage";
 import { g } from "@/lib/format";
+import { SHOP } from "@/shop/config";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ function UnitCard({ u }: { u: StorageUnit }) {
           <input type="hidden" name="id" value={u.id} />
           <div><label className="lbl">Label</label><input name="label" defaultValue={u.label} required className="input !py-1 text-sm" /></div>
           <div><label className="lbl">Rate/wk (g)</label><input name="rate_per_week" type="number" min={0} step="any" defaultValue={u.ratePerWeek} className="input !py-1 text-sm" /></div>
-          <div><label className="lbl">Site</label><input name="location" defaultValue={u.location} required className="input !py-1 text-sm" placeholder="Darkwater Crossing" /></div>
+          <div><label className="lbl">Site</label><input name="location" defaultValue={u.location} required className="input !py-1 text-sm" placeholder={SHOP.homeLocation} /></div>
           <div><label className="lbl">Kind</label>
             <select name="kind" defaultValue={u.kind} className="input !py-1 text-sm">
               <option value="rental">Rental</option>

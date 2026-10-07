@@ -4,11 +4,12 @@ import { UPCOMING_SECTIONS, isSheetsConfigured } from "@/lib/sheets";
 import { getCatalogue } from "@/lib/catalog";
 import { isShopOpen } from "@/lib/shop";
 import { getStorage } from "@/lib/storage";
+import { SHOP } from "@/shop/config";
 
 export const revalidate = 60;
 
 export default async function Home() {
-  const [{ categories, items }, open, storage] = await Promise.all([getCatalogue(), isShopOpen(), getStorage("Darkwater Crossing")]);
+  const [{ categories, items }, open, storage] = await Promise.all([getCatalogue(), isShopOpen(), getStorage(SHOP.homeLocation)]);
   const sorted = [...categories].sort((a, b) => a.sort_order - b.sort_order);
   const active = items.filter((i) => i.active && !i.parent_id);
   const sections = sorted
@@ -33,19 +34,18 @@ export default async function Home() {
           <Sigil size={128} />
         </div>
         <div>
-          <h1 className="font-display text-3xl md:text-4xl">Merchantlight Company</h1>
+          <h1 className="font-display text-3xl md:text-4xl">{SHOP.company}</h1>
           <p className="mt-2">
             {open ? (
-              <span className="badge badge-in">● Open now — salesperson at the Darkwater store</span>
+              <span className="badge badge-in">{SHOP.openBadge}</span>
             ) : (
-              <span className="badge badge-out">○ Currently closed — send word and we&apos;ll arrange it</span>
+              <span className="badge badge-out">{SHOP.closedBadge}</span>
             )}
           </p>
           <p className="mt-2 text-[#cbbfa5] max-w-2xl">
-            Outfitters of Eastmarch. Bags, clothes, arms, jewelry and trade goods —
-            crafted by friends, sold fair. White shirts welcome: come work and trade with us.
+            {SHOP.tagline}
           </p>
-          <p className="mt-1 text-sm text-[#e0bd4a]">Always buying: ores &amp; charcoal.</p>
+          <p className="mt-1 text-sm text-[#e0bd4a]">{SHOP.buyingCallout}</p>
           {!isSheetsConfigured() && (
             <p className="mt-4 text-xs text-[#8a7c64]">
               Running on built-in seed data. Connect a Google Sheet (SHEET_ID) to edit stock without redeploying.
@@ -86,19 +86,19 @@ export default async function Home() {
       </section>
 
       <section id="find-us" className="card overflow-hidden scroll-mt-24">
-        <img src="/darkwater-shop.jpg" alt="The Merchantlight general store in Darkwater Crossing" className="w-full h-auto block" />
+        <img src="/darkwater-shop.jpg" alt={`The ${SHOP.company} general store in ${SHOP.homeLocation}`} className="w-full h-auto block" />
         <div className="p-6 md:p-8 space-y-2">
           <h2 className="font-display text-2xl">Visit us</h2>
           <p className="text-[#cbbfa5] max-w-2xl">
-            You&apos;ll find us at the <b className="text-[#e8dcc4]">general store in Darkwater Crossing, Eastmarch</b> —
+            You&apos;ll find us at the <b className="text-[#e8dcc4]">{SHOP.visitStore}</b> —
             look for the lantern sign. Can&apos;t make the trip? We arrange{" "}
-            <b className="text-[#e8dcc4]">deliveries within Eastmarch</b> — find us in town or send word and we&apos;ll meet you on the road.
+            <b className="text-[#e8dcc4]">{SHOP.visitDelivery}</b> — find us in town or send word and we&apos;ll meet you on the road.
           </p>
           <p className="text-[#cbbfa5] max-w-2xl">
             Need space? Ask about <b className="text-[#e8dcc4]">barrel storage</b> at our shop.
           </p>
-          <p className="text-[#e0bd4a]">Always buying: ores &amp; charcoal — bring us your surplus.</p>
-          <p className="text-sm text-[#8a7c64]">All prices in gold (septims). Bulk rates marked where offered.</p>
+          <p className="text-[#e0bd4a]">{SHOP.buyingCalloutLong}</p>
+          <p className="text-sm text-[#8a7c64]">{SHOP.priceNote}</p>
         </div>
       </section>
     </div>

@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { recordSaleAction } from "@/lib/admin-actions";
+import { SHOP } from "@/shop/config";
 import LocationSelect from "./LocationSelect";
 import ItemPicker from "./ItemPicker";
 
@@ -25,7 +26,7 @@ interface Row {
   price: string;
 }
 
-const DEFAULT_LOCATIONS = ["Darkwater Crossing", "Windhelm", "Darkwater Crossing", "Whiterun", "Winterhold"];
+const DEFAULT_LOCATIONS = [...SHOP.locations];
 
 export default function SaleForm({ items, categories, locations = DEFAULT_LOCATIONS }: { items: CatalogOption[]; categories: CategoryOption[]; locations?: string[] }) {
   const inCat = (cat: string) => (cat ? items.filter((i) => i.category === cat) : items);

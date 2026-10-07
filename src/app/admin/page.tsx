@@ -7,6 +7,7 @@ import { getCash } from "@/lib/cash";
 import { getCatalogue } from "@/lib/catalog";
 import { getStorage } from "@/lib/storage";
 import { effectiveThreshold } from "@/lib/defaults";
+import { SHOP } from "@/shop/config";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,7 @@ export default async function AdminHome() {
 
   return (
     <div className="space-y-4">
-      <h1 className="font-display text-3xl">Quartermaster dashboard</h1>
+      <h1 className="font-display text-3xl">{SHOP.roleName} dashboard</h1>
       <div className="card p-4 flex flex-wrap items-center gap-3">
         <span className={open ? "badge badge-in" : "badge badge-out"}>
           {open ? "● Open — salesperson on duty" : "○ Closed"}

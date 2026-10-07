@@ -2,6 +2,7 @@ import { getCatalogue } from "@/lib/catalog";
 import { confirmAllSalesAction, confirmSaleAction, deleteSaleAction } from "@/lib/admin-actions";
 import { getBooks } from "@/lib/books";
 import { g } from "@/lib/format";
+import { SHOP } from "@/shop/config";
 import SaleForm from "@/components/SaleForm";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function SalesPage() {
   const [{ categories, items }, books] = await Promise.all([getCatalogue(), getBooks()]);
   const live = items.filter((i) => i.active);
-  const knownLocations = ["Darkwater Crossing", "Windhelm", "Darkwater Crossing", "Whiterun", "Winterhold"];
+  const knownLocations: string[] = [...SHOP.locations];
   for (const s of books.salesRows) {
     if (s.location && !knownLocations.includes(s.location)) knownLocations.push(s.location);
   }
