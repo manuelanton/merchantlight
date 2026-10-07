@@ -2,12 +2,14 @@
 import { useState } from "react";
 import { recordSaleAction } from "@/lib/admin-actions";
 import LocationSelect from "./LocationSelect";
+import ItemPicker from "./ItemPicker";
 
 export interface CatalogOption {
   id: string;
   name: string;
   price: number;
   category: string;
+  parent: string | null;
 }
 
 export interface CategoryOption {
@@ -29,6 +31,7 @@ export default function SaleForm({ items, categories, locations = DEFAULT_LOCATI
   const inCat = (cat: string) => (cat ? items.filter((i) => i.category === cat) : items);
   const firstOf = (cat: string) => inCat(cat)[0];
   const priceStr = (id: string) => String(items.find((i) => i.id === id)?.price ?? 0);
+  const parentName = (id: string | null) => (id ? items.find((i) => i.id === id)?.name || null : null);
   const [rows, setRows] = useState<Row[]>(() => {
     const f = firstOf("");
     return [{ key: 0, cat: "", itemId: f?.id || "", qty: "1", price: String(f?.price ?? 0) }];
@@ -79,9 +82,12 @@ export default function SaleForm({ items, categories, locations = DEFAULT_LOCATI
             <option value="">All sections</option>
             {categories.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
           </select>
-          <select name="item_id" className="input col-span-6 md:col-span-5" value={r.itemId} onChange={(e) => setRow(r.key, { itemId: e.target.value })} required aria-label="Item">
-            {inCat(r.cat).map((i) => <option key={i.id} value={i.id}>{i.name} — {i.price}g</option>)}
-          </select>
+          <ItemPicker
+            items={items.map((i) => ({ ...i, parent: i.parent ? parentName(i.parent) : null }))}
+            cat={r.cat} value={r.itemId}
+            onChange={(id) => setRow(r.key, { itemId: id })}
+            showPrice className="input col-span-6 md:col-span-5"
+          />
           <input name="qty" type="number" step="any" min={1} value={r.qty} onChange={(e) => setRow(r.key, { qty: e.target.value })} className="input col-span-5 md:col-span-1" aria-label="Quantity" />
           <input name="unit_sale_price" type="number" step="any" min={0} value={r.price} onChange={(e) => setRow(r.key, { price: e.target.value })} className="input col-span-5 md:col-span-2" aria-label="Price each" title="Base price auto-filled — edit for discounts" />
           <div className="col-span-2 md:col-span-1 flex md:justify-end">

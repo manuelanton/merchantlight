@@ -18,6 +18,7 @@ export default async function ItemsPage() {
   const sorted = [...categories].sort((a, b) => a.sort_order - b.sort_order);
   const stock: Record<string, number> = {};
   for (const [id, s] of books.stockByItem) stock[id] = s.qty;
+  for (const [id, s] of books.stockByParent) stock[id] = s.qty;
   const ingredientRows = await db.select().from(itemIngredients);
 
   return (
@@ -42,6 +43,7 @@ export default async function ItemsPage() {
           description: i.description, active: i.active,
           low_threshold: i.low_threshold ?? null,
           buy_price: i.buy_price, max_stock: i.max_stock ?? null,
+          parent_id: i.parent_id ?? null,
         }))}
         categories={sorted.map((c) => ({ slug: c.slug, name: c.name, icon: c.icon }))}
         stock={stock}

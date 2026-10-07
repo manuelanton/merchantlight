@@ -36,6 +36,7 @@ export async function getCatalogue(): Promise<{ categories: Category[]; items: I
         sale_price: i.salePrice,
         cost_value: i.costValue,
         stock: 0,
+        parent_id: i.parentId ?? null,
         low_threshold: i.lowThreshold ?? null,
         buy_price: i.buyPrice,
         max_stock: i.maxStock ?? null,

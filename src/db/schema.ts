@@ -23,6 +23,7 @@ export const items = pgTable("items", {
   createdByDiscordId: text("created_by_discord_id").notNull().default(""),
   createdByName: text("created_by_name").notNull().default(""),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  parentId: text("parent_id"),
 });
 
 /** One recorded sale. Prices snapshotted so later catalogue edits don't rewrite history. */

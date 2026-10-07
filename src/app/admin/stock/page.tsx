@@ -16,7 +16,7 @@ export default async function StockPage() {
       <h1 className="font-display text-3xl">Add stock</h1>
       <p className="text-sm text-[#8a7c64]">Removing stock happens through sales — use a negative amount here only for corrections.</p>
       <StockForm
-        items={live.map((i) => ({ id: i.id, name: i.name, price: i.sale_price, category: i.category_slug }))}
+        items={live.map((i) => ({ id: i.id, name: i.name, price: i.sale_price, category: i.category_slug, parent: i.parent_id ?? null }))}
         categories={categories.map((c) => ({ slug: c.slug, name: c.name }))}
       />
       <StockManager

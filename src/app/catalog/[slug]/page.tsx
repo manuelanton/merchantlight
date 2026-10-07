@@ -8,7 +8,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
   const { categories, items } = await getCatalogue();
   const cat = categories.find((c) => c.slug === slug);
   if (!cat) return <div>Unknown section. <Link href="/" className="text-[#c9a227]">Back</Link></div>;
-  const list = items.filter((i) => i.active && i.category_slug === slug).sort((a, b) => a.sale_price - b.sale_price);
+  const list = items.filter((i) => i.active && !i.parent_id && i.category_slug === slug).sort((a, b) => a.sale_price - b.sale_price);
   if (!list.length) {
     return (
       <div className="space-y-4">

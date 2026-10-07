@@ -21,7 +21,7 @@ export default async function AdminHome() {
   const lockbox = cash.pots.find((p) => p.name === "Lockbox")?.balance || 0;
   const { items } = await getCatalogue();
   const thresholdFor = (id: string) => items.find((i) => i.id === id)?.low_threshold ?? DEFAULT_LOW_AT;
-  const lowStock = [...b.stockByItem.entries()]
+  const lowStock = [...b.stockByParent.entries()]
     .filter(([, s]) => s.qty > 0)
     .map(([id, s]) => ({ ...s, threshold: thresholdFor(id) }))
     .filter((s) => s.qty <= s.threshold);

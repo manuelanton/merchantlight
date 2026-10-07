@@ -10,7 +10,7 @@ export const revalidate = 60;
 export default async function Home() {
   const [{ categories, items }, open, storage] = await Promise.all([getCatalogue(), isShopOpen(), getStorage("Darkwater Crossing")]);
   const sorted = [...categories].sort((a, b) => a.sort_order - b.sort_order);
-  const active = items.filter((i) => i.active);
+  const active = items.filter((i) => i.active && !i.parent_id);
   const sections = sorted
     .map((c) => {
       const list = active.filter((i) => i.category_slug === c.slug);

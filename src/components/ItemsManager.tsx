@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { addIngredientAction, deleteIngredientAction, deleteItemAction, updateItemAction } from "@/lib/admin-actions";
+import { addIngredientAction, createVariantAction, deleteIngredientAction, deleteItemAction, updateItemAction } from "@/lib/admin-actions";
 import { g } from "@/lib/format";
 import { effectiveCost, hasRecipe } from "@/lib/cost";
 import IngredientForm from "./IngredientForm";
@@ -16,6 +16,7 @@ export interface ManagedItem {
   low_threshold: number | null;
   buy_price: number;
   max_stock: number | null;
+  parent_id: string | null;
 }
 
 export interface ManagedCategory {
@@ -117,7 +118,12 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
           <table className="ledger">
             <thead><tr><th>Item</th><th>Price</th><th>Cost</th><th>Profit</th><th>Stock</th><th>Shown</th><th></th></tr></thead>
             <tbody>
-              {list.map((i) => {
+              {list.flatMap((i) => {
+                if (i.parent_id) return []; // variants render under their parent
+                const kids = list.filter((k) => k.parent_id === i.id);
+                return [i, ...kids];
+              }).map((i) => {
+                const isVariant = !!i.parent_id;
                 const cost = eff(i.id);
                 const recipe = fromRecipe(i.id);
                 const margin = Math.round((i.sale_price - cost) * 100) / 100;
@@ -125,7 +131,7 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                 return (
                 <>
                 <tr key={i.id}>
-                  <td><b>{i.name}</b></td>
+                  <td><b>{isVariant ? `↳ ${i.name}` : i.name}</b>{!isVariant && list.some((k) => k.parent_id === i.id) && <span className="text-xs text-[#8a7c64]"> ({list.filter((k) => k.parent_id === i.id).length} variants)</span>}</td>
                   <td className="text-[#e0bd4a]">{i.sale_price}g</td>
                   <td title={recipe ? "From recipe — updates with material costs" : "Manual cost"}>
                     {g(cost)}g{recipe && <span className="text-[#8a7c64]"> ≈</span>}
@@ -137,7 +143,7 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                   <td>{i.active ? "yes" : "no"}</td>
                   <td>
                     <div className="flex gap-2 justify-end">
-                      {i.category_slug !== "materials" && (
+                      {!isVariant && i.category_slug !== "materials" && (
                         <button
                           type="button"
                           onClick={() => setOpenRecipe(expanded ? null : i.id)}
@@ -146,6 +152,16 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                         >
                           {expanded ? "Hide recipe" : "Recipe"}
                         </button>
+                      )}
+                      {!isVariant && (
+                        <details className="inline-block">
+                          <summary className="btn-ghost !py-1 !px-2 text-xs cursor-pointer list-none inline-block" title="Add a named variant (same price/cost, tracked separately)">+ Variant</summary>
+                          <form action={createVariantAction} className="mt-2 p-3 card space-y-2 min-w-[240px]">
+                            <input type="hidden" name="parent_id" value={i.id} />
+                            <div><label className="lbl">Variant name</label><input name="name" required className="input" placeholder="e.g. Common Clothes (blue)" /></div>
+                            <button className="btn-gold !py-1 w-full text-sm" type="submit">Add variant</button>
+                          </form>
+                        </details>
                       )}
                       <details
                         className="inline-block"

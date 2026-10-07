@@ -446,9 +446,41 @@ export async function updateItemAction(formData: FormData) {
 
 export async function deleteItemAction(formData: FormData) {
   await quartermaster();
+  const id = String(formData.get("id"));
   const db = await getDb();
   // Safe: sales + stock moves keep item-name snapshots, so history survives.
-  await db.delete(items).where(eq(items.id, String(formData.get("id"))));
+  const kids = await db.select({ id: items.id }).from(items).where(eq(items.parentId, id));
+  if (kids.length) throw new Error(`Has ${kids.length} variant(s) — delete or re-home them first`);
+  await db.delete(items).where(eq(items.id, id));
+  revalidatePath("/", "layout");
+}
+
+/** Add a variant under a parent: copies category/price/cost/visibility. */
+export async function createVariantAction(formData: FormData) {
+  const qm = await quartermaster();
+  const parentId = String(formData.get("parent_id"));
+  const name = String(formData.get("name") || "").trim();
+  if (!name) throw new Error("Variant needs a name");
+  const db = await getDb();
+  const found = await db.select().from(items).where(eq(items.id, parentId)).limit(1);
+  const parent = found[0];
+  if (!parent) throw new Error("Parent not found");
+  if (parent.parentId) throw new Error("Cannot nest variants — pick a top-level item");
+  await db.insert(items).values({
+    id: `${parent.id}-v-${slugify(name, Date.now().toString(36))}`,
+    name,
+    categorySlug: parent.categorySlug,
+    description: "",
+    salePrice: parent.salePrice,
+    costValue: parent.costValue,
+    active: parent.active,
+    lowThreshold: parent.lowThreshold,
+    buyPrice: parent.buyPrice,
+    maxStock: parent.maxStock,
+    parentId: parent.id,
+    createdByDiscordId: qm.discordId,
+    createdByName: qm.name,
+  });
   revalidatePath("/", "layout");
 }
 

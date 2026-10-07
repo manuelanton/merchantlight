@@ -1,7 +1,7 @@
 import { desc } from "drizzle-orm";
 import { auth, isQuartermaster } from "@/auth";
 import { getDb } from "@/db";
-import { ledger, notes, sales, stockMoves } from "@/db/schema";
+import { items, ledger, notes, sales, stockMoves } from "@/db/schema";
 import { getMembers } from "@/lib/members";
 
 export interface Books {
@@ -10,6 +10,7 @@ export interface Books {
   ledgerRows: (typeof ledger.$inferSelect)[];
   noteRows: (typeof notes.$inferSelect)[];
   stockByItem: Map<string, { name: string; qty: number }>;
+  stockByParent: Map<string, { name: string; qty: number }>;
   revenue: number;
   profit: number;
   rentPaid: number;
@@ -27,19 +28,29 @@ export async function getBooks(): Promise<Books> {
   const discordId = (session as unknown as { discordId?: string } | null)?.discordId;
   if (!session?.user || !isQuartermaster(discordId)) throw new Error("UNAUTHORIZED");
   const db = await getDb();
-  const [salesRows, moveRows, ledgerRows, noteRows] = await Promise.all([
+  const [salesRows, moveRows, ledgerRows, noteRows, itemRows] = await Promise.all([
     db.select().from(sales).orderBy(desc(sales.timestamp)).limit(200),
     db.select().from(stockMoves).orderBy(desc(stockMoves.timestamp)).limit(300),
     db.select().from(ledger).orderBy(desc(ledger.timestamp)).limit(300),
     db.select().from(notes).orderBy(desc(notes.timestamp)).limit(100),
+    db.select({ id: items.id, name: items.name, parentId: items.parentId }).from(items),
   ]);
 
+  // Variant moves roll up into their parent: the parent carries the count.
+  // stockByItem stays per exact item; stockByParent aggregates variant families.
+  const parentOf = new Map(itemRows.map((i) => [i.id, i.parentId || i.id]));
+  const displayName = new Map(itemRows.map((i) => [i.id, i.parentId ? (itemRows.find((p) => p.id === i.parentId)?.name || i.name) : i.name]));
   const stockByItem = new Map<string, { name: string; qty: number }>();
+  const stockByParent = new Map<string, { name: string; qty: number }>();
   for (const m of [...moveRows].reverse()) {
     const cur = stockByItem.get(m.itemId) || { name: m.itemName, qty: 0 };
     cur.qty += m.delta;
     if (m.itemName) cur.name = m.itemName;
     stockByItem.set(m.itemId, cur);
+    const pid = parentOf.get(m.itemId) || m.itemId;
+    const par = stockByParent.get(pid) || { name: displayName.get(pid) || m.itemName, qty: 0 };
+    par.qty += m.delta;
+    stockByParent.set(pid, par);
   }
 
   const revenue = salesRows.reduce((a, s) => a + s.unitSalePrice * s.qty, 0);
@@ -60,5 +71,5 @@ export async function getBooks(): Promise<Books> {
   // Roster = active registered members. History is untouched by roster changes.
   const roster = activeMembers;
 
-  return { salesRows, moveRows, ledgerRows, noteRows, stockByItem, revenue, profit, rentPaid, balances, members: activeMembers, roster };
+  return { salesRows, moveRows, ledgerRows, noteRows, stockByItem, stockByParent, revenue, profit, rentPaid, balances, members: activeMembers, roster };
 }

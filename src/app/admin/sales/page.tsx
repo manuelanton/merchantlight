@@ -21,7 +21,7 @@ export default async function SalesPage() {
       <h1 className="font-display text-3xl">Record a sale</h1>
       <p className="text-sm text-[#8a7c64]">Sales land pending — gold splits only once someone confirms the deposit.</p>
       <SaleForm
-        items={live.map((i) => ({ id: i.id, name: i.name, price: i.sale_price, category: i.category_slug }))}
+        items={live.map((i) => ({ id: i.id, name: i.name, price: i.sale_price, category: i.category_slug, parent: i.parent_id ?? null }))}
         categories={categories.map((c) => ({ slug: c.slug, name: c.name }))}
         locations={knownLocations}
       />

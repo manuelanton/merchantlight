@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { adjustStockAction } from "@/lib/admin-actions";
+import ItemPicker from "./ItemPicker";
 import type { CatalogOption, CategoryOption } from "./SaleForm";
 interface Row {
   key: number;
@@ -57,9 +58,12 @@ export default function StockForm({ items, categories }: { items: CatalogOption[
             <option value="">All sections</option>
             {categories.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
           </select>
-          <select name="item_id" className="input col-span-6 md:col-span-6" value={r.itemId} onChange={(e) => setRow(r.key, { itemId: e.target.value })} required aria-label="Item">
-            {inCat(r.cat).map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-          </select>
+          <ItemPicker
+            items={items.map((i) => ({ ...i, parent: i.parent ? (items.find((p) => p.id === i.parent)?.name || null) : null }))}
+            cat={r.cat} value={r.itemId}
+            onChange={(id) => setRow(r.key, { itemId: id })}
+            className="input col-span-6 md:col-span-6"
+          />
           <input name="delta" type="number" step="any" value={r.delta} onChange={(e) => setRow(r.key, { delta: e.target.value })} className="input col-span-10 md:col-span-2" aria-label="Amount" title="Positive adds stock; negative only for corrections" required />
           <div className="col-span-2 md:col-span-1 flex md:justify-end">
             <button type="button" onClick={() => removeRow(r.key)} className="btn-ghost !px-3 w-10 shrink-0" title="Remove row">✕</button>

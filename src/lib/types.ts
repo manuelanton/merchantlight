@@ -17,6 +17,7 @@ export const ItemSchema = z.object({
   sale_price: z.coerce.number().default(0),
   cost_value: z.coerce.number().default(0),
   stock: z.coerce.number().default(0),
+  parent_id: z.string().nullish(),
   low_threshold: z.number().nullish(),
   buy_price: z.coerce.number().default(0),
   max_stock: z.number().nullish(),
