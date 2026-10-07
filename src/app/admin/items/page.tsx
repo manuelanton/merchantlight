@@ -40,6 +40,8 @@ export default async function ItemsPage() {
           id: i.id, name: i.name, category_slug: i.category_slug,
           sale_price: i.sale_price, cost_value: i.cost_value,
           description: i.description, active: i.active,
+          low_threshold: i.low_threshold ?? null,
+          buy_price: i.buy_price, max_stock: i.max_stock ?? null,
         }))}
         categories={sorted.map((c) => ({ slug: c.slug, name: c.name, icon: c.icon }))}
         stock={stock}
@@ -48,6 +50,29 @@ export default async function ItemsPage() {
           materialName: r.materialName, qty: r.qty,
         }))}
       />
+
+      <Collapsible title="Buying guide (materials)">
+        <p className="text-xs text-[#8a7c64]">What we pay suppliers, and when to stop buying. Edit buy price / cap in each row&apos;s Edit form.</p>
+        <table className="ledger mt-2">
+          <thead><tr><th>Material</th><th>We pay</th><th>On hand</th><th>Cap</th><th>Status</th></tr></thead>
+          <tbody>
+            {items.filter((i) => i.category_slug === "materials").sort((a, b) => a.name.localeCompare(b.name)).map((m) => {
+              const onHand = stock[m.id] ?? 0;
+              const cap = m.max_stock ?? null;
+              const full = cap !== null && onHand >= cap;
+              return (
+                <tr key={m.id}>
+                  <td><b>{m.name}</b></td>
+                  <td className="text-[#e0bd4a]">{m.buy_price > 0 ? `${m.buy_price}g` : "—"}</td>
+                  <td>{onHand}</td>
+                  <td>{cap ?? "—"}</td>
+                  <td className={full ? "text-[#e08a8a]" : "text-[#7fd08a]"}>{full ? "Full — don't buy" : "Buying"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </Collapsible>
 
       <Collapsible title="Categories">
         <form action={createCategoryAction} className="flex flex-wrap gap-2 items-end">

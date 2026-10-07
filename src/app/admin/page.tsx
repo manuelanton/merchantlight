@@ -4,11 +4,12 @@ import { getBooks } from "@/lib/books";
 import { g } from "@/lib/format";
 import { isShopOpen } from "@/lib/shop";
 import { getCash } from "@/lib/cash";
+import { getCatalogue } from "@/lib/catalog";
 import { getStorage } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
-const LOW_AT = 2;
+const DEFAULT_LOW_AT = 2;
 
 const KIND_ICON: Record<string, string> = { news: "📯", request: "🙏", todo: "☑️", stock: "📦" };
 
@@ -18,9 +19,14 @@ export default async function AdminHome() {
   const st = await getStorage();
   const cash = await getCash();
   const lockbox = cash.pots.find((p) => p.name === "Lockbox")?.balance || 0;
+  const { items } = await getCatalogue();
+  const thresholdFor = (id: string) => items.find((i) => i.id === id)?.low_threshold ?? DEFAULT_LOW_AT;
+  const lowStock = [...b.stockByItem.entries()]
+    .filter(([, s]) => s.qty > 0)
+    .map(([id, s]) => ({ ...s, threshold: thresholdFor(id) }))
+    .filter((s) => s.qty <= s.threshold);
   const ledgerBal = b.ledgerRows.reduce((a, e) => a + e.amountGold, 0);
   const openNotes = b.noteRows.filter((n) => !n.resolved);
-  const lowStock = [...b.stockByItem.values()].filter((s) => s.qty > 0 && s.qty <= LOW_AT);
   const hotMap = new Map<string, { name: string; qty: number; revenue: number }>();
   for (const s of b.salesRows) {
     const cur = hotMap.get(s.itemId) || { name: s.itemName, qty: 0, revenue: 0 };
@@ -145,7 +151,7 @@ export default async function AdminHome() {
               </ul>
             </div>
             <div>
-              <h2 className="font-display text-lg">Running low (≤ {LOW_AT})</h2>
+              <h2 className="font-display text-lg">Running low</h2>
               <ul className="text-sm mt-2 space-y-1">
                 {lowStock.slice(0, 6).map((s) => (
                   <li key={s.name} className="flex items-center gap-2">

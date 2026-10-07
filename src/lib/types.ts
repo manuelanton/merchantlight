@@ -17,7 +17,9 @@ export const ItemSchema = z.object({
   sale_price: z.coerce.number().default(0),
   cost_value: z.coerce.number().default(0),
   stock: z.coerce.number().default(0),
-  low_threshold: z.coerce.number().default(2),
+  low_threshold: z.number().nullish(),
+  buy_price: z.coerce.number().default(0),
+  max_stock: z.number().nullish(),
   image_url: z.string().default(""),
   active: z.union([z.boolean(), z.string()]).transform((v) =>
     v === true || v === "TRUE" || v === "true" || v === "1" ? true : v === false || v === "FALSE" || v === "false" || v === "0" ? false : Boolean(v)

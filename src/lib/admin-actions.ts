@@ -424,6 +424,8 @@ export async function createItemAction(formData: FormData) {
 export async function updateItemAction(formData: FormData) {
   await quartermaster();
   const db = await getDb();
+  const lowRaw = String(formData.get("low_threshold") || "").trim();
+  const maxRaw = String(formData.get("max_stock") || "").trim();
   await db
     .update(items)
     .set({
@@ -433,6 +435,9 @@ export async function updateItemAction(formData: FormData) {
       salePrice: Number(formData.get("sale_price") || 0),
       costValue: Number(formData.get("cost_value") || 0),
       active: String(formData.get("active") || "true") === "true",
+      lowThreshold: lowRaw === "" ? null : Math.max(0, Number(lowRaw) || 0),
+      buyPrice: Number(formData.get("buy_price") || 0),
+      maxStock: maxRaw === "" ? null : Math.max(0, Number(maxRaw) || 0),
       updatedAt: new Date(),
     })
     .where(eq(items.id, String(formData.get("id"))));

@@ -127,12 +127,13 @@ const REF: SeedRow[] = [
   ["it-snowy-sabre-cat-pelt", "Snowy Sabre Cat Pelt", "materials", "", 6, 0],
 ];
 
-const blank: Pick<Item, "image_url" | "active" | "created_by_char" | "updated_by_char" | "updated_at"> = {
+const blank: Pick<Item, "image_url" | "active" | "created_by_char" | "updated_by_char" | "updated_at" | "buy_price"> = {
   image_url: "",
   active: true,
   created_by_char: "",
   updated_by_char: "",
   updated_at: "",
+  buy_price: 0,
 };
 
 export const SEED_ITEMS: Item[] = [

@@ -13,6 +13,9 @@ export interface ManagedItem {
   cost_value: number;
   description: string;
   active: boolean;
+  low_threshold: number | null;
+  buy_price: number;
+  max_stock: number | null;
 }
 
 export interface ManagedCategory {
@@ -167,6 +170,11 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                           <div><label className="lbl">Price</label><input name="sale_price" type="number" step="any" defaultValue={i.sale_price} className="input" /></div>
                           <div><label className="lbl">Cost</label><input name="cost_value" type="number" step="any" defaultValue={i.cost_value} className="input" /></div>
                           <div><label className="lbl">Description</label><input name="description" defaultValue={i.description} className="input" /></div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div><label className="lbl">Low at</label><input name="low_threshold" type="number" min={0} step="any" defaultValue={i.low_threshold ?? ""} placeholder="auto (2)" className="input" title="Warn when stock hits this — blank uses the default" /></div>
+                          <div><label className="lbl">Buy price</label><input name="buy_price" type="number" min={0} step="any" defaultValue={i.buy_price} className="input" title="What we pay suppliers per unit" /></div>
+                          <div><label className="lbl">Max stock</label><input name="max_stock" type="number" min={0} step="1" defaultValue={i.max_stock ?? ""} placeholder="no cap" className="input" title="Don't buy past this" /></div>
+                        </div>
                           <div><label className="lbl">Visible</label>
                             <select name="active" defaultValue={String(i.active)} className="input"><option value="true">Yes</option><option value="false">Hidden</option></select>
                           </div>
