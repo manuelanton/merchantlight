@@ -34,7 +34,6 @@ export const SHOP = {
   moveBanner: "We've moved — find us at the general store in Darkwater Crossing!",
   tagline:
     "Outfitters of Eastmarch. Bags, clothes, arms, jewelry and trade goods — crafted by friends, sold fair. White shirts welcome: come work and trade with us.",
-  buyingCallout: "Always buying: ores & charcoal.",
   priceNote: "All prices in gold (septims). Bulk rates marked where offered.",
   openBadge: "● Open now — salesperson at the Darkwater store",
   closedBadge: "○ Currently closed — send word and we'll arrange it",
