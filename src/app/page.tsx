@@ -101,7 +101,6 @@ export default async function Home() {
             Need space? Ask about <b className="text-[#e8dcc4]">barrel storage</b> at our shop.
           </p>
           )}
-          <p className="text-[#e0bd4a]">{SHOP.buyingCalloutLong}</p>
           <p className="text-sm text-[#8a7c64]">{SHOP.priceNote}</p>
         </div>
       </section>
