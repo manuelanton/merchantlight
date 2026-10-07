@@ -51,12 +51,15 @@ export const SHOP = {
   roleName: "Quartermaster",
 
   /**
-   * Feature toggles (all on = current behavior).
-   * storage/notes/guide gate admin tabs; cash/recipes/variants are
+   * Feature toggles (all on = current behavior, except storagePublic).
+   * storage/notes/guide gate admin tabs; storagePublic gates the public
+   * storage teaser card + visit-us note. cash/recipes/variants are
    * engine-level and stay on for now (wiring gates = future work).
    */
   features: {
     storage: true,
+    /** Show storage rental teaser on the public catalogue. Off = hidden. */
+    storagePublic: false,
     cash: true,
     recipes: true,
     variants: true,

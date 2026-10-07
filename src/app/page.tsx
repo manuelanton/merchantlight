@@ -73,6 +73,7 @@ export default async function Home() {
             )}
           </Link>
         ))}
+        {SHOP.features.storagePublic && (
         <Link href="#find-us" className="card p-5 hover:border-[#d97a1f] transition block">
           <div className="font-display text-xl">🛢️ Storage</div>
           <p className="text-sm text-[#b8a888] mt-1">
@@ -83,6 +84,7 @@ export default async function Home() {
             <span className="text-sm text-[#c9a227] ml-2">Visit us →</span>
           </p>
         </Link>
+        )}
       </section>
 
       <section id="find-us" className="card overflow-hidden scroll-mt-24">
@@ -94,9 +96,11 @@ export default async function Home() {
             look for the lantern sign. Can&apos;t make the trip? We arrange{" "}
             <b className="text-[#e8dcc4]">{SHOP.visitDelivery}</b> — find us in town or send word and we&apos;ll meet you on the road.
           </p>
+          {SHOP.features.storagePublic && (
           <p className="text-[#cbbfa5] max-w-2xl">
             Need space? Ask about <b className="text-[#e8dcc4]">barrel storage</b> at our shop.
           </p>
+          )}
           <p className="text-[#e0bd4a]">{SHOP.buyingCalloutLong}</p>
           <p className="text-sm text-[#8a7c64]">{SHOP.priceNote}</p>
         </div>
