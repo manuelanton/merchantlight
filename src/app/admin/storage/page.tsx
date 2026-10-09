@@ -4,6 +4,7 @@ import {
   deleteUnitAction,
   freeUnitAction,
   rentUnitAction,
+  undoCollectUnitAction,
   updateUnitAction,
 } from "@/lib/admin-actions";
 import { getStorage, type StorageUnit } from "@/lib/storage";
@@ -72,6 +73,10 @@ function UnitCard({ u }: { u: StorageUnit }) {
               <button className="btn-gold !py-1 text-xs" type="submit" title="Log one week paid from the chosen date">
                 Collect {g(u.ratePerWeek)}g
               </button>
+            </form>
+            <form action={undoCollectUnitAction}>
+              <input type="hidden" name="id" value={u.id} />
+              <button className="btn-ghost !py-1 text-xs" type="submit" title="Undo latest collect: paid-through rolls back, income row removed">Undo</button>
             </form>
                     <form action={freeUnitAction}>
                       <input type="hidden" name="id" value={u.id} />

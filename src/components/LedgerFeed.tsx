@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { deleteLedgerAction, updateLedgerAction } from "@/lib/admin-actions";
+import { deleteLedgerAction, rebookSharedGroupToCoffersAction, updateLedgerAction, voidSharedGroupAction } from "@/lib/admin-actions";
 import { g } from "@/lib/format";
 import MemberSelect from "./MemberSelect";
 
@@ -108,7 +108,24 @@ export default function LedgerFeed({ feed, members }: { feed: FeedEntry[]; membe
                         )}
                       </details>
                     </td>
-                    <td />
+                    <td className="whitespace-nowrap">
+                      {gr.kind === "shared" && (
+                        <>
+                          <form action={voidSharedGroupAction} className="inline-block mr-1">
+                            {gr.rows.map((r) => <input key={r.id} type="hidden" name="ids" value={r.id} />)}
+                            <button className="btn-ghost !py-1 !px-2 text-xs" type="submit" title="Undo the whole split at once">Void group</button>
+                          </form>
+                          {gr.total < 0 && (
+                            <form action={rebookSharedGroupToCoffersAction} className="inline-block">
+                              {gr.rows.map((r) => <input key={r.id} type="hidden" name="ids" value={r.id} />)}
+                              <input type="hidden" name="category" value={gr.rows[0]?.category || ""} />
+                              <input type="hidden" name="title" value={gr.title} />
+                              <button className="btn-ghost !py-1 !px-2 text-xs" type="submit" title="Move the whole split to company coffers (nobody charged)">→ coffers</button>
+                            </form>
+                          )}
+                        </>
+                      )}
+                    </td>
                   </tr>
                 );
               }

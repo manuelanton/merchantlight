@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { adjustBalanceAction, adjustCashAction, requestRestockAction, setShopOpenAction, sweepCashAction } from "@/lib/admin-actions";
+import { adjustBalanceAction, adjustCashAction, deleteCashMoveAction, requestRestockAction, setShopOpenAction, sweepCashAction } from "@/lib/admin-actions";
 import { getBooks } from "@/lib/books";
 import { g } from "@/lib/format";
 import { isShopOpen } from "@/lib/shop";
@@ -93,6 +93,32 @@ export default async function AdminHome() {
           <input name="reason" className="input !py-1 text-sm flex-1" placeholder="Reason — e.g. opening float" />
           <button className="btn-ghost !py-1 text-xs whitespace-nowrap" type="submit">Log cash</button>
         </form>
+      </details>
+      <details>
+        <summary className="text-xs text-[#c9a227] cursor-pointer hover:text-[#e8dcc4]">Cash history (sweeps go away as a pair)…</summary>
+        <div className="card mt-2 overflow-x-auto">
+          <table className="ledger min-w-[640px]">
+            <thead><tr><th>When</th><th>Pot</th><th>Amount</th><th>Note</th><th>By</th><th></th></tr></thead>
+            <tbody>
+              {cash.moves.map((m) => (
+                <tr key={m.id}>
+                  <td className="text-xs">{new Date(m.timestamp).toLocaleString()}</td>
+                  <td>{m.pot}</td>
+                  <td className={m.delta >= 0 ? "text-[#7fd08a]" : "text-[#e08a8a]"}>{g(m.delta)}g</td>
+                  <td className="text-[#8a7c64]">{m.reason}</td>
+                  <td>{m.actorName}</td>
+                  <td>
+                    <form action={deleteCashMoveAction} className="inline-block">
+                      <input type="hidden" name="id" value={m.id} />
+                      <button className="btn-ghost !py-1 !px-2 text-xs" type="submit" title="Delete this cash move">✕</button>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+              {!cash.moves.length && <tr><td colSpan={6} className="text-[#8a7c64]">No cash moves yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
       </details>
       <div className="card p-4 flex flex-wrap items-center gap-3">
         <span className="font-display text-lg">Storage: {st.filled}/{st.units.filter((u) => u.kind !== "internal").length} filled</span>

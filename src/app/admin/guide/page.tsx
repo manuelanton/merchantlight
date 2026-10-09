@@ -124,9 +124,10 @@ export default function GuidePage() {
         <p>Only <i>profit</i> ever splits. Sale revenue is never paid out whole — that would pay the materials twice.</p>
       </Rule>
 
-      <Rule title="7 · Fixing mistakes">
-        <p>Wrong sale? <b>Void</b> it on the Sales page (stock returns, shares evaporate). Don&apos;t post manual counter-rows.</p>
-        <p>Wrong ledger row? Edit or ✕ it — except auto-posted split shares, which you change by voiding their sale.</p>
+      <Rule title="7 · Fixing mistakes — everything undoes">
+        <p>Wrong sale? <b>Void</b> it on the Sales page (stock returns, profit shares evaporate, lockbox cash reverses). Don&apos;t post manual counter-rows.</p>
+        <p>Wrong ledger row? Edit or ✕ it — except auto-posted sale splits, which you change by voiding their sale. A whole rent-style split undoes in one click with <b>Void group</b>; forgot the coffers tick? <b>→ coffers</b> rebooks the group to company gold.</p>
+        <p>Wrong stock move? ✕ it on the Stock page (sale moves only go away via their sale). Wrong cash move? ✕ it in Cash history on the dashboard (sweeps undo as a pair). Wrong collect? <b>Undo</b> on the storage unit rolls the week back and removes the income.</p>
         <p>Ledger groups collapse each split into one row — expand it to see who got what.</p>
       </Rule>
 

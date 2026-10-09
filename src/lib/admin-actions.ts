@@ -1,5 +1,5 @@
 "use server";
-import { eq, like } from "drizzle-orm";
+import { desc, eq, inArray, like } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { auth, isQuartermaster } from "@/auth";
 import { getDb } from "@/db";
@@ -354,6 +354,54 @@ export async function deleteLedgerAction(formData: FormData) {
   revalidatePath("/admin", "layout");
 }
 
+/** Undo a whole shared split group (e.g. a rent split) in one click.
+ *  Sale profit splits are refused — those undo by voiding their sale,
+ *  so stock and lockbox cash stay consistent. */
+export async function voidSharedGroupAction(formData: FormData) {
+  await quartermaster();
+  const ids = formData.getAll("ids").map(String).filter(Boolean);
+  if (!ids.length) throw new Error("Nothing to void");
+  const db = await getDb();
+  const rows = await db.select().from(ledger).where(inArray(ledger.id, ids));
+  if (!rows.length) throw new Error("Rows already gone");
+  for (const r of rows) {
+    if (r.description.includes("[sale:")) throw new Error("Sale splits undo by voiding their sale");
+  }
+  await db.delete(ledger).where(inArray(ledger.id, rows.map((r) => r.id)));
+  revalidatePath("/admin", "layout");
+}
+
+/** Rebook a shared money-out group (e.g. rent) to company coffers:
+ *  the N share rows become one unattributed row. For the classic
+ *  "forgot to tick pay-from-coffers" mistake. */
+export async function rebookSharedGroupToCoffersAction(formData: FormData) {
+  const qm = await quartermaster();
+  const ids = formData.getAll("ids").map(String).filter(Boolean);
+  if (!ids.length) throw new Error("Nothing to rebook");
+  const db = await getDb();
+  const rows = await db.select().from(ledger).where(inArray(ledger.id, ids));
+  if (!rows.length) throw new Error("Rows already gone");
+  for (const r of rows) {
+    if (r.description.includes("[sale:")) throw new Error("Sale splits can't move to coffers");
+    if (r.type !== "expense") throw new Error("Only expense groups can move to coffers");
+  }
+  const total = Math.round(rows.reduce((a, r) => a + r.amountGold, 0) * 100) / 100;
+  if (!(total < 0)) throw new Error("Only money-out groups can move to coffers");
+  const category = String(formData.get("category") || rows[0].category);
+  const title = String(formData.get("title") || "Shared bill").trim() || "Shared bill";
+  await db.delete(ledger).where(inArray(ledger.id, rows.map((r) => r.id)));
+  await db.insert(ledger).values({
+    id: uid("lg"),
+    type: "expense",
+    member: "",
+    amountGold: total,
+    category,
+    description: `${title} — paid from company coffers (rebooked ${rows.length}-way split)`,
+    actorDiscordId: qm.discordId,
+  });
+  revalidatePath("/admin", "layout");
+}
+
 /** Set the ledger balance directly: posts one unattributed adjustment for the
  *  difference, so no member is distorted. */
 export async function adjustBalanceAction(formData: FormData) {
@@ -688,6 +736,25 @@ export async function freeUnitAction(formData: FormData) {
   revalidatePath("/admin", "layout");
 }
 
+/** Undo the latest collect on a unit: paid-through rolls back a week
+ *  and the posted income row is removed. */
+export async function undoCollectUnitAction(formData: FormData) {
+  await quartermaster();
+  const id = String(formData.get("id"));
+  const db = await getDb();
+  const found = await db.select().from(ledger)
+    .where(like(ledger.description, `%[unit:${id}]%`))
+    .orderBy(desc(ledger.timestamp)).limit(1);
+  const row = found[0];
+  if (!row) throw new Error("No collect to undo on this unit");
+  const base = row.description.match(/from (\d{4}-\d{2}-\d{2})/)?.[1];
+  if (!base) throw new Error("Can't read the collected week — delete the income row manually");
+  await db.update(storageUnits).set({ paidThrough: new Date(`${base}T12:00:00`) })
+    .where(eq(storageUnits.id, id));
+  await db.delete(ledger).where(eq(ledger.id, row.id));
+  revalidatePath("/admin", "layout");
+}
+
 export async function addUnitAction(formData: FormData) {
   const qm = await quartermaster();
   const label = String(formData.get("label") || "").trim() || `Chest ${Date.now().toString(36)}`;
@@ -782,6 +849,20 @@ export async function sweepCashAction(formData: FormData) {
     actorDiscordId: qm.discordId,
     actorName: qm.name,
   });
+  revalidatePath("/admin", "layout");
+}
+
+/** Delete a cash move. Sweep halves (-out/-in) go away as a pair. */
+export async function deleteCashMoveAction(formData: FormData) {
+  await quartermaster();
+  const id = String(formData.get("id"));
+  const db = await getDb();
+  const pair = id.endsWith("-out") || id.endsWith("-in") ? id.slice(0, -4) : null;
+  if (pair) {
+    await db.delete(cashMoves).where(inArray(cashMoves.id, [`${pair}-out`, `${pair}-in`]));
+  } else {
+    await db.delete(cashMoves).where(eq(cashMoves.id, id));
+  }
   revalidatePath("/admin", "layout");
 }
 
