@@ -69,6 +69,13 @@ export default function ContributionForm({
       </label>
       {withItems && (
         <div className="space-y-2 border-t border-[#1c2b31] pt-3">
+          <div className="hidden md:grid grid-cols-12 gap-2 text-xs uppercase tracking-wider text-[#8a7c64]">
+            <span className="col-span-3">Section</span>
+            <span className="col-span-5">Item</span>
+            <span className="col-span-2">Qty</span>
+            <span className="col-span-1">Each (g)</span>
+            <span className="col-span-1" />
+          </div>
           {rows.map((r) => (
             <div key={r.key} className="grid grid-cols-12 gap-2 items-center border-b border-[#1c2b31] pb-2">
               <select
@@ -90,6 +97,7 @@ export default function ContributionForm({
                 name="contrib_qty" type="number" min={0.01} step="any" value={r.qty}
                 onChange={(e) => setRow(r.key, { qty: e.target.value })}
                 className="input col-span-6 md:col-span-2" aria-label="Quantity"
+                title="Quantity contributed"
               />
               <input
                 type="number" min={0} step="any" value={r.value !== "" ? r.value : costOf(r.itemId)}
