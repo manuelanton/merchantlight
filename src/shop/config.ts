@@ -55,6 +55,8 @@ export const SHOP = {
    * engine-level and stay on for now (wiring gates = future work).
    */
   features: {
+    /** Stock tracking trial: off = catalogue + sales + gold only. */
+    stock: false,
     storage: true,
     /** Show storage rental teaser on the public catalogue. Off = hidden. */
     storagePublic: false,

@@ -7,6 +7,7 @@ import { getCash } from "@/lib/cash";
 import { getCatalogue } from "@/lib/catalog";
 import { getStorage } from "@/lib/storage";
 import { effectiveThreshold } from "@/lib/defaults";
+import { isFeatureOn } from "@/lib/features";
 import { SHOP } from "@/shop/config";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,7 @@ export default async function AdminHome() {
   const cash = await getCash();
   const lockbox = cash.pots.find((p) => p.name === "Lockbox")?.balance || 0;
   const { items } = await getCatalogue();
+  const trackStock = await isFeatureOn("stock");
   const thresholdFor = (id: string) => effectiveThreshold(items.find((i) => i.id === id)?.low_threshold);
   const lowStock = [...b.stockByParent.entries()]
     .filter(([, s]) => s.qty > 0)
@@ -176,6 +178,7 @@ export default async function AdminHome() {
                 {!hottest.length && <li className="text-[#8a7c64]">No sales yet.</li>}
               </ul>
             </div>
+            {trackStock && (
             <div>
               <h2 className="font-display text-lg">Running low</h2>
               <ul className="text-sm mt-2 space-y-1">
@@ -192,10 +195,11 @@ export default async function AdminHome() {
                 {!lowStock.length && <li className="text-[#8a7c64]">Nothing running low.</li>}
               </ul>
             </div>
+            )}
           </div>
           <div className="mt-2 flex gap-3">
             <Link href="/admin/sales" className="text-sm text-[#c9a227]">All sales →</Link>
-            <Link href="/admin/stock" className="text-sm text-[#c9a227]">Manage stock →</Link>
+            {trackStock && <Link href="/admin/stock" className="text-sm text-[#c9a227]">Manage stock →</Link>}
           </div>
         </div>
       </div>

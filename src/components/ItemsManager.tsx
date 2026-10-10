@@ -35,7 +35,7 @@ export interface ManagedIngredient {
   qty: number;
 }
 
-export default function ItemsManager({ items, categories, stock, ingredients }: { items: ManagedItem[]; categories: ManagedCategory[]; stock: Record<string, number>; ingredients: ManagedIngredient[] }) {
+export default function ItemsManager({ items, categories, stock, ingredients, showStock = true }: { items: ManagedItem[]; categories: ManagedCategory[]; stock: Record<string, number>; ingredients: ManagedIngredient[]; showStock?: boolean }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [openRecipe, setOpenRecipe] = useState<string | null>(null);
@@ -133,7 +133,7 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
           </div>
           <div className="overflow-x-auto">
           <table className="ledger w-full">
-            <thead><tr><th>Item</th><th>Price</th><th>Cost</th><th>Profit</th><th>Stock</th><th>Shown</th><th></th></tr></thead>
+            <thead><tr><th>Item</th><th>Price</th><th>Cost</th><th>Profit</th>{showStock && <th>Stock</th>}<th>Shown</th><th></th></tr></thead>
             <tbody>
               {list.flatMap((i) => {
                 if (i.parent_id) return []; // variants render under their parent
@@ -159,7 +159,7 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                   <td className={price - cost >= 0 ? "text-[#7fd08a]" : "text-[#e08a8a]"} title="Approximate — sale price minus cost">
                     ≈{g(price - cost)}g
                   </td>
-                  <td>{stock[i.id] ?? 0}</td>
+                  {showStock && <td>{stock[i.id] ?? 0}</td>}
                   <td>{i.active ? "yes" : "no"}</td>
                   <td>
                     <div className="flex gap-2 justify-end">
@@ -199,7 +199,7 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                 </tr>
                 {expanded && (
                 <tr key={`${i.id}-recipe`}>
-                  <td colSpan={7} className="!p-0">
+                  <td colSpan={showStock ? 7 : 6} className="!p-0">
                     <div className="m-3 p-4 card space-y-3">
                       <p className="text-xs">
                         Materials: <b className="text-[#e0bd4a]">{g(cost)}g</b> · Sells: <b className="text-[#e0bd4a]">{g(price)}g</b> ·{" "}

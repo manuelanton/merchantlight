@@ -2,6 +2,7 @@ import { getCatalogue } from "@/lib/catalog";
 import { confirmAllSalesAction, confirmSaleAction, deleteSaleAction } from "@/lib/admin-actions";
 import { getBooks } from "@/lib/books";
 import { g } from "@/lib/format";
+import { isFeatureOn } from "@/lib/features";
 import { SHOP } from "@/shop/config";
 import SaleForm from "@/components/SaleForm";
 
@@ -9,6 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SalesPage() {
   const [{ categories, items }, books] = await Promise.all([getCatalogue(), getBooks()]);
+  const trackStock = await isFeatureOn("stock");
   const live = items.filter((i) => i.active);
   const knownLocations: string[] = [...SHOP.locations];
   for (const s of books.salesRows) {
@@ -25,6 +27,7 @@ export default async function SalesPage() {
         items={live.map((i) => ({ id: i.id, name: i.name, price: i.sale_price, category: i.category_slug, parent: i.parent_id ?? null, parent_id: i.parent_id ?? null, inherit_parent: i.inherit_parent ?? true }))}
         categories={categories.map((c) => ({ slug: c.slug, name: c.name }))}
         locations={knownLocations}
+        showRoad={trackStock}
       />
 
       {pending.length > 0 && (

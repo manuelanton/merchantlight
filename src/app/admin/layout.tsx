@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth, isQuartermaster, signIn, signOut } from "@/auth";
 import { backofficeEnabled } from "@/lib/flags";
+import { isFeatureOn, isSuperAdmin } from "@/lib/features";
 import { SHOP } from "@/shop/config";
 import CopyId from "@/components/CopyId";
 
@@ -71,16 +72,21 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <Link href="/admin" className="hover:text-[#c9a227]">Dashboard</Link>
           <Link href="/admin/items" className="hover:text-[#c9a227]">Items</Link>
           <Link href="/admin/sales" className="hover:text-[#c9a227]">Sales</Link>
-          <Link href="/admin/stock" className="hover:text-[#c9a227]">Stock</Link>
-          {SHOP.features.storage && (
+          {(await isFeatureOn("stock")) && (
+            <Link href="/admin/stock" className="hover:text-[#c9a227]">Stock</Link>
+          )}
+          {(await isFeatureOn("storage")) && (
             <Link href="/admin/storage" className="hover:text-[#c9a227]">Storage</Link>
           )}
           <Link href="/admin/ledger" className="hover:text-[#c9a227]">Ledger</Link>
-          {SHOP.features.notes && (
+          {(await isFeatureOn("notes")) && (
             <Link href="/admin/notes" className="hover:text-[#c9a227]">Board</Link>
           )}
-          {SHOP.features.guide && (
+          {(await isFeatureOn("guide")) && (
             <Link href="/admin/guide" className="hover:text-[#c9a227]">Guide</Link>
+          )}
+          {isSuperAdmin(discordId) && (
+            <Link href="/admin/super" className="hover:text-[#c9a227]" title="Superadmin playground">⚙️</Link>
           )}
         </nav>
         <form

@@ -31,7 +31,7 @@ interface Row {
 
 const DEFAULT_LOCATIONS = [...SHOP.locations];
 
-export default function SaleForm({ items, categories, locations = DEFAULT_LOCATIONS }: { items: CatalogOption[]; categories: CategoryOption[]; locations?: string[] }) {
+export default function SaleForm({ items, categories, locations = DEFAULT_LOCATIONS, showRoad = true }: { items: CatalogOption[]; categories: CategoryOption[]; locations?: string[]; showRoad?: boolean }) {
   // Kinds are counters: inheriting variants sell at their parent's price.
   const priced = useMemo(
     () =>
@@ -120,10 +120,12 @@ export default function SaleForm({ items, categories, locations = DEFAULT_LOCATI
         <LocationSelect locations={locations} />
         <div><label className="lbl">Notes</label><input name="notes" className="input" placeholder="Haggled, bundle…" /></div>
       </div>
+      {showRoad && (
       <label className="flex items-center gap-2 text-sm cursor-pointer">
         <input type="checkbox" name="from_road" value="1" className="accent-[#d97a1f]" />
         Sold on the road — goods never entered the chest, don&apos;t deduct stock
       </label>
+      )}
       <div className="flex justify-end">
         <button className="btn-gold !py-2 !px-5 text-sm" type="submit">Record sale</button>
       </div>

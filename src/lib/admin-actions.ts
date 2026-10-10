@@ -10,6 +10,7 @@ import { g, splitEvenly } from "@/lib/format";
 import { effectiveCost } from "@/lib/cost";
 import { setShopOpen } from "@/lib/shop";
 import { SHOP } from "@/shop/config";
+import { isFeatureOn, isSuperAdmin } from "@/lib/features";
 
 async function quartermaster() {
   const session = await auth();
@@ -38,7 +39,9 @@ export async function recordSaleAction(formData: FormData) {
   const seller = String(formData.get("seller") || qm.name).trim() || qm.name;
   // Road sale: goods never entered the chest, so nothing leaves stock.
   // Revenue + profit still flow normally on confirm.
-  const fromRoad = String(formData.get("from_road") || "") === "1";
+  // Stock tracking as a whole can be switched off from /admin/super.
+  const trackStock = await isFeatureOn("stock");
+  const fromRoad = String(formData.get("from_road") || "") === "1" || !trackStock;
   const db = await getDb();
   const catalog = await getCatalogItems();
   const dbIngredients = await db.select().from(itemIngredients);
@@ -273,7 +276,8 @@ export async function addLedgerAction(formData: FormData) {
   const member = fromCoffers ? "" : String(formData.get("member") || qm.name);
   const db = await getDb();
   // Contributions may carry item rows (valued in the form): append the summary
-  // and add the goods to stock automatically.
+  // and — while stock tracking is on — add the goods to stock automatically.
+  const trackStock = await isFeatureOn("stock");
   const contribIds = formData.getAll("contrib_item_id").map(String).filter(Boolean);
   const contribQtys = formData.getAll("contrib_qty").map(String);
   let fullDescription = description;
@@ -285,6 +289,7 @@ export async function addLedgerAction(formData: FormData) {
       const qty = Number(contribQtys[n] || 0);
       if (!(qty > 0)) continue;
       const itemName = catalog.find((i) => i.id === contribIds[n])?.name || "goods";
+      if (!trackStock) continue;
       await db.insert(stockMoves).values({
         id: uid("sm"),
         itemId: contribIds[n],
@@ -662,7 +667,35 @@ export async function setShopOpenAction(formData: FormData) {
   await quartermaster();
   await setShopOpen(String(formData.get('open')) === '1');
   revalidatePath('/', 'layout');
-  revalidatePath('/admin', 'layout');
+  revalidatePath('/admin', 'layout');
+
+}
+
+/** Superadmin only (SUPERADMIN_DISCORD_ID): flip a runtime feature flag.
+ *  mode = "on" | "off" | "default" (clear the DB override, follow code). */
+export async function setFeatureAction(formData: FormData) {
+  const qm = await quartermaster();
+  if (!isSuperAdmin(qm.discordId)) throw new Error("UNAUTHORIZED");
+  const key = String(formData.get("key") || "").trim();
+  const mode = String(formData.get("mode") || "").trim();
+  if (!/^[a-zA-Z]+$/.test(key)) throw new Error("Bad flag");
+  const db = await getDb();
+  const rowKey = `feature:${key}`;
+  if (mode === "default") {
+    await db.delete(settings).where(eq(settings.key, rowKey));
+  } else if (mode === "on" || mode === "off") {
+    const value = mode === "on" ? "1" : "0";
+    const found = await db.select().from(settings).where(eq(settings.key, rowKey)).limit(1);
+    if (found.length) {
+      await db.update(settings).set({ value, updatedAt: new Date() }).where(eq(settings.key, rowKey));
+    } else {
+      await db.insert(settings).values({ key: rowKey, value });
+    }
+  } else {
+    throw new Error("Bad mode");
+  }
+  revalidatePath('/', 'layout');
+  revalidatePath('/admin', 'layout');
 }
 
 /** Recipe lines for cost math. Accepts repeated material_item_id/qty rows. No

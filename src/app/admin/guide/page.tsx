@@ -85,15 +85,14 @@ export default function GuidePage() {
 
       <Rule title="1 · Recording a sale">
         <p>Use <b>+ Add item</b> for multi-item deals — one submission per customer, so the ledger groups it as one split.</p>
-        <p>Sales land <b>pending</b>: stock drops at once, gold splits only when someone hits <b>Confirm ✓</b> after the gold reaches the chest.</p>
-        <p>Sold on the road? Tick <b>“Sold on the road”</b> — the gold still flows, but nothing leaves chest stock (marked 🛣).</p>
+        <p>Sales land <b>pending</b>: gold splits only when someone hits <b>Confirm ✓</b> after the gold reaches the chest. Sales don&apos;t touch shelf counts — stock tracking is currently off.</p>
         <p>Price autofills from the catalogue — edit it for discounts. Cost autofills from recipe → manual cost → price (variants follow their parent when inherit is on).</p>
       </Rule>
 
-      <Rule title="2 · Stock in, stock out">
-        <p><b>Add stock</b> for everything coming in (crafted, bought, found). Sales remove stock by themselves.</p>
-        <p>Never hand-edit a count to “fix” it — log a correction move (negative amount) so the history stays honest.</p>
-        <p>Removing stock happens through sales. Deleting a sale (Void) puts its stock back automatically.</p>
+      <Rule title="2 · Goods in and out (no counts)">
+        <p>We don&apos;t track quantities — nobody remembered to log them, and wrong counts caused more confusion than none. The catalogue is the price list; sales are the record of what moved.</p>
+        <p>Donated or crafted goods don&apos;t need logging for the count — contributions credit the donor&apos;s gold value with an itemized note, and that&apos;s the whole entry.</p>
+        <p>Removing stock happens through sales records alone. Deleting a sale (Void) removes its record and its profit shares automatically.</p>
       </Rule>
 
       <Rule title="3 · Money in and out">
@@ -105,9 +104,8 @@ export default function GuidePage() {
       </Rule>
 
       <Rule title="4 · Donated goods go in ONCE">
-        <p>Contributing goods does <b>two things at once</b>: credits the donor&apos;s balance <i>and</i> adds the goods to stock. That&apos;s the whole entry — done.</p>
-        <p><b>Never</b> log the same goods again under Add stock. That double-counts the count (gold only moves once per posting, but the shelves will lie).</p>
-        <p>Rule of thumb: <b>contributions</b> = goods with a donor · <b>Add stock</b> = crafted, found, or bought-with-chest-gold goods with no donor.</p>
+        <p>Contributing goods does <b>one thing</b>: credits the donor&apos;s gold balance with an itemized note of what came in. That&apos;s the whole entry — done.</p>
+        <p>Rule of thumb: <b>contributions</b> = goods with a donor · <b>sales</b> = goods going out. No counts anywhere.</p>
         <p>Sale profits already exclude material costs, so splitting them never pays the materials twice. If costs look wrong, fill them on the material — don&apos;t post manual corrections.</p>
       </Rule>
 
@@ -126,9 +124,9 @@ export default function GuidePage() {
       </Rule>
 
       <Rule title="7 · Fixing mistakes — everything undoes">
-        <p>Wrong sale? <b>Void</b> it on the Sales page (stock returns, profit shares evaporate, lockbox cash reverses). Don&apos;t post manual counter-rows.</p>
+        <p>Wrong sale? <b>Void</b> it on the Sales page (record and profit shares evaporate, lockbox cash reverses). Don&apos;t post manual counter-rows.</p>
         <p>Wrong ledger row? Edit or ✕ it — except auto-posted sale splits, which you change by voiding their sale. A whole rent-style split undoes in one click with <b>Void group</b>; forgot the coffers tick? <b>→ coffers</b> rebooks the group to company gold.</p>
-        <p>Wrong stock move? ✕ it on the Stock page (sale moves only go away via their sale). Wrong cash move? ✕ it in Cash history on the dashboard (sweeps undo as a pair). Wrong collect? <b>Undo</b> on the storage unit rolls the week back and removes the income.</p>
+        <p>Wrong cash move? ✕ it in Cash history on the dashboard (sweeps undo as a pair). Wrong collect? <b>Undo</b> on the storage unit rolls the week back and removes the income.</p>
         <p>Ledger groups collapse each split into one row — expand it to see who got what.</p>
       </Rule>
 

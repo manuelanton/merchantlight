@@ -1,11 +1,14 @@
+import { notFound } from "next/navigation";
 import { getCatalogue } from "@/lib/catalog";
 import { getBooks } from "@/lib/books";
+import { isFeatureOn } from "@/lib/features";
 import StockForm from "@/components/StockForm";
 import StockManager from "@/components/StockManager";
 
 export const dynamic = "force-dynamic";
 
 export default async function StockPage() {
+  if (!(await isFeatureOn("stock"))) notFound();
   const [{ categories, items }, books] = await Promise.all([getCatalogue(), getBooks()]);
   const live = items.filter((i) => i.active);
   const itemCategory: Record<string, string> = {};

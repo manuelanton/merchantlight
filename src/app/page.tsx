@@ -4,11 +4,13 @@ import { UPCOMING_SECTIONS, isSheetsConfigured } from "@/lib/sheets";
 import { getCatalogue } from "@/lib/catalog";
 import { isShopOpen } from "@/lib/shop";
 import { getStorage } from "@/lib/storage";
+import { isFeatureOn } from "@/lib/features";
 import { SHOP } from "@/shop/config";
 
 export const revalidate = 60;
 
 export default async function Home() {
+  const [showStorage, showUpcoming] = await Promise.all([isFeatureOn("storagePublic"), isFeatureOn("upcomingTeasers")]);
   const [{ categories, items }, open, storage] = await Promise.all([getCatalogue(), isShopOpen(), getStorage(SHOP.homeLocation)]);
   const sorted = [...categories].sort((a, b) => a.sort_order - b.sort_order);
   const active = items.filter((i) => i.active && !i.parent_id);
@@ -26,7 +28,7 @@ export default async function Home() {
       };
     })
     .filter((s) => s !== null)
-    .filter((s) => !s.comingSoon || SHOP.features.upcomingTeasers);
+    .filter((s) => !s.comingSoon || showUpcoming);
 
   return (
     <div className="space-y-8">
@@ -73,7 +75,7 @@ export default async function Home() {
             )}
           </Link>
         ))}
-        {SHOP.features.storagePublic && (
+        {showStorage && (
         <Link href="#find-us" className="card p-5 hover:border-[#d97a1f] transition block">
           <div className="font-display text-xl">🛢️ Storage</div>
           <p className="text-sm text-[#b8a888] mt-1">
@@ -96,7 +98,7 @@ export default async function Home() {
             look for the lantern sign. Can&apos;t make the trip? We arrange{" "}
             <b className="text-[#e8dcc4]">{SHOP.visitDelivery}</b> — find us in town or send word and we&apos;ll meet you on the road.
           </p>
-          {SHOP.features.storagePublic && (
+          {showStorage && (
           <p className="text-[#cbbfa5] max-w-2xl">
             Need space? Ask about <b className="text-[#e8dcc4]">barrel storage</b> at our shop.
           </p>

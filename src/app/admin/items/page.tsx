@@ -9,6 +9,7 @@ import { getDb } from "@/db";
 import { itemIngredients } from "@/db/schema";
 import { effectiveCost } from "@/lib/cost";
 import { effectiveMaxStock, unitValue } from "@/lib/defaults";
+import { isFeatureOn } from "@/lib/features";
 import AddItemForm from "@/components/AddItemForm";
 import Collapsible from "@/components/Collapsible";
 import ItemsManager from "@/components/ItemsManager";
@@ -25,6 +26,7 @@ export default async function ItemsPage() {
   const costItems = items.map((m) => ({ id: m.id, cost_value: m.cost_value, sale_price: m.sale_price, parent_id: m.parent_id ?? null, inherit_parent: m.inherit_parent ?? true }));
   const costIngs = ingredientRows.map((r) => ({ itemId: r.itemId, materialItemId: r.materialItemId, qty: r.qty }));
   const effCost = (id: string) => effectiveCost(id, costItems, costIngs);
+  const trackStock = await isFeatureOn("stock");
 
   return (
     <div className="space-y-6">
@@ -53,6 +55,7 @@ export default async function ItemsPage() {
         }))}
         categories={sorted.map((c) => ({ slug: c.slug, name: c.name, icon: c.icon }))}
         stock={stock}
+        showStock={trackStock}
         ingredients={ingredientRows.map((r) => ({
           id: r.id, itemId: r.itemId, materialItemId: r.materialItemId,
           materialName: r.materialName, qty: r.qty,
@@ -62,7 +65,7 @@ export default async function ItemsPage() {
       <Collapsible title="Buying guide (materials)">
         <p className="text-xs text-[#8a7c64]">What we pay suppliers, and when to stop buying. Edit buy price / cap in each row&apos;s Edit form. Blank buy falls back to cost; blank cap uses tiered default (&lt;1g → 500, &lt;2g → 250, else 10).</p>
         <table className="ledger mt-2">
-          <thead><tr><th>Material</th><th>We pay</th><th>On hand</th><th>Cap</th><th>Status</th></tr></thead>
+          <thead><tr><th>Material</th><th>We pay</th>{trackStock && <th>On hand</th>}<th>Cap</th>{trackStock && <th>Status</th>}</tr></thead>
           <tbody>
             {items.filter((i) => i.category_slug === "materials").sort((a, b) => a.name.localeCompare(b.name)).map((m) => {
               const onHand = stock[m.id] ?? 0;
@@ -76,9 +79,9 @@ export default async function ItemsPage() {
                 <tr key={m.id}>
                   <td><b>{m.name}</b></td>
                   <td className="text-[#e0bd4a]">{wePay > 0 ? `${wePay}g` : "—"}</td>
-                  <td>{onHand}</td>
+                  {trackStock && <td>{onHand}</td>}
                   <td>{cap}{auto && <span className="text-[#8a7c64]"> auto</span>}</td>
-                  <td className={full ? "text-[#e08a8a]" : "text-[#7fd08a]"}>{full ? "Full — don't buy" : "Buying"}</td>
+                  {trackStock && <td className={full ? "text-[#e08a8a]" : "text-[#7fd08a]"}>{full ? "Full — don't buy" : "Buying"}</td>}
                 </tr>
               );
             })}
