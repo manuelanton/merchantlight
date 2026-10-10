@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { deleteMoveAction } from "@/lib/admin-actions";
+import Collapsible from "./Collapsible";
 
 export interface MoveRow {
   id: string;
@@ -48,8 +49,7 @@ export default function StockManager({
         </select>
       </div>
 
-      <div className="card p-4">
-        <h2 className="font-display text-lg">Current stock</h2>
+      <Collapsible title="Current stock" defaultOpen>
         <table className="ledger mt-2"><thead><tr><th>Item</th><th>On hand</th></tr></thead>
           <tbody>
             {shownCounts.map((s) => (
@@ -58,7 +58,7 @@ export default function StockManager({
             {!shownCounts.length && <tr><td colSpan={2} className="text-[#8a7c64]">Nothing matches.</td></tr>}
           </tbody>
         </table>
-      </div>
+      </Collapsible>
 
       <div className="card overflow-x-auto">
         <table className="ledger min-w-[760px]">

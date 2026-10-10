@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { adjustStockAction } from "@/lib/admin-actions";
 import ItemPicker from "./ItemPicker";
 import type { CatalogOption, CategoryOption } from "./SaleForm";
@@ -30,9 +31,11 @@ export default function StockForm({ items, categories }: { items: CatalogOption[
     );
   const removeRow = (key: number) => setRows((rs) => (rs.length > 1 ? rs.filter((r) => r.key !== key) : rs));
   const [flash, setFlash] = useState("");
+  const router = useRouter();
 
   const save = async (fd: FormData) => {
     await adjustStockAction(fd);
+    router.refresh();
     setRows([{ key: n + 1, cat: "", itemId: items[0]?.id || "", delta: "1" }]);
     setN((x) => x + 2);
     setFlash("Logged ✓");
