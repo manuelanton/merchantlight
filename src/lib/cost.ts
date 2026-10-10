@@ -14,10 +14,12 @@ export interface CostIngredient {
 
 function resolveParent(itemId: string, items: CostItem[]): CostItem | undefined {
   const item = items.find((i) => i.id === itemId);
-  if (item?.parent_id && item?.inherit_parent !== false) {
-    return items.find((i) => i.id === item.parent_id);
+  // Never follow a missing, disabled, or self link — a bad row must
+  // degrade to its own values, never crash a page.
+  if (!item?.parent_id || item.inherit_parent === false || item.parent_id === itemId) {
+    return undefined;
   }
-  return undefined;
+  return items.find((i) => i.id === item.parent_id);
 }
 
 /**
@@ -58,18 +60,28 @@ export function effectiveCost(
 }
 
 /** True when the effective cost comes from a recipe rather than the manual field (follows variant inheritance). */
-export function hasRecipe(itemId: string, ingredients: CostIngredient[], items?: CostItem[]): boolean {
+export function hasRecipe(itemId: string, ingredients: CostIngredient[], items?: CostItem[], seen: Set<string> = new Set()): boolean {
+  if (seen.has(itemId)) return false;
   if (items) {
     const parent = resolveParent(itemId, items);
-    if (parent) return hasRecipe(parent.id, ingredients, items);
+    if (parent) {
+      const next = new Set(seen);
+      next.add(itemId);
+      return hasRecipe(parent.id, ingredients, items, next);
+    }
   }
   return ingredients.some((r) => r.itemId === itemId);
 }
 
 /** Manual cost following variant inheritance (no recipe math, no price fallback). */
-export function inheritedManualCost(itemId: string, items: CostItem[]): number {
+export function inheritedManualCost(itemId: string, items: CostItem[], seen: Set<string> = new Set()): number {
+  if (seen.has(itemId)) return 0;
   const parent = resolveParent(itemId, items);
-  if (parent) return inheritedManualCost(parent.id, items);
+  if (parent) {
+    const next = new Set(seen);
+    next.add(itemId);
+    return inheritedManualCost(parent.id, items, next);
+  }
   return items.find((i) => i.id === itemId)?.cost_value || 0;
 }
 
