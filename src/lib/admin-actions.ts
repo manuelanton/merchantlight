@@ -496,6 +496,7 @@ export async function updateItemAction(formData: FormData) {
   const parentId = parentRaw === "" ? null : parentRaw;
   const inheritParent = String(formData.get("inherit_parent") || "") === "on";
   if (parentId === id) throw new Error("An item cannot be its own parent");
+  let parentRow: typeof items.$inferSelect | null = null;
   if (parentId) {
     const [parentRows, kidRows] = await Promise.all([
       db.select().from(items).where(eq(items.id, parentId)).limit(1),
@@ -505,15 +506,20 @@ export async function updateItemAction(formData: FormData) {
     if (!parent) throw new Error("Parent not found");
     if (parent.parentId) throw new Error("Cannot nest variants — pick a top-level item");
     if (kidRows.length) throw new Error(`Has ${kidRows.length} variant(s) — delete or re-home them first`);
+    parentRow = parent;
   }
+  // Inheriting kinds are counters: price + cost always follow the parent,
+  // so per-kind values can never drift.
+  const salePrice = parentId && inheritParent && parentRow ? parentRow.salePrice : Number(formData.get("sale_price") || 0);
+  const costValue = parentId && inheritParent && parentRow ? parentRow.costValue : Number(formData.get("cost_value") || 0);
   await db
     .update(items)
     .set({
       name: String(formData.get("name") || "Unnamed").trim(),
       categorySlug: String(formData.get("category_slug")),
       description: String(formData.get("description") || ""),
-      salePrice: Number(formData.get("sale_price") || 0),
-      costValue: Number(formData.get("cost_value") || 0),
+      salePrice,
+      costValue,
       active: String(formData.get("active") || "true") === "true",
       lowThreshold: lowRaw === "" ? null : Math.max(0, Number(lowRaw) || 0),
       buyPrice: Number(formData.get("buy_price") || 0),

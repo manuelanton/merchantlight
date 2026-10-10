@@ -72,3 +72,20 @@ export function inheritedManualCost(itemId: string, items: CostItem[]): number {
   if (parent) return inheritedManualCost(parent.id, items);
   return items.find((i) => i.id === itemId)?.cost_value || 0;
 }
+
+/** Sale price following variant inheritance: kinds are counters,
+ *  the parent carries the price. Non-inheriting items sell at their own price. */
+export function effectivePrice(
+  itemId: string,
+  items: Pick<CostItem, "id" | "sale_price" | "parent_id" | "inherit_parent">[],
+  seen: Set<string> = new Set()
+): number {
+  if (seen.has(itemId)) return 0;
+  const parent = resolveParent(itemId, items as CostItem[]);
+  if (parent) {
+    const next = new Set(seen);
+    next.add(itemId);
+    return effectivePrice(parent.id, items, next);
+  }
+  return items.find((i) => i.id === itemId)?.sale_price || 0;
+}

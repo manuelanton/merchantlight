@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { addIngredientAction, createVariantAction, deleteIngredientAction, deleteItemAction, updateItemAction } from "@/lib/admin-actions";
 import { g } from "@/lib/format";
-import { effectiveCost, hasRecipe } from "@/lib/cost";
+import { effectiveCost, effectivePrice, hasRecipe } from "@/lib/cost";
 import { defaultMaxStock, unitValue } from "@/lib/defaults";
 import IngredientForm from "./IngredientForm";
 
@@ -84,6 +84,7 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
     ingredients: ingredients.map((r) => ({ itemId: r.itemId, materialItemId: r.materialItemId, qty: r.qty })),
   }), [items, ingredients]);
   const eff = (id: string) => effectiveCost(id, costInputs.items, costInputs.ingredients);
+  const effPrice = (id: string) => effectivePrice(id, costInputs.items);
   const fromRecipe = (id: string) => hasRecipe(id, costInputs.ingredients, costInputs.items);
   const matUnit = (id: string) => effectiveCost(id, costInputs.items, costInputs.ingredients);
 
@@ -141,8 +142,9 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
               }).map((i) => {
                 const isVariant = !!i.parent_id;
                 const cost = eff(i.id);
+                const price = effPrice(i.id);
                 const recipe = fromRecipe(i.id);
-                const margin = Math.round((i.sale_price - cost) * 100) / 100;
+                const margin = Math.round((price - cost) * 100) / 100;
                 const expanded = openRecipe === i.id;
                 const kidCount = list.filter((k) => k.parent_id === i.id).length;
                 const isParent = kidCount > 0;
@@ -150,12 +152,12 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                 <>
                 <tr key={i.id}>
                   <td><b>{isVariant ? `↳ ${i.name}` : i.name}</b>{!isVariant && isParent && <span className="text-xs text-[#8a7c64]"> ({kidCount} variants)</span>}{isVariant && i.inherit_parent && <span className="text-xs text-[#8a7c64]" title="Follows parent price/cost/recipe"> ⟡</span>}</td>
-                  <td className="text-[#e0bd4a]">{i.sale_price}g</td>
+                  <td className="text-[#e0bd4a]">{price}g</td>
                   <td title={recipe ? "From recipe — updates with material costs" : "Manual cost"}>
                     {g(cost)}g{recipe && <span className="text-[#8a7c64]"> ≈</span>}
                   </td>
-                  <td className={i.sale_price - cost >= 0 ? "text-[#7fd08a]" : "text-[#e08a8a]"} title="Approximate — sale price minus cost">
-                    ≈{g(i.sale_price - cost)}g
+                  <td className={price - cost >= 0 ? "text-[#7fd08a]" : "text-[#e08a8a]"} title="Approximate — sale price minus cost">
+                    ≈{g(price - cost)}g
                   </td>
                   <td>{stock[i.id] ?? 0}</td>
                   <td>{i.active ? "yes" : "no"}</td>
@@ -200,7 +202,7 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
                   <td colSpan={7} className="!p-0">
                     <div className="m-3 p-4 card space-y-3">
                       <p className="text-xs">
-                        Materials: <b className="text-[#e0bd4a]">{g(cost)}g</b> · Sells: <b className="text-[#e0bd4a]">{g(i.sale_price)}g</b> ·{" "}
+                        Materials: <b className="text-[#e0bd4a]">{g(cost)}g</b> · Sells: <b className="text-[#e0bd4a]">{g(price)}g</b> ·{" "}
                         Margin: <b className={margin >= 0 ? "text-[#7fd08a]" : "text-[#e08a8a]"}>{g(margin)}g</b>
                       </p>
                         {(() => {
@@ -285,6 +287,12 @@ export default function ItemsManager({ items, categories, stock, ingredients }: 
             </div>
             <input type="hidden" name="id" value={editItem.id} />
             <div><label className="lbl">Name</label><input name="name" defaultValue={editItem.name} className="input" /></div>
+            {editItem.parent_id && (editItem.inherit_parent ?? true) && (
+              <p className="text-xs text-[#8a7c64]">
+                Counter of {items.find((m) => m.id === editItem.parent_id)?.name || "parent"} — sells at{" "}
+                <b className="text-[#e0bd4a]">{g(effPrice(editItem.id))}g</b>, costs {g(editCost)}g. Price/cost below are ignored while inherit is on.
+              </p>
+            )}
             <div><label className="lbl">Category</label>
               <select name="category_slug" defaultValue={editItem.category_slug} className="input">
                 {categories.map((cc) => <option key={cc.slug} value={cc.slug}>{cc.name}</option>)}
