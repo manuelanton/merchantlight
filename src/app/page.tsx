@@ -25,7 +25,8 @@ export default async function Home() {
         max: prices.length ? Math.max(...prices) : 0,
       };
     })
-    .filter((s) => s !== null);
+    .filter((s) => s !== null)
+    .filter((s) => !s.comingSoon || SHOP.features.upcomingTeasers);
 
   return (
     <div className="space-y-8">

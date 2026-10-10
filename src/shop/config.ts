@@ -63,6 +63,8 @@ export const SHOP = {
     variants: true,
     notes: true,
     guide: true,
+    /** Show teaser cards for empty upcoming sections (e.g. Enchantments). */
+    upcomingTeasers: false,
   },
 } as const;
 
