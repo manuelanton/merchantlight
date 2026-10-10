@@ -54,8 +54,10 @@ export async function getFeatureStates(): Promise<{ key: RuntimeFeatureKey; labe
   }));
 }
 
-/** Superadmin gate: only the Discord ID in SUPERADMIN_DISCORD_ID. Empty = nobody. */
+/** Superadmin gate: SUPERADMIN_DISCORD_ID env wins; falls back to WildCard
+ *  so no env wrangling is needed. Empty/mismatch = 404 everywhere. */
+const FALLBACK_SUPERADMIN = "146826443924439040"; // WildCard
 export function isSuperAdmin(discordId?: string | null): boolean {
-  const admin = (process.env.SUPERADMIN_DISCORD_ID || "").trim();
+  const admin = (process.env.SUPERADMIN_DISCORD_ID || "").trim() || FALLBACK_SUPERADMIN;
   return !!admin && !!discordId && discordId === admin;
 }
