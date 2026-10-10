@@ -40,7 +40,7 @@ export default async function SalesPage() {
             <tbody>
               {pending.map((x) => (
                 <tr key={x.id}>
-                  <td>{x.itemName}</td>
+                  <td>{x.itemName}{x.deductedStock === false && <span className="text-xs text-[#8a7c64]" title="Road sale — never touched chest stock"> 🛣</span>}</td>
                   <td>{x.qty}</td>
                   <td className="text-[#e0bd4a]">{g(x.unitSalePrice * x.qty)}g</td>
                   <td>{x.soldByName}</td>
@@ -68,7 +68,7 @@ export default async function SalesPage() {
             {done.map((x) => (
               <tr key={x.id}>
                 <td className="text-xs">{new Date(x.timestamp).toLocaleString()}</td>
-                <td>{x.itemName}</td>
+                <td>{x.itemName}{x.deductedStock === false && <span className="text-xs text-[#8a7c64]" title="Road sale — never touched chest stock"> 🛣</span>}</td>
                 <td>{x.qty}</td>
                 <td>{g(x.unitSalePrice)}g</td>
                 <td className="text-[#7fd08a]">+{g(x.totalProfit)}g</td>

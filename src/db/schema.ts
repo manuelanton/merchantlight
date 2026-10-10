@@ -46,6 +46,8 @@ export const sales = pgTable("sales", {
   status: text("status").notNull().default("pending"),
   confirmedBy: text("confirmed_by").notNull().default(""),
   confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+  /** False for road sales: goods never entered the chest, so no stock moves. */
+  deductedStock: boolean("deducted_stock").notNull().default(true),
 });
 
 /** Every stock movement that isn't a sale: restocks, corrections, spoilage. */

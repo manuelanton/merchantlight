@@ -36,6 +36,9 @@ export async function recordSaleAction(formData: FormData) {
   const location = String(formData.get("location") || SHOP.defaultLocation);
   const notes = String(formData.get("notes") || "");
   const seller = String(formData.get("seller") || qm.name).trim() || qm.name;
+  // Road sale: goods never entered the chest, so nothing leaves stock.
+  // Revenue + profit still flow normally on confirm.
+  const fromRoad = String(formData.get("from_road") || "") === "1";
   const db = await getDb();
   const catalog = await getCatalogItems();
   const dbIngredients = await db.select().from(itemIngredients);
@@ -72,17 +75,20 @@ export async function recordSaleAction(formData: FormData) {
       soldByName: seller,
       notes,
       status: "pending",
+      deductedStock: !fromRoad,
     });
-    // A sale is also a stock movement out (goods are gone either way).
-    await db.insert(stockMoves).values({
-      id: uid("sm"),
-      itemId: ids[n],
-      itemName,
-      delta: -qty,
-      reason: `Sale (${location})`,
-      actorDiscordId: qm.discordId,
-      actorName: seller,
-    });
+    if (!fromRoad) {
+      // A sale is also a stock movement out (goods are gone either way).
+      await db.insert(stockMoves).values({
+        id: uid("sm"),
+        itemId: ids[n],
+        itemName,
+        delta: -qty,
+        reason: `Sale (${location})`,
+        actorDiscordId: qm.discordId,
+        actorName: seller,
+      });
+    }
   }
   revalidatePath("/admin", "layout");
 }
@@ -178,15 +184,18 @@ export async function deleteSaleAction(formData: FormData) {
   const s = found[0];
   if (!s) throw new Error("Sale not found");
   await db.delete(sales).where(eq(sales.id, id));
-  await db.insert(stockMoves).values({
-    id: uid("sm"),
-    itemId: s.itemId,
-    itemName: s.itemName,
-    delta: s.qty,
-    reason: `Void sale by ${s.soldByName}`,
-    actorDiscordId: qm.discordId,
-    actorName: qm.name,
-  });
+  // Road sales never touched stock, so there is nothing to put back.
+  if (s.deductedStock !== false) {
+    await db.insert(stockMoves).values({
+      id: uid("sm"),
+      itemId: s.itemId,
+      itemName: s.itemName,
+      delta: s.qty,
+      reason: `Void sale by ${s.soldByName}`,
+      actorDiscordId: qm.discordId,
+      actorName: qm.name,
+    });
+  }
   // Remove the auto-posted split shares for this exact sale (never earned).
   const shares = await db.select().from(ledger).where(like(ledger.description, `%[sale:${id}]%`));
   for (const row of shares) {

@@ -86,6 +86,7 @@ export default function GuidePage() {
       <Rule title="1 · Recording a sale">
         <p>Use <b>+ Add item</b> for multi-item deals — one submission per customer, so the ledger groups it as one split.</p>
         <p>Sales land <b>pending</b>: stock drops at once, gold splits only when someone hits <b>Confirm ✓</b> after the gold reaches the chest.</p>
+        <p>Sold on the road? Tick <b>“Sold on the road”</b> — the gold still flows, but nothing leaves chest stock (marked 🛣).</p>
         <p>Price autofills from the catalogue — edit it for discounts. Cost autofills from recipe → manual cost → price (variants follow their parent when inherit is on).</p>
       </Rule>
 

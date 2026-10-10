@@ -1,0 +1,1 @@
+ALTER TABLE "sales" ADD COLUMN "deducted_stock" boolean DEFAULT true NOT NULL;
