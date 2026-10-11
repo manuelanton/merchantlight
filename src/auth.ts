@@ -26,12 +26,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
 });
 
+/** Extra quartermasters baked in so nobody has to touch Vercel env.
+ *  FotherMucker — remove once ADMIN_DISCORD_IDS covers them. */
+const EXTRA_ADMIN_IDS = ["1067252552661475408"];
+
 /** Discord user ids allowed into /admin. No server admin needed to manage this list. */
 export function adminIds(): string[] {
-  return (process.env.ADMIN_DISCORD_IDS || "")
+  const fromEnv = (process.env.ADMIN_DISCORD_IDS || "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+  return [...new Set([...fromEnv, ...EXTRA_ADMIN_IDS])];
 }
 
 export function isQuartermaster(discordId?: string | null): boolean {
