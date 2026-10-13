@@ -28,11 +28,15 @@ export async function getBooks(): Promise<Books> {
   const discordId = (session as unknown as { discordId?: string } | null)?.discordId;
   if (!session?.user || !isQuartermaster(discordId)) throw new Error("UNAUTHORIZED");
   const db = await getDb();
+  // No limits: balances, revenue, and stock are cumulative sums — truncating
+  // history silently corrupts them once the books outgrow the cap (ledger
+  // passed 300 rows in Oct 2026 and the dashboard started lying).
+  // Scale is hundreds of rows; this stays cheap for years.
   const [salesRows, moveRows, ledgerRows, noteRows, itemRows] = await Promise.all([
-    db.select().from(sales).orderBy(desc(sales.timestamp)).limit(200),
-    db.select().from(stockMoves).orderBy(desc(stockMoves.timestamp)).limit(300),
-    db.select().from(ledger).orderBy(desc(ledger.timestamp)).limit(300),
-    db.select().from(notes).orderBy(desc(notes.timestamp)).limit(100),
+    db.select().from(sales).orderBy(desc(sales.timestamp)),
+    db.select().from(stockMoves).orderBy(desc(stockMoves.timestamp)),
+    db.select().from(ledger).orderBy(desc(ledger.timestamp)),
+    db.select().from(notes).orderBy(desc(notes.timestamp)),
     db.select({ id: items.id, name: items.name, parentId: items.parentId }).from(items),
   ]);
 
