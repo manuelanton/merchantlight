@@ -8,6 +8,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // Explicit names: Auth.js would otherwise look for AUTH_DISCORD_ID/SECRET.
       clientId: process.env.DISCORD_CLIENT_ID,
       clientSecret: process.env.DISCORD_CLIENT_SECRET,
+      // Discord now sends `iss` with its OAuth response; without an explicit
+      // issuer Auth.js expects a dummy fallback and rejects the callback.
+      issuer: "https://discord.com",
       // 'identify' scope is enough: id, username, avatar. No server access needed.
       authorization: { params: { scope: "identify" } },
     }),
