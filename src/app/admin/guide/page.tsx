@@ -83,10 +83,18 @@ export default function GuidePage() {
 
       <h2 className="font-display text-2xl pt-2">The rules behind them</h2>
 
+      <Rule title="0 · How our numbers work">
+        <p><b>Profit</b> = sale price − live recipe cost at the moment of sale (frozen into the sale record — later catalogue edits never rewrite history). <b>Only profit splits</b> across members; materials are never expensed, so nothing is ever paid twice.</p>
+        <p><b>Revenue counts at confirm</b>, not at sale: pending sales move no gold until someone confirms the deposit. A per-line <b>discount</b> reduces revenue before profit is figured.</p>
+        <p><b>Cost basis is the live catalogue</b> (recipe → manual cost → sale price as zero-profit fallback), not what was actually paid long ago. Changing a material reprices future sales, never past ones.</p>
+        <p><b>Tips stay with the seller</b> and never enter the books. Haggled deals go in the discount field, not the notes.</p>
+        <p>The ledger is <b>editable single-entry</b>: fix mistakes with void/edit/✕ (rule 7), never with counter-rows.</p>
+      </Rule>
+
       <Rule title="1 · Recording a sale">
         <p>Use <b>+ Add item</b> for multi-item deals — one submission per customer, so the ledger groups it as one split.</p>
         <p>Sales land <b>pending</b>: gold splits only when someone hits <b>Confirm ✓</b> after the gold reaches the chest. Sales don&apos;t touch shelf counts — stock tracking is currently off.</p>
-        <p>Price autofills from the catalogue — edit it for discounts. Cost autofills from recipe → manual cost → price (variants follow their parent when inherit is on).</p>
+        <p>Price autofills from the catalogue — the v2 sale form has a per-line discount column (v1: edit the price directly). Cost autofills from recipe → manual cost → price (variants follow their parent when inherit is on).</p>
       </Rule>
 
       <Rule title="2 · Goods in and out (no counts)">
@@ -115,10 +123,11 @@ export default function GuidePage() {
         <p>Fix a duplicate with the row&apos;s <b>Edit</b> button (ledger, items) — don&apos;t add compensating rows.</p>
       </Rule>
 
-      <Rule title="6 · Costs, recipes, margins, variants">
+      <Rule title="6 · Costs, recipes, margins, variants, bundles">
         <p>Unknown cost counts as sale price (zero assumed profit) — fill real material costs for honest margins.</p>
         <p>An item with a recipe prices itself from live material costs; changing a material reprices every recipe using it.</p>
         <p>Variants (↳) inherit price/cost/recipe from their parent by default (⟡) — untick inherit to price one-off. Use + Variant, re-home in Edit.</p>
+        <p>A <b>bundle</b> is just an item with a recipe and a fixed price (e.g. backpack + bedroll at one price): add it like any item, attach the components as its recipe, set the bundle price. Profit math is automatic.</p>
         <p>Buying: blank low warns at 2; blank buy pays cost; blank cap uses tiered default (&lt;1g → 500, &lt;2g → 250, else 10).</p>
         <p>Only <i>profit</i> ever splits. Sale revenue is never paid out whole — that would pay the materials twice.</p>
       </Rule>

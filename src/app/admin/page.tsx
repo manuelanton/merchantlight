@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { adjustBalanceAction, adjustCashAction, deleteCashMoveAction, requestRestockAction, setShopOpenAction, sweepCashAction } from "@/lib/admin-actions";
+import { adjustBalanceAction, adjustCashAction, deleteCashMoveAction, requestRestockAction, setCoffersFloorAction, setShopOpenAction, sweepCashAction } from "@/lib/admin-actions";
 import { getBooks } from "@/lib/books";
 import { g } from "@/lib/format";
 import { isShopOpen } from "@/lib/shop";
@@ -78,7 +78,16 @@ export default async function AdminHome() {
             {p.name} <b className="text-[#e0bd4a]">{g(p.balance)}g</b>
           </span>
         ))}
+        {cash.floor > 0 && (
+          <span className={`text-sm ${cash.pots.reduce((a, p) => a + p.balance, 0) >= cash.floor ? "text-[#8a7c64]" : "text-[#e08a8a] font-bold"}`} title="Coffers floor — pooled gold should stay above this">
+            floor {g(cash.floor)}g{cash.pots.reduce((a, p) => a + p.balance, 0) < cash.floor ? " — below!" : ""}
+          </span>
+        )}
         <span className="text-xs text-[#8a7c64]">Sales land in the lockbox; sweep moves the take to the safe. Starting gold via Adjust below.</span>
+        <form action={setCoffersFloorAction} className="flex gap-2 items-center ml-auto">
+          <input name="floor_gold" type="number" min={0} step="any" defaultValue={cash.floor > 0 ? cash.floor : ""} placeholder="Floor" className="input !w-24 !py-1 text-sm" title="Coffers floor — warn when pooled gold drops below this" />
+          <button className="btn-ghost !py-1 text-xs whitespace-nowrap" type="submit" title="Set the coffers floor">Set floor</button>
+        </form>
         <form action={sweepCashAction} className="flex gap-2 items-center ml-auto">
           <input name="amount_gold" type="number" min={0} step="any" defaultValue={lockbox > 0 ? lockbox : ""} placeholder="Amount" className="input !w-24 !py-1 text-sm" title="End-of-day: move gold from lockbox to safe" />
           <button className="btn-gold !py-1 text-xs whitespace-nowrap" type="submit" title="Move gold from the register lockbox to the safe">Sweep to safe →</button>

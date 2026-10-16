@@ -6,9 +6,11 @@ import { getDb } from "@/db";
 import { categories, cashMoves, cashPots, itemIngredients, items, ledger, members, notes, sales, settings, stockMoves, storageUnits } from "@/db/schema";
 import { getCatalogItems } from "@/lib/catalog";
 import { getRoster } from "@/lib/members";
+import { getMemberForDiscord } from "@/lib/members";
 import { g, splitEvenly } from "@/lib/format";
 import { effectiveCost } from "@/lib/cost";
 import { setShopOpen } from "@/lib/shop";
+import { setCoffersFloor } from "@/lib/cash";
 import { SHOP } from "@/shop/config";
 import { isFeatureOn, isSuperAdmin } from "@/lib/features";
 
@@ -17,6 +19,27 @@ async function quartermaster() {
   const discordId = (session as unknown as { discordId?: string } | null)?.discordId;
   if (!session?.user || !isQuartermaster(discordId)) throw new Error("UNAUTHORIZED");
   return { name: session.user.name || SHOP.roleName, discordId: discordId! };
+}
+
+/**
+ * Manager gate with a lenient transition: a linked row enforces its role,
+ * an unlinked quartermaster keeps legacy access (same as today) so nobody
+ * is locked out before the Owner links them. The super page flags unlinked
+ * accounts until then.
+ */
+async function requireManager() {
+  const qm = await quartermaster();
+  await ensureManager(qm.discordId);
+  return qm;
+}
+
+/** Throw unless the Discord account may manage money or destroy records.
+ *  Exported for the pending-vs-confirmed split in deleteSaleAction. */
+export async function ensureManager(discordId: string) {
+  const linked = await getMemberForDiscord(discordId);
+  if (linked && linked.role !== "manager" && linked.role !== "owner") {
+    throw new Error("UNAUTHORIZED");
+  }
 }
 
 const uid = (p: string) => `${p}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
@@ -45,6 +68,7 @@ export async function recordSaleAction(formData: FormData) {
   const db = await getDb();
   const catalog = await getCatalogItems();
   const dbIngredients = await db.select().from(itemIngredients);
+  const discounts = rowsOf(formData, "discount");
   const effCost = (itemId: string, fallback: number) => {
     const lines = dbIngredients.filter((r) => r.itemId === itemId);
     if (!lines.length) return fallback;
@@ -57,6 +81,7 @@ export async function recordSaleAction(formData: FormData) {
   for (let n = 0; n < ids.length; n++) {
     const qty = Math.max(1, Number(qtys[n] || 1));
     const price = Number(prices[n] || 0);
+    const discount = Math.max(0, Number(discounts[n] || 0));
     const item = catalog.find((i) => i.id === ids[n]);
     const itemName = item?.name || "goods";
     // Cost basis: live recipe cost wins; then manual cost; then the submitted
@@ -64,6 +89,7 @@ export async function recordSaleAction(formData: FormData) {
     const submitted = Number(formData.get("unit_cost") || 0);
     const baseCost = item && item.cost_value > 0 ? item.cost_value : submitted > 0 ? submitted : price;
     const itemCost = effCost(ids[n], baseCost);
+    const revenue = Math.max(0, Math.round((price * qty - discount) * 100) / 100);
     const saleId = uid("sl");
     await db.insert(sales).values({
       id: saleId,
@@ -72,7 +98,8 @@ export async function recordSaleAction(formData: FormData) {
       qty,
       unitSalePrice: price,
       unitCostSnapshot: itemCost,
-      totalProfit: (price - itemCost) * qty,
+      totalProfit: Math.round((revenue - itemCost * qty) * 100) / 100,
+      discount,
       location,
       soldByDiscordId: qm.discordId,
       soldByName: seller,
@@ -98,7 +125,7 @@ export async function recordSaleAction(formData: FormData) {
 
 /** Confirm a deposited sale: posts the profit split across the roster. */
 export async function confirmSaleAction(formData: FormData) {
-  const qm = await quartermaster();
+  const qm = await requireManager();
   const id = String(formData.get("id"));
   const db = await getDb();
   const found = await db.select().from(sales).where(eq(sales.id, id)).limit(1);
@@ -106,7 +133,8 @@ export async function confirmSaleAction(formData: FormData) {
   if (!s) throw new Error("Sale not found");
   if (s.status === "confirmed") throw new Error("Already confirmed");
   const roster = await getRoster();
-  const profit = Math.round((s.unitSalePrice - s.unitCostSnapshot) * s.qty * 100) / 100;
+  const discount = s.discount || 0;
+  const profit = Math.round((s.unitSalePrice * s.qty - discount - s.unitCostSnapshot * s.qty) * 100) / 100;
   if (profit !== 0) {
     const who = roster.length ? roster : [s.soldByName];
     const shares = splitEvenly(profit, who.length);
@@ -117,14 +145,14 @@ export async function confirmSaleAction(formData: FormData) {
         member: who[i],
         amountGold: shares[i],
         category: "sales",
-        description: `Sale profit split [sale:${s.id}]: ${s.itemName} × ${s.qty} at ${s.location} (${g(s.unitSalePrice)}g − ${g(s.unitCostSnapshot)}g cost)${s.notes ? ` — ${s.notes}` : ""} (share ${i + 1} of ${who.length})`,
+        description: `Sale profit split [sale:${s.id}]: ${s.itemName} × ${s.qty} at ${s.location} (${g(s.unitSalePrice)}g − ${g(s.unitCostSnapshot)}g cost)${discount > 0 ? ` − ${g(discount)}g discount` : ""}${s.notes ? ` — ${s.notes}` : ""} (share ${i + 1} of ${who.length})`,
         actorDiscordId: qm.discordId,
       });
     }
   }
   await db.update(sales).set({ status: "confirmed", confirmedBy: qm.name, confirmedAt: new Date() }).where(eq(sales.id, id));
   // Cash lands in the register lockbox (physical gold ≠ profit shares).
-  const revenue = Math.round(s.unitSalePrice * s.qty * 100) / 100;
+  const revenue = Math.max(0, Math.round((s.unitSalePrice * s.qty - discount) * 100) / 100);
   if (revenue !== 0) {
     await db.insert(cashMoves).values({
       id: uid("cm"),
@@ -140,7 +168,7 @@ export async function confirmSaleAction(formData: FormData) {
 
 /** Confirm every pending sale at once (end-of-shift): posts all profit splits + lockbox cash. */
 export async function confirmAllSalesAction() {
-  const qm = await quartermaster();
+  const qm = await requireManager();
   const db = await getDb();
   const pending = await db.select().from(sales).where(eq(sales.status, "pending"));
   const existing = await db.select().from(ledger);
@@ -148,7 +176,8 @@ export async function confirmAllSalesAction() {
   for (const e of existing) nets.set(e.member, (nets.get(e.member) || 0) + e.amountGold);
   const roster = [...nets.keys()].sort();
   for (const s of pending) {
-    const profit = Math.round((s.unitSalePrice - s.unitCostSnapshot) * s.qty * 100) / 100;
+    const discount = s.discount || 0;
+    const profit = Math.round((s.unitSalePrice * s.qty - discount - s.unitCostSnapshot * s.qty) * 100) / 100;
     if (profit !== 0) {
       const who = roster.length ? roster : [s.soldByName];
       const shares = splitEvenly(profit, who.length);
@@ -159,12 +188,12 @@ export async function confirmAllSalesAction() {
           member: who[i],
           amountGold: shares[i],
           category: "sales",
-          description: `Sale profit split [sale:${s.id}]: ${s.itemName} × ${s.qty} at ${s.location} (${g(s.unitSalePrice)}g − ${g(s.unitCostSnapshot)}g cost)${s.notes ? ` — ${s.notes}` : ""} (share ${i + 1} of ${who.length})`,
+          description: `Sale profit split [sale:${s.id}]: ${s.itemName} × ${s.qty} at ${s.location} (${g(s.unitSalePrice)}g − ${g(s.unitCostSnapshot)}g cost)${discount > 0 ? ` − ${g(discount)}g discount` : ""}${s.notes ? ` — ${s.notes}` : ""} (share ${i + 1} of ${who.length})`,
           actorDiscordId: qm.discordId,
         });
       }
     }
-    const revenue = Math.round(s.unitSalePrice * s.qty * 100) / 100;
+    const revenue = Math.max(0, Math.round((s.unitSalePrice * s.qty - discount) * 100) / 100);
     if (revenue !== 0) {
       await db.insert(cashMoves).values({
         id: uid("cm"),
@@ -186,6 +215,9 @@ export async function deleteSaleAction(formData: FormData) {
   const found = await db.select().from(sales).where(eq(sales.id, id)).limit(1);
   const s = found[0];
   if (!s) throw new Error("Sale not found");
+  // Voiding a confirmed sale reverses money — managers only. Anyone can
+  // retract their own still-pending line.
+  if (s.status === "confirmed") await ensureManager(qm.discordId);
   await db.delete(sales).where(eq(sales.id, id));
   // Road sales never touched stock, so there is nothing to put back.
   if (s.deductedStock !== false) {
@@ -206,7 +238,7 @@ export async function deleteSaleAction(formData: FormData) {
   }
   // If the sale was confirmed, its cash already landed in the lockbox — take it back out.
   if (s.status === "confirmed") {
-    const revenue = Math.round(s.unitSalePrice * s.qty * 100) / 100;
+    const revenue = Math.max(0, Math.round((s.unitSalePrice * s.qty - (s.discount || 0)) * 100) / 100);
     if (revenue !== 0) {
       await db.insert(cashMoves).values({
         id: uid("cm"),
@@ -250,7 +282,7 @@ export async function adjustStockAction(formData: FormData) {
 
 /** Delete a manual stock move. Sale-linked moves go away via their sale instead. */
 export async function deleteMoveAction(formData: FormData) {
-  await quartermaster();
+  await requireManager();
   const id = String(formData.get("id"));
   const db = await getDb();
   const found = await db.select().from(stockMoves).where(eq(stockMoves.id, id)).limit(1);
@@ -268,6 +300,9 @@ export async function addLedgerAction(formData: FormData) {
   if (!amount) throw new Error("Amount must not be zero — every entry moves gold");
   if ((type === "expense" || type === "payout") && amount > 0) amount = -amount;
   if ((type === "contribution" || type === "sale_income") && amount < 0) amount = -amount;
+  // Payouts hand company gold to a member — managers only. Contributions and
+  // expenses (purchases) stay open so anyone can log them.
+  if (type === "payout") await ensureManager(qm.discordId);
   const category = String(formData.get("category") || "");
   const description = String(formData.get("description") || "");
   // Company coffers: unattributed company money (e.g. storage income pool).
@@ -301,6 +336,23 @@ export async function addLedgerAction(formData: FormData) {
       });
     }
   }
+  // v2 purchase rows on expenses: what came in for the gold going out.
+  // Informational only — appended to the note, no counts are tracked.
+  const purchIds = type === "expense" ? formData.getAll("purch_item_id").map(String).filter(Boolean) : [];
+  const purchQtys = formData.getAll("purch_qty").map(String);
+  if (purchIds.length) {
+    const catalog = await getCatalogItems();
+    const parts: string[] = [];
+    for (let n = 0; n < purchIds.length; n++) {
+      const qty = Number(purchQtys[n] || 0);
+      if (!(qty > 0)) continue;
+      parts.push(`${catalog.find((i) => i.id === purchIds[n])?.name || "goods"} × ${purchQtys[n]}`);
+    }
+    if (parts.length) {
+      const goods = parts.join(", ");
+      fullDescription = fullDescription ? `${fullDescription} (${goods})` : goods;
+    }
+  }
   // Rent is always shared: an expense categorized as rent fans out into
   // equal per-member shares instead of one lump row — unless it comes
   // straight from company coffers, which charges nobody.
@@ -316,7 +368,7 @@ export async function addLedgerAction(formData: FormData) {
           member: roster[i],
           amountGold: -shares[i],
           category: "rent",
-          description: `Rent split${description ? ` (${description})` : ""}: share ${i + 1} of ${roster.length} of ${g(total)}g`,
+          description: `Rent split${fullDescription ? ` (${fullDescription})` : ""}: share ${i + 1} of ${roster.length} of ${g(total)}g`,
           actorDiscordId: qm.discordId,
         });
       }
@@ -339,7 +391,7 @@ export async function addLedgerAction(formData: FormData) {
 }
 
 export async function updateLedgerAction(formData: FormData) {
-  const qm = await quartermaster();
+  const qm = await requireManager();
   const id = String(formData.get("id"));
   const type = String(formData.get("type")) as "contribution" | "expense" | "payout" | "sale_income";
   let amount = Number(formData.get("amount_gold") || 0);
@@ -362,7 +414,7 @@ export async function updateLedgerAction(formData: FormData) {
 }
 
 export async function deleteLedgerAction(formData: FormData) {
-  await quartermaster();
+  await requireManager();
   const db = await getDb();
   await db.delete(ledger).where(eq(ledger.id, String(formData.get("id"))));
   revalidatePath("/admin", "layout");
@@ -372,7 +424,7 @@ export async function deleteLedgerAction(formData: FormData) {
  *  Sale profit splits are refused — those undo by voiding their sale,
  *  so stock and lockbox cash stay consistent. */
 export async function voidSharedGroupAction(formData: FormData) {
-  await quartermaster();
+  await requireManager();
   const ids = formData.getAll("ids").map(String).filter(Boolean);
   if (!ids.length) throw new Error("Nothing to void");
   const db = await getDb();
@@ -389,7 +441,7 @@ export async function voidSharedGroupAction(formData: FormData) {
  *  the N share rows become one unattributed row. For the classic
  *  "forgot to tick pay-from-coffers" mistake. */
 export async function rebookSharedGroupToCoffersAction(formData: FormData) {
-  const qm = await quartermaster();
+  const qm = await requireManager();
   const ids = formData.getAll("ids").map(String).filter(Boolean);
   if (!ids.length) throw new Error("Nothing to rebook");
   const db = await getDb();
@@ -419,7 +471,7 @@ export async function rebookSharedGroupToCoffersAction(formData: FormData) {
 /** Set the ledger balance directly: posts one unattributed adjustment for the
  *  difference, so no member is distorted. */
 export async function adjustBalanceAction(formData: FormData) {
-  await quartermaster();
+  await requireManager();
   const target = Number(formData.get("target_gold"));
   if (!Number.isFinite(target)) throw new Error("Enter a target balance");
   const db = await getDb();
@@ -447,7 +499,7 @@ function slugify(s: string, fallback: string) {
 }
 
 export async function createItemAction(formData: FormData) {
-  const qm = await quartermaster();
+  const qm = await requireManager();
   const name = String(formData.get("name") || "Unnamed").trim();
   const db = await getDb();
   const itemId = `${slugify(name, `item-${Date.now()}`)}`;
@@ -492,7 +544,7 @@ export async function createItemAction(formData: FormData) {
 }
 
 export async function updateItemAction(formData: FormData) {
-  await quartermaster();
+  await requireManager();
   const db = await getDb();
   const id = String(formData.get("id"));
   const lowRaw = String(formData.get("low_threshold") || "").trim();
@@ -538,7 +590,7 @@ export async function updateItemAction(formData: FormData) {
 }
 
 export async function deleteItemAction(formData: FormData) {
-  await quartermaster();
+  await requireManager();
   const id = String(formData.get("id"));
   const db = await getDb();
   // Safe: sales + stock moves keep item-name snapshots, so history survives.
@@ -550,7 +602,7 @@ export async function deleteItemAction(formData: FormData) {
 
 /** Add a variant under a parent: copies category/price/cost/visibility. */
 export async function createVariantAction(formData: FormData) {
-  const qm = await quartermaster();
+  const qm = await requireManager();
   const parentId = String(formData.get("parent_id"));
   const name = String(formData.get("name") || "").trim();
   if (!name) throw new Error("Variant needs a name");
@@ -579,7 +631,7 @@ export async function createVariantAction(formData: FormData) {
 }
 
 export async function createCategoryAction(formData: FormData) {
-  await quartermaster();
+  await requireManager();
   const name = String(formData.get("name") || "").trim();
   if (!name) throw new Error("Category needs a name");
   const db = await getDb();
@@ -595,7 +647,7 @@ export async function createCategoryAction(formData: FormData) {
 }
 
 export async function renameCategoryAction(formData: FormData) {
-  await quartermaster();
+  await requireManager();
   const db = await getDb();
   await db
     .update(categories)
@@ -605,7 +657,7 @@ export async function renameCategoryAction(formData: FormData) {
 }
 
 export async function deleteCategoryAction(formData: FormData) {
-  await quartermaster();
+  await requireManager();
   const id = String(formData.get("id"));
   const db = await getDb();
   const used = await db.select({ id: items.id }).from(items).where(eq(items.categorySlug, id));
@@ -664,11 +716,18 @@ export async function requestRestockAction(formData: FormData) {
 
 /** Shop open/closed toggle (salesperson on duty). Shows publicly in the hero. */
 export async function setShopOpenAction(formData: FormData) {
-  await quartermaster();
+  await requireManager();
   await setShopOpen(String(formData.get('open')) === '1');
   revalidatePath('/', 'layout');
   revalidatePath('/admin', 'layout');
 
+}
+
+/** Set the coffers floor (managers+): dashboard cash turns red below it. */
+export async function setCoffersFloorAction(formData: FormData) {
+  await requireManager();
+  await setCoffersFloor(Number(formData.get("floor_gold") || 0));
+  revalidatePath("/admin", "layout");
 }
 
 /** Superadmin only (SUPERADMIN_DISCORD_ID): flip a runtime feature flag.
@@ -701,7 +760,7 @@ export async function setFeatureAction(formData: FormData) {
 /** Recipe lines for cost math. Accepts repeated material_item_id/qty rows. No
  *  redirect — revalidation alone updates the list without a hard reload. */
 export async function addIngredientAction(formData: FormData) {
-  const qm = await quartermaster();
+  const qm = await requireManager();
   const materialIds = formData.getAll("material_item_id").map(String).filter(Boolean);
   const qtys = formData.getAll("qty").map(String);
   if (!materialIds.length) throw new Error("No ingredients");
@@ -725,7 +784,7 @@ export async function addIngredientAction(formData: FormData) {
 }
 
 export async function deleteIngredientAction(formData: FormData) {
-  await quartermaster();
+  await requireManager();
   const db = await getDb();
   await db.delete(itemIngredients).where(eq(itemIngredients.id, String(formData.get("id"))));
   revalidatePath("/admin", "layout");
@@ -736,7 +795,7 @@ export async function deleteIngredientAction(formData: FormData) {
 // never dilutes per-member splits. Balances only move on splits and manual rows.
 
 export async function rentUnitAction(formData: FormData) {
-  const qm = await quartermaster();
+  const qm = await requireManager();
   const id = String(formData.get("id"));
   const occupant = String(formData.get("occupant") || "").trim();
   if (!occupant) throw new Error("Name the occupant");
@@ -777,7 +836,7 @@ export async function collectUnitAction(formData: FormData) {
 }
 
 export async function freeUnitAction(formData: FormData) {
-  await quartermaster();
+  await requireManager();
   const db = await getDb();
   await db.update(storageUnits).set({ occupant: "", occupiedSince: null, paidThrough: null })
     .where(eq(storageUnits.id, String(formData.get("id"))));
@@ -787,7 +846,7 @@ export async function freeUnitAction(formData: FormData) {
 /** Undo the latest collect on a unit: paid-through rolls back a week
  *  and the posted income row is removed. */
 export async function undoCollectUnitAction(formData: FormData) {
-  await quartermaster();
+  await requireManager();
   const id = String(formData.get("id"));
   const db = await getDb();
   const found = await db.select().from(ledger)
@@ -804,7 +863,7 @@ export async function undoCollectUnitAction(formData: FormData) {
 }
 
 export async function addUnitAction(formData: FormData) {
-  const qm = await quartermaster();
+  const qm = await requireManager();
   const label = String(formData.get("label") || "").trim() || `Chest ${Date.now().toString(36)}`;
   const location = String(formData.get("location") || "").trim() || SHOP.defaultLocation;
   const db = await getDb();
@@ -819,7 +878,7 @@ export async function addUnitAction(formData: FormData) {
 }
 
 export async function updateUnitAction(formData: FormData) {
-  await quartermaster();
+  await requireManager();
   const rate = Number(formData.get("rate_per_week") || 0);
   if (!(rate >= 0)) throw new Error("Rate must be 0 or more");
   const label = String(formData.get("label") || "").trim();
@@ -837,7 +896,7 @@ export async function updateUnitAction(formData: FormData) {
 }
 
 export async function deleteUnitAction(formData: FormData) {
-  await quartermaster();
+  await requireManager();
   const db = await getDb();
   const found = await db.select().from(storageUnits).where(eq(storageUnits.id, String(formData.get("id")))).limit(1);
   if (found[0]?.occupant) throw new Error("Free the unit first");
@@ -848,7 +907,7 @@ export async function deleteUnitAction(formData: FormData) {
 // ---------- members (explicit roster; splits use active members) ----------
 
 export async function addMemberAction(formData: FormData) {
-  await quartermaster();
+  await requireManager();
   const name = String(formData.get("name") || "").trim();
   if (!name) throw new Error("Name the member");
   const db = await getDb();
@@ -861,7 +920,7 @@ export async function addMemberAction(formData: FormData) {
 }
 
 export async function setMemberActiveAction(formData: FormData) {
-  await quartermaster();
+  await requireManager();
   const db = await getDb();
   await db.update(members)
     .set({ active: String(formData.get("active")) === "true" })
@@ -869,9 +928,31 @@ export async function setMemberActiveAction(formData: FormData) {
   revalidatePath("/admin", "layout");
 }
 
+/** Owner-only: set a member's role (owner | manager | worker). */
+export async function setMemberRoleAction(formData: FormData) {
+  const qm = await quartermaster();
+  if (!isSuperAdmin(qm.discordId)) throw new Error("UNAUTHORIZED");
+  const role = String(formData.get("role") || "");
+  if (role !== "owner" && role !== "manager" && role !== "worker") throw new Error("Bad role");
+  const db = await getDb();
+  await db.update(members).set({ role }).where(eq(members.id, String(formData.get("id"))));
+  revalidatePath("/admin", "layout");
+}
+
+/** Owner-only: link a Discord account (seen acting in the books) to a member
+ *  row, enabling role gates for them. Pass empty discord_id to unlink. */
+export async function linkMemberDiscordAction(formData: FormData) {
+  const qm = await quartermaster();
+  if (!isSuperAdmin(qm.discordId)) throw new Error("UNAUTHORIZED");
+  const discordId = String(formData.get("discord_id") || "").trim() || null;
+  const db = await getDb();
+  await db.update(members).set({ discordId }).where(eq(members.id, String(formData.get("id"))));
+  revalidatePath("/admin", "layout");
+}
+
 /** End-of-day sweep: move gold from the register lockbox to the safe. */
 export async function sweepCashAction(formData: FormData) {
-  const qm = await quartermaster();
+  const qm = await requireManager();
   const amount = Math.round(Number(formData.get("amount_gold") || 0) * 100) / 100;
   if (!(amount > 0)) throw new Error("Amount must be more than 0");
   const db = await getDb();
@@ -902,7 +983,7 @@ export async function sweepCashAction(formData: FormData) {
 
 /** Delete a cash move. Sweep halves (-out/-in) go away as a pair. */
 export async function deleteCashMoveAction(formData: FormData) {
-  await quartermaster();
+  await requireManager();
   const id = String(formData.get("id"));
   const db = await getDb();
   const pair = id.endsWith("-out") || id.endsWith("-in") ? id.slice(0, -4) : null;
@@ -916,7 +997,7 @@ export async function deleteCashMoveAction(formData: FormData) {
 
 /** Manual cash adjustment: starting float, found gold, corrections. Positive adds, negative removes. */
 export async function adjustCashAction(formData: FormData) {
-  const qm = await quartermaster();
+  const qm = await requireManager();
   const pot = String(formData.get("pot") || "Lockbox");
   if (pot !== "Lockbox" && pot !== "Safe") throw new Error("Unknown pot");
   const amount = Math.round(Number(formData.get("amount_gold") || 0) * 100) / 100;

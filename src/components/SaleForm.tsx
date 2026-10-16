@@ -27,11 +27,12 @@ interface Row {
   itemId: string;
   qty: string;
   price: string;
+  discount: string;
 }
 
 const DEFAULT_LOCATIONS = [...SHOP.locations];
 
-export default function SaleForm({ items, categories, locations = DEFAULT_LOCATIONS, showRoad = true }: { items: CatalogOption[]; categories: CategoryOption[]; locations?: string[]; showRoad?: boolean }) {
+export default function SaleForm({ items, categories, locations = DEFAULT_LOCATIONS, showRoad = true, showDiscount = false }: { items: CatalogOption[]; categories: CategoryOption[]; locations?: string[]; showRoad?: boolean; showDiscount?: boolean }) {
   // Kinds are counters: inheriting variants sell at their parent's price.
   const priced = useMemo(
     () =>
@@ -50,13 +51,13 @@ export default function SaleForm({ items, categories, locations = DEFAULT_LOCATI
   const parentName = (id: string | null) => (id ? priced.find((i) => i.id === id)?.name || null : null);
   const [rows, setRows] = useState<Row[]>(() => {
     const f = firstOf("");
-    return [{ key: 0, cat: "", itemId: f?.id || "", qty: "1", price: String(f?.price ?? 0) }];
+    return [{ key: 0, cat: "", itemId: f?.id || "", qty: "1", price: String(f?.price ?? 0), discount: "0" }];
   });
   const [n, setN] = useState(1);
 
   const addRow = () => {
     const f = firstOf("");
-    setRows((r) => [...r, { key: n, cat: "", itemId: f?.id || "", qty: "1", price: String(f?.price ?? 0) }]);
+    setRows((r) => [...r, { key: n, cat: "", itemId: f?.id || "", qty: "1", price: String(f?.price ?? 0), discount: "0" }]);
     setN((x) => x + 1);
   };
   const setRow = (key: number, patch: Partial<Row>) =>
@@ -77,15 +78,16 @@ export default function SaleForm({ items, categories, locations = DEFAULT_LOCATI
     );
   const removeRow = (key: number) => setRows((rs) => (rs.length > 1 ? rs.filter((r) => r.key !== key) : rs));
 
-  const total = rows.reduce((a, r) => a + (Number(r.qty) || 0) * (Number(r.price) || 0), 0);
+  const total = rows.reduce((a, r) => a + Math.max(0, (Number(r.qty) || 0) * (Number(r.price) || 0) - (Number(r.discount) || 0)), 0);
 
   return (
     <form action={recordSaleAction} className="card p-4 space-y-2">
       <div className="hidden md:grid grid-cols-12 gap-2 text-xs uppercase tracking-wider text-[#8a7c64]">
         <span className="col-span-3">Section</span>
-        <span className="col-span-5">Item</span>
+        <span className={showDiscount ? "col-span-4" : "col-span-5"}>Item</span>
         <span className="col-span-1">Qty</span>
         <span className="col-span-2">Price (g)</span>
+        {showDiscount && <span className="col-span-1">Disc (g)</span>}
         <span className="col-span-1" />
       </div>
       {rows.map((r) => (
@@ -102,10 +104,13 @@ export default function SaleForm({ items, categories, locations = DEFAULT_LOCATI
             items={priced.map((i) => ({ ...i, parent: i.parent ? parentName(i.parent) : null }))}
             cat={r.cat} value={r.itemId}
             onChange={(id) => setRow(r.key, { itemId: id })}
-            showPrice className="input col-span-6 md:col-span-5"
+            showPrice className={showDiscount ? "input col-span-6 md:col-span-4" : "input col-span-6 md:col-span-5"}
           />
           <input name="qty" type="number" step="any" min={1} value={r.qty} onChange={(e) => setRow(r.key, { qty: e.target.value })} className="input col-span-5 md:col-span-1" aria-label="Quantity" />
           <input name="unit_sale_price" type="number" step="any" min={0} value={r.price} onChange={(e) => setRow(r.key, { price: e.target.value })} className="input col-span-5 md:col-span-2" aria-label="Price each" title="Base price auto-filled — edit for discounts" />
+          {showDiscount && (
+            <input name="discount" type="number" step="any" min={0} value={r.discount} onChange={(e) => setRow(r.key, { discount: e.target.value })} className="input col-span-4 md:col-span-1" aria-label="Discount (g)" title="Flat discount on this line — revenue is price minus discount" />
+          )}
           <div className="col-span-2 md:col-span-1 flex md:justify-end">
             <button type="button" onClick={() => removeRow(r.key)} className="btn-ghost !px-3 w-10 shrink-0" title="Remove row">✕</button>
           </div>

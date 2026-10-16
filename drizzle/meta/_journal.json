@@ -106,6 +106,13 @@
       "when": 1791646154135,
       "tag": "0014_road-sales",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1792178378788,
+      "tag": "0015_member-roles-discount",
+      "breakpoints": true
     }
   ]
 }

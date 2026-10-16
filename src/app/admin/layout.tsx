@@ -85,6 +85,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           {(await isFeatureOn("guide")) && (
             <Link href="/admin/guide" className="hover:text-[#c9a227]">Guide</Link>
           )}
+          <Link href="/admin/v2" className="hover:text-[#c9a227]" title="v2 pilot surfaces">✨v2</Link>
           {isSuperAdmin(discordId) && (
             <Link href="/admin/super" className="hover:text-[#c9a227]" title="Superadmin playground">⚙️</Link>
           )}

@@ -48,6 +48,8 @@ export const sales = pgTable("sales", {
   confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
   /** False for road sales: goods never entered the chest, so no stock moves. */
   deductedStock: boolean("deducted_stock").notNull().default(true),
+  /** Per-line discount in gold. Revenue = qty*price − discount (floored at 0). */
+  discount: real("discount").notNull().default(0),
 });
 
 /** Every stock movement that isn't a sale: restocks, corrections, spoilage. */
@@ -141,4 +143,8 @@ export const members = pgTable("members", {
   name: text("name").notNull().unique(),
   active: boolean("active").notNull().default(true),
   joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
+  /** owner | manager | worker. New rows start least-privileged. */
+  role: text("role").notNull().default("worker"),
+  /** Discord account linked by the Owner. Null = cannot pass role gates. */
+  discordId: text("discord_id"),
 });

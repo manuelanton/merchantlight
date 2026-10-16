@@ -35,7 +35,7 @@ export interface ManagedIngredient {
   qty: number;
 }
 
-export default function ItemsManager({ items, categories, stock, ingredients, showStock = true }: { items: ManagedItem[]; categories: ManagedCategory[]; stock: Record<string, number>; ingredients: ManagedIngredient[]; showStock?: boolean }) {
+export default function ItemsManager({ items, categories, stock, ingredients, showStock = true, canManage = true }: { items: ManagedItem[]; categories: ManagedCategory[]; stock: Record<string, number>; ingredients: ManagedIngredient[]; showStock?: boolean; canManage?: boolean }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [openRecipe, setOpenRecipe] = useState<string | null>(null);
@@ -173,7 +173,7 @@ export default function ItemsManager({ items, categories, stock, ingredients, sh
                           {expanded ? "Hide recipe" : "Recipe"}
                         </button>
                       )}
-                      {!isVariant && (
+                      {!isVariant && canManage && (
                         <button
                           type="button"
                           onClick={() => setVariantId(i.id)}
@@ -183,6 +183,7 @@ export default function ItemsManager({ items, categories, stock, ingredients, sh
                           + Variant
                         </button>
                       )}
+                      {canManage && (
                       <button
                         type="button"
                         onClick={() => setEditId(i.id)}
@@ -190,10 +191,13 @@ export default function ItemsManager({ items, categories, stock, ingredients, sh
                       >
                         Edit
                       </button>
+                      )}
+                      {canManage && (
                       <form action={deleteItemAction} className="inline-block">
                         <input type="hidden" name="id" value={i.id} />
                         <button className="btn-ghost !py-1 !px-2 text-xs" type="submit" title="Delete item">✕</button>
                       </form>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -217,10 +221,12 @@ export default function ItemsManager({ items, categories, stock, ingredients, sh
                                     return (
                                     <li key={r.id} className="flex items-center gap-2">
                                       <span className="flex-1">{matName(r.materialItemId, r.materialName)} × {g(r.qty)} ({g(r.qty * c)}g{assumed ? " = price" : ""})</span>
+                                    {canManage && (
                                     <form action={deleteIngredientAction} className="inline">
                                       <input type="hidden" name="id" value={r.id} />
                                       <button className="btn-ghost !py-0 !px-1.5 text-xs" type="submit" title="Remove ingredient">✕</button>
                                     </form>
+                                    )}
                                   </li>
                                   );
                                 })}
@@ -229,11 +235,13 @@ export default function ItemsManager({ items, categories, stock, ingredients, sh
                               <p className="text-xs text-[#8a7c64]">No recipe yet — add the first ingredient below.</p>
                             )}
                             <p className="text-xs text-[#8a7c64]">Unknown costs count as sale price (zero assumed profit) — overwrite on the material when known.</p>
+                            {canManage && (
                             <IngredientForm
                               itemId={i.id}
                               materials={items.filter((m) => m.category_slug === "materials").map((m) => ({ id: m.id, name: m.name, cost: m.cost_value }))}
                               onSaved={() => setOpenRecipe(null)}
                             />
+                            )}
                           </>
                         );
                       })()}

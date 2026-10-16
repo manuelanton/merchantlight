@@ -10,6 +10,8 @@ import { itemIngredients } from "@/db/schema";
 import { effectiveCost } from "@/lib/cost";
 import { effectiveMaxStock, unitValue } from "@/lib/defaults";
 import { isFeatureOn } from "@/lib/features";
+import { auth } from "@/auth";
+import { canManage } from "@/lib/members";
 import AddItemForm from "@/components/AddItemForm";
 import Collapsible from "@/components/Collapsible";
 import ItemsManager from "@/components/ItemsManager";
@@ -27,6 +29,8 @@ export default async function ItemsPage() {
   const costIngs = ingredientRows.map((r) => ({ itemId: r.itemId, materialItemId: r.materialItemId, qty: r.qty }));
   const effCost = (id: string) => effectiveCost(id, costItems, costIngs);
   const trackStock = await isFeatureOn("stock");
+  const session = await auth();
+  const manager = await canManage((session as unknown as { discordId?: string } | null)?.discordId);
 
   return (
     <div className="space-y-6">
@@ -36,12 +40,18 @@ export default async function ItemsPage() {
         Deleting an item is safe: sales and stock history keep its name.
       </p>
 
+      {!manager && (
+        <p className="text-sm text-[#e0bd4a]">Worker view — recording only. Catalogue changes need a Manager.</p>
+      )}
+
+      {manager && (
       <Collapsible title="Add item" defaultOpen>
         <AddItemForm
           categories={sorted.map((c) => ({ slug: c.slug, name: c.name }))}
           materials={items.filter((m) => m.category_slug === "materials").map((m) => ({ id: m.id, name: m.name, cost: m.cost_value }))}
         />
       </Collapsible>
+      )}
 
       <ItemsManager
         items={items.map((i) => ({
@@ -56,6 +66,7 @@ export default async function ItemsPage() {
         categories={sorted.map((c) => ({ slug: c.slug, name: c.name, icon: c.icon }))}
         stock={stock}
         showStock={trackStock}
+        canManage={manager}
         ingredients={ingredientRows.map((r) => ({
           id: r.id, itemId: r.itemId, materialItemId: r.materialItemId,
           materialName: r.materialName, qty: r.qty,
@@ -89,6 +100,7 @@ export default async function ItemsPage() {
         </table>
       </Collapsible>
 
+      {manager && (
       <Collapsible title="Categories">
         <form action={createCategoryAction} className="flex flex-wrap gap-2 items-end">
           <div><label className="lbl">New section name *</label><input name="name" required className="input !w-auto" placeholder="Enchantments" /></div>
@@ -121,6 +133,7 @@ export default async function ItemsPage() {
           })}
         </ul>
       </Collapsible>
+      )}
     </div>
   );
 }

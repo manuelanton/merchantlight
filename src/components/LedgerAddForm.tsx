@@ -4,14 +4,91 @@ import { addLedgerAction } from "@/lib/admin-actions";
 import { SHOP } from "@/shop/config";
 import ContributionForm from "./ContributionForm";
 import MemberSelect from "./MemberSelect";
+
+interface PurchRow {
+  key: number;
+  cat: string;
+  itemId: string;
+  qty: string;
+}
+
+/** Optional goods list on an expense (v2): what came in for the gold going out.
+ *  Informational only — lands in the entry's description, no counts tracked. */
+function PurchaseRows({
+  items,
+  categories,
+}: {
+  items: { id: string; name: string; category: string }[];
+  categories: { slug: string; name: string }[];
+}) {
+  const [rows, setRows] = useState([{ key: 0, cat: "", itemId: items[0]?.id || "", qty: "1" }]);
+  const [n, setN] = useState(1);
+  const inCat = (cat: string) => (cat ? items.filter((i) => i.category === cat) : items);
+  const addRow = () => {
+    setRows((r) => [...r, { key: n, cat: "", itemId: items[0]?.id || "", qty: "1" }]);
+    setN((x) => x + 1);
+  };
+  const setRow = (key: number, patch: Partial<PurchRow>) =>
+    setRows((rs) =>
+      rs.map((r) => {
+        if (r.key !== key) return r;
+        const next = { ...r, ...patch };
+        if (patch.cat !== undefined) next.itemId = inCat(patch.cat)[0]?.id || "";
+        return next;
+      })
+    );
+  const removeRow = (key: number) => setRows((rs) => (rs.length > 1 ? rs.filter((r) => r.key !== key) : rs));
+  return (
+    <div className="space-y-2 border-t border-[#1c2b31] pt-3">
+      <p className="text-xs text-[#8a7c64]">What came in (optional — lands in the note, no counts kept)</p>
+      <div className="hidden md:grid grid-cols-12 gap-2 text-xs uppercase tracking-wider text-[#8a7c64]">
+        <span className="col-span-4">Section</span>
+        <span className="col-span-6">Item</span>
+        <span className="col-span-2">Qty</span>
+      </div>
+      {rows.map((r) => (
+        <div key={r.key} className="grid grid-cols-12 gap-2 items-center">
+          <select
+            className="input col-span-12 md:col-span-4" value={r.cat}
+            onChange={(e) => setRow(r.key, { cat: e.target.value })}
+            aria-label="Section"
+          >
+            <option value="">All sections</option>
+            {categories.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
+          </select>
+          <select
+            name="purch_item_id" className="input col-span-7 md:col-span-6"
+            value={r.itemId} onChange={(e) => setRow(r.key, { itemId: e.target.value })}
+            aria-label="Purchased item"
+          >
+            {inCat(r.cat).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+          <input
+            name="purch_qty" type="number" min={0.01} step="any" value={r.qty}
+            onChange={(e) => setRow(r.key, { qty: e.target.value })}
+            className="input col-span-3 md:col-span-1" aria-label="Quantity"
+          />
+          <div className="col-span-2 md:col-span-1 flex md:justify-end">
+            <button type="button" onClick={() => removeRow(r.key)} className="btn-ghost !px-2.5 shrink-0" title="Remove row">✕</button>
+          </div>
+        </div>
+      ))}
+      <button type="button" onClick={addRow} className="btn-ghost !py-1 text-xs">+ Add row</button>
+    </div>
+  );
+}
 export default function LedgerAddForm({
   members,
   items,
   categories,
+  showPurchase = false,
+  allowPayout = true,
 }: {
   members: string[];
   items: { id: string; name: string; cost: number; category: string }[];
   categories: { slug: string; name: string }[];
+  showPurchase?: boolean;
+  allowPayout?: boolean;
 }) {
   const [type, setType] = useState("contribution");
   const [coffers, setCoffers] = useState(false);
@@ -34,7 +111,7 @@ export default function LedgerAddForm({
           <select name="type" value={type} onChange={(e) => setType(e.target.value)} className="input">
             <option value="contribution">contribution (+)</option>
             <option value="expense">expense (−)</option>
-            <option value="payout">payout (−)</option>
+            {allowPayout && <option value="payout">payout (−)</option>}
           </select>
         </div>
         {type !== "contribution" && (
@@ -56,8 +133,9 @@ export default function LedgerAddForm({
             {!coffers && <MemberSelect members={members} name="member" label="Member" required />}
             {coffers && <input type="hidden" name="from_coffers" value="1" />}
             <div><label className="lbl">Category</label><input name="category" className="input" placeholder="rent / materials / thread" /></div>
-            <div><label className="lbl">Description</label><input name="description" className="input" placeholder={`e.g. ${SHOP.homeLocation} rent, Morndas`} /></div>
+            <div><label className="lbl">Description</label><input name="description" className="input" placeholder="e.g. Darkwater Crossing rent, Morndas" /></div>
           </div>
+          {showPurchase && <PurchaseRows items={items} categories={categories} />}
         </>
       )}
       <div className="flex justify-end">
