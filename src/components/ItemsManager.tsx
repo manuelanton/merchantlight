@@ -41,6 +41,7 @@ export default function ItemsManager({ items, categories, stock, ingredients, sh
   const [openRecipe, setOpenRecipe] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [variantId, setVariantId] = useState<string | null>(null);
+  const [variantError, setVariantError] = useState<string | null>(null);
 
   const toggle = (slug: string) =>
     setSelected((s) => (s.includes(slug) ? s.filter((x) => x !== slug) : [...s, slug]));
@@ -152,7 +153,7 @@ export default function ItemsManager({ items, categories, stock, ingredients, sh
                 <>
                 <tr key={i.id}>
                   <td><b>{isVariant ? `↳ ${i.name}` : i.name}</b>{!isVariant && isParent && <span className="text-xs text-[#8a7c64]"> ({kidCount} variants)</span>}{isVariant && i.inherit_parent && <span className="text-xs text-[#8a7c64]" title="Follows parent price/cost/recipe"> ⟡</span>}</td>
-                  <td className="text-[#e0bd4a]">{price}g</td>
+                  <td className="text-[#e0bd4a]">{g(price)}g</td>
                   <td title={recipe ? "From recipe — updates with material costs" : "Manual cost"}>
                     {g(cost)}g{recipe && <span className="text-[#8a7c64]"> ≈</span>}
                   </td>
@@ -263,18 +264,26 @@ export default function ItemsManager({ items, categories, stock, ingredients, sh
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
           <button aria-label="Close" onClick={() => setVariantId(null)} className="absolute inset-0 bg-black/70" />
           <form
-            action={async (fd: FormData) => { await createVariantAction(fd); setVariantId(null); }}
-            className="relative card p-5 space-y-3 w-full max-w-sm max-h-[90vh] overflow-y-auto"
+            action={async (fd: FormData) => {
+              const r = await createVariantAction(fd);
+              if (r?.error) { setVariantError(r.error); return; }
+              setVariantError(null);
+              setVariantId(null);
+            }}
+            className="relative card p-5 space-y-3 w-full max-w-md max-h-[90vh] overflow-y-auto"
           >
             <div className="flex items-center gap-2">
-              <h3 className="font-display text-lg flex-1">+ Variant of {variantParent.name}</h3>
-              <button type="button" onClick={() => setVariantId(null)} className="btn-ghost !py-1 !px-2 text-xs" title="Close">✕</button>
+              <h3 className="font-display text-lg flex-1">Add variant — {variantParent.name}</h3>
+              <button type="button" onClick={() => { setVariantId(null); setVariantError(null); }} className="btn-ghost !py-1 !px-2 text-xs" title="Close">✕</button>
             </div>
+            {variantError && (
+              <p className="text-sm text-[#e08a8a] border border-[#7a2430] bg-[#7a2430]/20 rounded-lg px-3 py-2">{variantError}</p>
+            )}
             <input type="hidden" name="parent_id" value={variantParent.id} />
             <div><label className="lbl">Variant name</label><input name="name" required autoFocus className="input" placeholder="e.g. Common Clothes (blue)" /></div>
             <p className="text-xs text-[#8a7c64]">Copies price/cost, inherits live after that.</p>
             <div className="flex gap-2 justify-end">
-              <button type="button" onClick={() => setVariantId(null)} className="btn-ghost !py-1 text-sm">Cancel</button>
+              <button type="button" onClick={() => { setVariantId(null); setVariantError(null); }} className="btn-ghost !py-1 text-sm">Cancel</button>
               <button className="btn-gold !py-1 text-sm" type="submit">Add variant</button>
             </div>
           </form>

@@ -4,6 +4,14 @@ export function g(n: number): string {
   return String(Math.round(n * 100) / 100);
 }
 
+/** Parse a gold/qty form value: accepts "15", "15.5", and "15,5" (comma decimal). */
+export function num(v: FormDataEntryValue | null | undefined, fallback = 0): number {
+  const s = String(v ?? "").trim().replace(",", ".");
+  if (s === "") return fallback;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 /** Split a total into integer-cent shares that sum EXACTLY to the total. */
 export function splitEvenly(total: number, n: number): number[] {
   if (n <= 0) return [];

@@ -1,5 +1,4 @@
 import {
-  createCategoryAction,
   deleteCategoryAction,
   renameCategoryAction,
 } from "@/lib/admin-actions";
@@ -9,10 +8,12 @@ import { getDb } from "@/db";
 import { itemIngredients } from "@/db/schema";
 import { effectiveCost } from "@/lib/cost";
 import { effectiveMaxStock, unitValue } from "@/lib/defaults";
+import { g } from "@/lib/format";
 import { isFeatureOn } from "@/lib/features";
 import { auth } from "@/auth";
 import { canManage } from "@/lib/members";
 import AddItemForm from "@/components/AddItemForm";
+import AddCategoryForm from "@/components/AddCategoryForm";
 import Collapsible from "@/components/Collapsible";
 import ItemsManager from "@/components/ItemsManager";
 
@@ -89,7 +90,7 @@ export default async function ItemsPage() {
               return (
                 <tr key={m.id}>
                   <td><b>{m.name}</b></td>
-                  <td className="text-[#e0bd4a]">{wePay > 0 ? `${wePay}g` : "—"}</td>
+                  <td className="text-[#e0bd4a]">{wePay > 0 ? `${g(wePay)}g` : "—"}</td>
                   {trackStock && <td>{onHand}</td>}
                   <td>{cap}{auto && <span className="text-[#8a7c64]"> auto</span>}</td>
                   {trackStock && <td className={full ? "text-[#e08a8a]" : "text-[#7fd08a]"}>{full ? "Full — don't buy" : "Buying"}</td>}
@@ -102,12 +103,8 @@ export default async function ItemsPage() {
 
       {manager && (
       <Collapsible title="Categories">
-        <form action={createCategoryAction} className="flex flex-wrap gap-2 items-end">
-          <div><label className="lbl">New section name *</label><input name="name" required className="input !w-auto" placeholder="Enchantments" /></div>
-          <div><label className="lbl">Icon</label><input name="icon" defaultValue="📦" className="input !w-20" /></div>
-          <button className="btn-gold !py-2" type="submit">Add section</button>
-        </form>
-        <ul className="space-y-2">
+        <AddCategoryForm />
+        <ul className="mt-2 space-y-2">
           {sorted.map((c) => {
             const n = items.filter((i) => i.category_slug === c.slug).length;
             return (

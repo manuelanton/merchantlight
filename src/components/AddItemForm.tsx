@@ -1,6 +1,7 @@
 "use client";
-import { useState } from "react";
-import { createItemAction } from "@/lib/admin-actions";
+import { useActionState, useState } from "react";
+import { createItemAction, type ActionResult } from "@/lib/admin-actions";
+import { g } from "@/lib/format";
 
 interface Row {
   key: number;
@@ -18,6 +19,7 @@ export default function AddItemForm({
   const [withRecipe, setWithRecipe] = useState(false);
   const [rows, setRows] = useState<Row[]>([{ key: 0, materialId: materials[0]?.id || "", qty: "1" }]);
   const [n, setN] = useState(1);
+  const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(createItemAction, null);
 
   const addRow = () => {
     setRows((r) => [...r, { key: n, materialId: materials[0]?.id || "", qty: "1" }]);
@@ -28,7 +30,10 @@ export default function AddItemForm({
   const removeRow = (key: number) => setRows((rs) => rs.filter((r) => r.key !== key));
 
   return (
-    <form action={createItemAction} className="space-y-3">
+    <form action={formAction} className="space-y-3">
+      {state?.error && (
+        <p className="text-sm text-[#e08a8a] border border-[#7a2430] bg-[#7a2430]/20 rounded-lg px-3 py-2">{state.error}</p>
+      )}
       <div className="grid md:grid-cols-3 gap-3">
         <div><label className="lbl">Name *</label><input name="name" required className="input" placeholder="Fine Leather Boots" /></div>
         <div><label className="lbl">Category</label>
@@ -57,7 +62,7 @@ export default function AddItemForm({
                 value={r.materialId} onChange={(e) => setRow(r.key, { materialId: e.target.value })}
                 aria-label="Material"
               >
-                {materials.map((m) => <option key={m.id} value={m.id}>{m.name}{m.cost ? ` (${m.cost}g)` : ""}</option>)}
+                {materials.map((m) => <option key={m.id} value={m.id}>{m.name}{m.cost ? ` (${g(m.cost)}g)` : ""}</option>)}
               </select>
               <div className="flex gap-2 items-center">
                 <input
@@ -76,7 +81,7 @@ export default function AddItemForm({
           )}
         </div>
       )}
-      <button className="btn-gold" type="submit">Add item</button>
+      <button className="btn-gold" type="submit" disabled={pending}>{pending ? "Adding…" : "Add item"}</button>
     </form>
   );
 }

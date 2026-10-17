@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { g, num } from "@/lib/format";
 import MemberSelect from "./MemberSelect";
 
 /** Contribution form: pick member + optionally value it from catalogue items at cost. */
@@ -20,8 +21,8 @@ export default function ContributionForm({
   const inCat = (cat: string) => (cat ? items.filter((i) => i.category === cat) : items);
   const costOf = (id: string) => items.find((i) => i.id === id)?.cost || 0;
   const rowValue = (r: { itemId: string; qty: string; value: string }) =>
-    (r.value !== "" ? Number(r.value) || 0 : costOf(r.itemId));
-  const autoTotal = rows.reduce((a, r) => a + (Number(r.qty) || 0) * rowValue(r), 0);
+    (r.value !== "" ? num(r.value) : costOf(r.itemId));
+  const autoTotal = rows.reduce((a, r) => a + num(r.qty) * rowValue(r), 0);
 
   const addRow = () => {
     setRows((r) => [...r, { key: n, cat: "", itemId: items[0]?.id || "", qty: "1", value: "" }]);
@@ -43,7 +44,7 @@ export default function ContributionForm({
   const removeRow = (key: number) => setRows((rs) => rs.filter((r) => r.key !== key));
 
   const summary = rows
-    .filter((r) => r.itemId && (Number(r.qty) || 0) > 0)
+    .filter((r) => r.itemId && num(r.qty) > 0)
     .map((r) => `${items.find((i) => i.id === r.itemId)?.name || "goods"} × ${r.qty}`)
     .join(", ");
 
@@ -55,7 +56,7 @@ export default function ContributionForm({
           <label className="lbl">Amount (g) *</label>
           <input
             name="amount_gold" type="number" min={0} step="any" required className="input"
-            value={withItems ? Math.round(autoTotal * 100) / 100 : manual}
+            value={withItems ? g(autoTotal) : manual}
             onChange={(e) => setManual(e.target.value)}
             readOnly={withItems}
             title={withItems ? "Auto-valued from items below — uncheck to type freely" : undefined}
@@ -91,7 +92,7 @@ export default function ContributionForm({
                 value={r.itemId} onChange={(e) => setRow(r.key, { itemId: e.target.value })}
                 aria-label="Contributed item"
               >
-                {inCat(r.cat).map((m) => <option key={m.id} value={m.id}>{m.name} ({m.cost}g)</option>)}
+                {inCat(r.cat).map((m) => <option key={m.id} value={m.id}>{m.name} ({g(m.cost)}g)</option>)}
               </select>
               <input
                 name="contrib_qty" type="number" min={0.01} step="any" value={r.qty}
@@ -112,7 +113,7 @@ export default function ContributionForm({
           ))}
           <div className="flex items-center gap-3">
             <button type="button" onClick={addRow} className="btn-ghost !py-1 text-xs">+ Add row</button>
-            <span className="text-sm text-[#8a7c64] ml-auto">Valued at: <b className="text-[#e0bd4a]">{Math.round(autoTotal * 100) / 100}g</b></span>
+            <span className="text-sm text-[#8a7c64] ml-auto">Valued at: <b className="text-[#e0bd4a]">{g(autoTotal)}g</b></span>
           </div>
           <input type="hidden" name="description_auto" value={summary} />
         </div>

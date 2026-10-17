@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getCatalogue } from "@/lib/catalog";
+import { g } from "@/lib/format";
 import { SHOP } from "@/shop/config";
 
 export const revalidate = 60;
@@ -46,7 +47,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
               <div className="flex items-baseline gap-3">
                 <span className="font-display text-lg">{i.name}</span>
                 <span aria-hidden className="flex-1 border-b border-dotted border-[#5a4a33] -translate-y-1" />
-                <span className="text-lg text-[#e0bd4a] whitespace-nowrap">{i.sale_price}g</span>
+                <span className="text-lg text-[#e0bd4a] whitespace-nowrap">{g(i.sale_price)}g</span>
               </div>
             </li>
           ))}

@@ -2,9 +2,11 @@
 import { useMemo, useState } from "react";
 import { recordSaleAction } from "@/lib/admin-actions";
 import { effectivePrice } from "@/lib/cost";
+import { g, num } from "@/lib/format";
 import { SHOP } from "@/shop/config";
 import LocationSelect from "./LocationSelect";
 import ItemPicker from "./ItemPicker";
+import NumInput from "./NumInput";
 
 export interface CatalogOption {
   id: string;
@@ -47,17 +49,17 @@ export default function SaleForm({ items, categories, locations = DEFAULT_LOCATI
   );
   const inCat = (cat: string) => (cat ? priced.filter((i) => i.category === cat) : priced);
   const firstOf = (cat: string) => inCat(cat)[0];
-  const priceStr = (id: string) => String(priced.find((i) => i.id === id)?.price ?? 0);
+  const priceStr = (id: string) => g(priced.find((i) => i.id === id)?.price ?? 0);
   const parentName = (id: string | null) => (id ? priced.find((i) => i.id === id)?.name || null : null);
   const [rows, setRows] = useState<Row[]>(() => {
     const f = firstOf("");
-    return [{ key: 0, cat: "", itemId: f?.id || "", qty: "1", price: String(f?.price ?? 0), discount: "0" }];
+    return [{ key: 0, cat: "", itemId: f?.id || "", qty: "1", price: g(f?.price ?? 0), discount: "0" }];
   });
   const [n, setN] = useState(1);
 
   const addRow = () => {
     const f = firstOf("");
-    setRows((r) => [...r, { key: n, cat: "", itemId: f?.id || "", qty: "1", price: String(f?.price ?? 0), discount: "0" }]);
+    setRows((r) => [...r, { key: n, cat: "", itemId: f?.id || "", qty: "1", price: g(f?.price ?? 0), discount: "0" }]);
     setN((x) => x + 1);
   };
   const setRow = (key: number, patch: Partial<Row>) =>
@@ -78,7 +80,7 @@ export default function SaleForm({ items, categories, locations = DEFAULT_LOCATI
     );
   const removeRow = (key: number) => setRows((rs) => (rs.length > 1 ? rs.filter((r) => r.key !== key) : rs));
 
-  const total = rows.reduce((a, r) => a + Math.max(0, (Number(r.qty) || 0) * (Number(r.price) || 0) - (Number(r.discount) || 0)), 0);
+  const total = rows.reduce((a, r) => a + Math.max(0, num(r.qty) * num(r.price) - num(r.discount)), 0);
 
   return (
     <form action={recordSaleAction} className="card p-4 space-y-2">
@@ -106,10 +108,10 @@ export default function SaleForm({ items, categories, locations = DEFAULT_LOCATI
             onChange={(id) => setRow(r.key, { itemId: id })}
             showPrice className={showDiscount ? "input col-span-6 md:col-span-4" : "input col-span-6 md:col-span-5"}
           />
-          <input name="qty" type="number" step="any" min={1} value={r.qty} onChange={(e) => setRow(r.key, { qty: e.target.value })} className="input col-span-5 md:col-span-1" aria-label="Quantity" />
-          <input name="unit_sale_price" type="number" step="any" min={0} value={r.price} onChange={(e) => setRow(r.key, { price: e.target.value })} className="input col-span-5 md:col-span-2" aria-label="Price each" title="Base price auto-filled — edit for discounts" />
+          <NumInput name="qty" value={r.qty} onValueChange={(v) => setRow(r.key, { qty: v })} className="input col-span-5 md:col-span-1" ariaLabel="Quantity" />
+          <NumInput name="unit_sale_price" value={r.price} onValueChange={(v) => setRow(r.key, { price: v })} className="input col-span-5 md:col-span-2" title="Base price auto-filled — edit for discounts" ariaLabel="Price each" />
           {showDiscount && (
-            <input name="discount" type="number" step="any" min={0} value={r.discount} onChange={(e) => setRow(r.key, { discount: e.target.value })} className="input col-span-4 md:col-span-1" aria-label="Discount (g)" title="Flat discount on this line — revenue is price minus discount" />
+            <NumInput name="discount" value={r.discount} onValueChange={(v) => setRow(r.key, { discount: v })} className="input col-span-4 md:col-span-1" title="Flat discount on this line — revenue is price minus discount" ariaLabel="Discount (g)" />
           )}
           <div className="col-span-2 md:col-span-1 flex md:justify-end">
             <button type="button" onClick={() => removeRow(r.key)} className="btn-ghost !px-3 w-10 shrink-0" title="Remove row">✕</button>
@@ -118,7 +120,7 @@ export default function SaleForm({ items, categories, locations = DEFAULT_LOCATI
       ))}
       <div className="flex items-center gap-3 pt-1">
         <button type="button" onClick={addRow} className="btn-ghost !py-1 text-sm">+ Add item</button>
-        <span className="text-sm text-[#8a7c64] ml-auto">Total: <b className="text-[#e0bd4a]">{total}g</b></span>
+        <span className="text-sm text-[#8a7c64] ml-auto">Total: <b className="text-[#e0bd4a]">{g(total)}g</b></span>
       </div>
       <div className="grid md:grid-cols-3 gap-3">
         <div><label className="lbl">Cost each, if known (g)</label><input name="unit_cost" type="number" step="any" min={0} defaultValue={0} className="input" /></div>

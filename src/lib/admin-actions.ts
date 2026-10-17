@@ -7,7 +7,7 @@ import { categories, cashMoves, cashPots, itemIngredients, items, ledger, member
 import { getCatalogItems } from "@/lib/catalog";
 import { getRoster } from "@/lib/members";
 import { getMemberForDiscord } from "@/lib/members";
-import { g, splitEvenly } from "@/lib/format";
+import { g, num, splitEvenly } from "@/lib/format";
 import { effectiveCost } from "@/lib/cost";
 import { setShopOpen } from "@/lib/shop";
 import { setCoffersFloor } from "@/lib/cash";
@@ -48,6 +48,9 @@ function rowsOf(formData: FormData, key: string): string[] {
   return formData.getAll(key).map(String);
 }
 
+/** What create-form actions return for useActionState: { error } renders inline. */
+export type ActionResult = { error?: string };
+
 /** Record a sale: one row per item (repeated item_id/qty/unit_sale_price fields).
  *  Sales land PENDING (gold still with the salesperson): stock moves at once,
  *  profit shares post only on confirm. No redirect — list refreshes in place. */
@@ -79,14 +82,14 @@ export async function recordSaleAction(formData: FormData) {
     );
   };
   for (let n = 0; n < ids.length; n++) {
-    const qty = Math.max(1, Number(qtys[n] || 1));
-    const price = Number(prices[n] || 0);
-    const discount = Math.max(0, Number(discounts[n] || 0));
+    const qty = Math.max(1, num(qtys[n], 1));
+    const price = num(prices[n]);
+    const discount = Math.max(0, num(discounts[n]));
     const item = catalog.find((i) => i.id === ids[n]);
     const itemName = item?.name || "goods";
     // Cost basis: live recipe cost wins; then manual cost; then the submitted
     // value; unknown costs default to the sale price (zero assumed profit).
-    const submitted = Number(formData.get("unit_cost") || 0);
+    const submitted = num(formData.get("unit_cost"));
     const baseCost = item && item.cost_value > 0 ? item.cost_value : submitted > 0 ? submitted : price;
     const itemCost = effCost(ids[n], baseCost);
     const revenue = Math.max(0, Math.round((price * qty - discount) * 100) / 100);
@@ -296,7 +299,7 @@ export async function deleteMoveAction(formData: FormData) {
 export async function addLedgerAction(formData: FormData) {
   const qm = await quartermaster();
   const type = String(formData.get("type")) as "contribution" | "expense" | "payout" | "sale_income";
-  let amount = Number(formData.get("amount_gold") || 0);
+  let amount = Math.round(num(formData.get("amount_gold")) * 100) / 100;
   if (!amount) throw new Error("Amount must not be zero — every entry moves gold");
   if ((type === "expense" || type === "payout") && amount > 0) amount = -amount;
   if ((type === "contribution" || type === "sale_income") && amount < 0) amount = -amount;
@@ -321,7 +324,7 @@ export async function addLedgerAction(formData: FormData) {
     const summary = String(formData.get("description_auto") || "").trim();
     if (summary) fullDescription = description ? `${description} (${summary})` : summary;
     for (let n = 0; n < contribIds.length; n++) {
-      const qty = Number(contribQtys[n] || 0);
+      const qty = num(contribQtys[n]);
       if (!(qty > 0)) continue;
       const itemName = catalog.find((i) => i.id === contribIds[n])?.name || "goods";
       if (!trackStock) continue;
@@ -344,9 +347,9 @@ export async function addLedgerAction(formData: FormData) {
     const catalog = await getCatalogItems();
     const parts: string[] = [];
     for (let n = 0; n < purchIds.length; n++) {
-      const qty = Number(purchQtys[n] || 0);
+      const qty = num(purchQtys[n]);
       if (!(qty > 0)) continue;
-      parts.push(`${catalog.find((i) => i.id === purchIds[n])?.name || "goods"} × ${purchQtys[n]}`);
+      parts.push(`${catalog.find((i) => i.id === purchIds[n])?.name || "goods"} × ${g(qty)}`);
     }
     if (parts.length) {
       const goods = parts.join(", ");
@@ -394,7 +397,7 @@ export async function updateLedgerAction(formData: FormData) {
   const qm = await requireManager();
   const id = String(formData.get("id"));
   const type = String(formData.get("type")) as "contribution" | "expense" | "payout" | "sale_income";
-  let amount = Number(formData.get("amount_gold") || 0);
+  let amount = Math.round(num(formData.get("amount_gold")) * 100) / 100;
   if (!amount) throw new Error("Amount must not be zero — every entry moves gold");
   if ((type === "expense" || type === "payout") && amount > 0) amount = -amount;
   if ((type === "contribution" || type === "sale_income") && amount < 0) amount = -amount;
@@ -472,7 +475,7 @@ export async function rebookSharedGroupToCoffersAction(formData: FormData) {
  *  difference, so no member is distorted. */
 export async function adjustBalanceAction(formData: FormData) {
   await requireManager();
-  const target = Number(formData.get("target_gold"));
+  const target = num(formData.get("target_gold"), NaN);
   if (!Number.isFinite(target)) throw new Error("Enter a target balance");
   const db = await getDb();
   const rows = await db.select().from(ledger);
@@ -498,11 +501,16 @@ function slugify(s: string, fallback: string) {
   return out || fallback;
 }
 
-export async function createItemAction(formData: FormData) {
+export async function createItemAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   const qm = await requireManager();
   const name = String(formData.get("name") || "Unnamed").trim();
   const db = await getDb();
   const itemId = `${slugify(name, `item-${Date.now()}`)}`;
+  // Friendly duplicate guard: a re-add of an existing name must not crash the page.
+  const dupe = await db.select({ name: items.name }).from(items).where(eq(items.id, itemId)).limit(1);
+  if (dupe.length) {
+    return { error: `“${dupe[0].name}” already exists — find it in the list above and press Edit instead.` };
+  }
   const lowRaw = String(formData.get("low_threshold") || "").trim();
   const maxRaw = String(formData.get("max_stock") || "").trim();
   await db.insert(items).values({
@@ -510,12 +518,12 @@ export async function createItemAction(formData: FormData) {
     name,
     categorySlug: String(formData.get("category_slug") || "trade-goods"),
     description: String(formData.get("description") || ""),
-    salePrice: Number(formData.get("sale_price") || 0),
-    costValue: Number(formData.get("cost_value") || 0),
+    salePrice: num(formData.get("sale_price")),
+    costValue: num(formData.get("cost_value")),
     active: String(formData.get("active") || "true") === "true",
-    lowThreshold: lowRaw === "" ? null : Math.max(0, Number(lowRaw) || 0),
-    buyPrice: Number(formData.get("buy_price") || 0),
-    maxStock: maxRaw === "" ? null : Math.max(0, Number(maxRaw) || 0),
+    lowThreshold: lowRaw === "" ? null : Math.max(0, num(lowRaw)),
+    buyPrice: num(formData.get("buy_price")),
+    maxStock: maxRaw === "" ? null : Math.max(0, num(maxRaw)),
     parentId: null,
     inheritParent: true,
     createdByDiscordId: qm.discordId,
@@ -527,7 +535,7 @@ export async function createItemAction(formData: FormData) {
   if (materialIds.length) {
     const catalog = await getCatalogItems();
     for (let n = 0; n < materialIds.length; n++) {
-      const qty = Number(qtys[n] || 1);
+      const qty = num(qtys[n], 1);
       if (!(qty > 0)) continue;
       const mat = catalog.find((m) => m.id === materialIds[n]);
       await db.insert(itemIngredients).values({
@@ -541,6 +549,7 @@ export async function createItemAction(formData: FormData) {
     }
   }
   revalidatePath("/", "layout");
+  return {};
 }
 
 export async function updateItemAction(formData: FormData) {
@@ -567,8 +576,8 @@ export async function updateItemAction(formData: FormData) {
   }
   // Inheriting kinds are counters: price + cost always follow the parent,
   // so per-kind values can never drift.
-  const salePrice = parentId && inheritParent && parentRow ? parentRow.salePrice : Number(formData.get("sale_price") || 0);
-  const costValue = parentId && inheritParent && parentRow ? parentRow.costValue : Number(formData.get("cost_value") || 0);
+  const salePrice = parentId && inheritParent && parentRow ? parentRow.salePrice : num(formData.get("sale_price"));
+  const costValue = parentId && inheritParent && parentRow ? parentRow.costValue : num(formData.get("cost_value"));
   await db
     .update(items)
     .set({
@@ -579,7 +588,7 @@ export async function updateItemAction(formData: FormData) {
       costValue,
       active: String(formData.get("active") || "true") === "true",
       lowThreshold: lowRaw === "" ? null : Math.max(0, Number(lowRaw) || 0),
-      buyPrice: Number(formData.get("buy_price") || 0),
+      buyPrice: num(formData.get("buy_price")),
       maxStock: maxRaw === "" ? null : Math.max(0, Number(maxRaw) || 0),
       parentId,
       inheritParent: parentId ? inheritParent : true,
@@ -601,18 +610,21 @@ export async function deleteItemAction(formData: FormData) {
 }
 
 /** Add a variant under a parent: copies category/price/cost/visibility. */
-export async function createVariantAction(formData: FormData) {
+export async function createVariantAction(formData: FormData): Promise<ActionResult> {
   const qm = await requireManager();
   const parentId = String(formData.get("parent_id"));
   const name = String(formData.get("name") || "").trim();
-  if (!name) throw new Error("Variant needs a name");
+  if (!name) return { error: "Variant needs a name" };
   const db = await getDb();
   const found = await db.select().from(items).where(eq(items.id, parentId)).limit(1);
   const parent = found[0];
-  if (!parent) throw new Error("Parent not found");
-  if (parent.parentId) throw new Error("Cannot nest variants — pick a top-level item");
+  if (!parent) return { error: "Parent not found — close and try again" };
+  if (parent.parentId) return { error: "Cannot nest variants — pick a top-level item" };
+  const variantId = `${parent.id}-v-${slugify(name, Date.now().toString(36))}`;
+  const dupe = await db.select({ name: items.name }).from(items).where(eq(items.id, variantId)).limit(1);
+  if (dupe.length) return { error: `A variant named “${dupe[0].name}” already exists under ${parent.name}.` };
   await db.insert(items).values({
-    id: `${parent.id}-v-${slugify(name, Date.now().toString(36))}`,
+    id: variantId,
     name,
     categorySlug: parent.categorySlug,
     description: "",
@@ -628,22 +640,27 @@ export async function createVariantAction(formData: FormData) {
     createdByName: qm.name,
   });
   revalidatePath("/", "layout");
+  return {};
 }
 
-export async function createCategoryAction(formData: FormData) {
+export async function createCategoryAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   await requireManager();
   const name = String(formData.get("name") || "").trim();
-  if (!name) throw new Error("Category needs a name");
+  if (!name) return { error: "Category needs a name" };
   const db = await getDb();
   const existing = await db.select().from(categories);
-  const maxSort = existing.reduce((a, c) => Math.max(a, c.sortOrder), 0);
   const slug = slugify(name, `cat-${Date.now()}`);
+  if (existing.some((c) => c.slug === slug || c.name.toLowerCase() === name.toLowerCase())) {
+    return { error: `A section named “${name}” already exists.` };
+  }
+  const maxSort = existing.reduce((a, c) => Math.max(a, c.sortOrder), 0);
   await db.insert(categories).values({
     id: slug, name, slug,
     icon: String(formData.get("icon") || "📦"),
     sortOrder: maxSort + 1,
   });
   revalidatePath("/", "layout");
+  return {};
 }
 
 export async function renameCategoryAction(formData: FormData) {
@@ -726,7 +743,7 @@ export async function setShopOpenAction(formData: FormData) {
 /** Set the coffers floor (managers+): dashboard cash turns red below it. */
 export async function setCoffersFloorAction(formData: FormData) {
   await requireManager();
-  await setCoffersFloor(Number(formData.get("floor_gold") || 0));
+  await setCoffersFloor(num(formData.get("floor_gold")));
   revalidatePath("/admin", "layout");
 }
 
@@ -768,7 +785,7 @@ export async function addIngredientAction(formData: FormData) {
   const catalog = await getCatalogItems();
   const db = await getDb();
   for (let n = 0; n < materialIds.length; n++) {
-    const qty = Number(qtys[n] || 1);
+    const qty = num(qtys[n], 1);
     if (!(qty > 0)) continue;
     const mat = catalog.find((i) => i.id === materialIds[n]);
     await db.insert(itemIngredients).values({
@@ -870,7 +887,7 @@ export async function addUnitAction(formData: FormData) {
   await db.insert(storageUnits).values({
     id: `unit-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
     label,
-    ratePerWeek: Number(formData.get("rate_per_week") || 60),
+    ratePerWeek: num(formData.get("rate_per_week"), 60),
     location,
   });
   void qm;
@@ -879,7 +896,7 @@ export async function addUnitAction(formData: FormData) {
 
 export async function updateUnitAction(formData: FormData) {
   await requireManager();
-  const rate = Number(formData.get("rate_per_week") || 0);
+  const rate = num(formData.get("rate_per_week"));
   if (!(rate >= 0)) throw new Error("Rate must be 0 or more");
   const label = String(formData.get("label") || "").trim();
   if (!label) throw new Error("Label cannot be empty");
@@ -953,7 +970,7 @@ export async function linkMemberDiscordAction(formData: FormData) {
 /** End-of-day sweep: move gold from the register lockbox to the safe. */
 export async function sweepCashAction(formData: FormData) {
   const qm = await requireManager();
-  const amount = Math.round(Number(formData.get("amount_gold") || 0) * 100) / 100;
+  const amount = Math.round(num(formData.get("amount_gold")) * 100) / 100;
   if (!(amount > 0)) throw new Error("Amount must be more than 0");
   const db = await getDb();
   const moves = await db.select().from(cashMoves);
@@ -1000,7 +1017,7 @@ export async function adjustCashAction(formData: FormData) {
   const qm = await requireManager();
   const pot = String(formData.get("pot") || "Lockbox");
   if (pot !== "Lockbox" && pot !== "Safe") throw new Error("Unknown pot");
-  const amount = Math.round(Number(formData.get("amount_gold") || 0) * 100) / 100;
+  const amount = Math.round(num(formData.get("amount_gold")) * 100) / 100;
   if (!amount) throw new Error("Amount must not be zero");
   const reason = String(formData.get("reason") || "Manual adjustment").trim() || "Manual adjustment";
   const db = await getDb();

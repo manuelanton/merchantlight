@@ -2,6 +2,7 @@ import Link from "next/link";
 import Sigil from "@/components/Sigil";
 import { UPCOMING_SECTIONS, isSheetsConfigured } from "@/lib/sheets";
 import { getCatalogue } from "@/lib/catalog";
+import { g } from "@/lib/format";
 import { isShopOpen } from "@/lib/shop";
 import { getStorage } from "@/lib/storage";
 import { isFeatureOn } from "@/lib/features";
@@ -68,7 +69,7 @@ export default async function Home() {
                   {s.count} goods
                 </p>
                 <p className="mt-2 text-[#e0bd4a]">
-                  {s.min === s.max ? `${s.min}g` : `${s.min}–${s.max}g`}
+                  {s.min === s.max ? `${g(s.min)}g` : `${g(s.min)}–${g(s.max)}g`}
                   <span className="text-sm text-[#c9a227] ml-2">Browse →</span>
                 </p>
               </>

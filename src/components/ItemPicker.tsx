@@ -1,4 +1,5 @@
 "use client";
+import { g } from "@/lib/format";
 
 export interface PickerItem {
   id: string;
@@ -30,14 +31,14 @@ export default function ItemPicker({
   const standalone: PickerItem[] = [];
   for (const i of list) {
     if (i.parent) {
-      const g = byParent.get(i.parent) || [];
-      g.push(i);
-      byParent.set(i.parent, g);
+      const kids = byParent.get(i.parent) || [];
+      kids.push(i);
+      byParent.set(i.parent, kids);
     } else {
       standalone.push(i);
     }
   }
-  const label = (i: PickerItem) => (showPrice ? `${i.name} — ${i.price}g` : i.name);
+  const label = (i: PickerItem) => (showPrice ? `${i.name} — ${g(i.price)}g` : i.name);
   return (
     <select
       name="item_id" className={className} value={value}

@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import { addIngredientAction } from "@/lib/admin-actions";
+import { g } from "@/lib/format";
+import NumInput from "./NumInput";
 
 interface Row {
   key: number;
@@ -49,13 +51,13 @@ export default function IngredientForm({
             value={r.materialId} onChange={(e) => setRow(r.key, { materialId: e.target.value })}
             aria-label="Material" required
           >
-            {materials.map((m) => <option key={m.id} value={m.id}>{m.name}{m.cost ? ` (${m.cost}g)` : ""}</option>)}
+            {materials.map((m) => <option key={m.id} value={m.id}>{m.name}{m.cost ? ` (${g(m.cost)}g)` : ""}</option>)}
           </select>
           <div className="flex gap-2 items-center">
-            <input
-              name="qty" type="number" min={0.01} step="any" value={r.qty}
-              onChange={(e) => setRow(r.key, { qty: e.target.value })}
-              className="input w-24" aria-label="Quantity"
+            <NumInput
+              name="qty" value={r.qty}
+              onValueChange={(v) => setRow(r.key, { qty: v })}
+              className="input w-24" ariaLabel="Quantity"
             />
             <button type="button" onClick={() => removeRow(r.key)} className="btn-ghost !px-2.5 shrink-0" title="Remove row">✕</button>
           </div>
