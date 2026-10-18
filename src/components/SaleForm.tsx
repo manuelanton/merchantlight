@@ -16,6 +16,7 @@ export interface CatalogOption {
   parent: string | null;
   parent_id?: string | null;
   inherit_parent?: boolean;
+  hidden?: boolean;
 }
 
 export interface CategoryOption {

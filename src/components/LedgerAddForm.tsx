@@ -18,7 +18,7 @@ function PurchaseRows({
   items,
   categories,
 }: {
-  items: { id: string; name: string; category: string }[];
+  items: { id: string; name: string; category: string; hidden?: boolean }[];
   categories: { slug: string; name: string }[];
 }) {
   const [rows, setRows] = useState([{ key: 0, cat: "", itemId: items[0]?.id || "", qty: "1" }]);
@@ -61,7 +61,7 @@ function PurchaseRows({
             value={r.itemId} onChange={(e) => setRow(r.key, { itemId: e.target.value })}
             aria-label="Purchased item"
           >
-            {inCat(r.cat).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+            {inCat(r.cat).map((m) => <option key={m.id} value={m.id}>{m.name}{m.hidden ? " (not listed)" : ""}</option>)}
           </select>
           <input
             name="purch_qty" type="number" min={0.01} step="any" value={r.qty}
@@ -85,7 +85,7 @@ export default function LedgerAddForm({
   allowPayout = true,
 }: {
   members: string[];
-  items: { id: string; name: string; cost: number; category: string }[];
+  items: { id: string; name: string; cost: number; category: string; hidden?: boolean }[];
   categories: { slug: string; name: string }[];
   showPurchase?: boolean;
   allowPayout?: boolean;

@@ -117,8 +117,9 @@ export default async function LedgerManager({ showPurchase = false }: { showPurc
 
       <LedgerAddForm
         members={b.members}
-        items={items.filter((i) => i.active).map((i) => ({
+        items={items.map((i) => ({
           id: i.id, name: i.name,
+          hidden: !i.active,
           // Donations value at cost (recipe, else manual) — never price. Follows variant inheritance.
           cost: hasRecipe(i.id, costInputs.ingredients, costInputs.items) ? effectiveCost(i.id, costInputs.items, costInputs.ingredients) : (inheritedManualCost(i.id, costInputs.items) || 0),
           category: i.category_slug,

@@ -10,7 +10,6 @@ export const dynamic = "force-dynamic";
 export default async function SalesPage() {
   const [{ categories, items }, books] = await Promise.all([getCatalogue(), getBooks()]);
   const trackStock = await isFeatureOn("stock");
-  const live = items.filter((i) => i.active);
   const knownLocations: string[] = [...SHOP.locations];
   for (const s of books.salesRows) {
     if (s.location && !knownLocations.includes(s.location)) knownLocations.push(s.location);
@@ -35,7 +34,7 @@ export default async function SalesPage() {
       <h1 className="font-display text-3xl">Record a sale</h1>
       <p className="text-sm text-[#8a7c64]">Sales land pending — gold splits only once someone confirms the deposit.</p>
       <SaleForm
-        items={live.map((i) => ({ id: i.id, name: i.name, price: i.sale_price, category: i.category_slug, parent: i.parent_id ?? null, parent_id: i.parent_id ?? null, inherit_parent: i.inherit_parent ?? true }))}
+        items={items.map((i) => ({ id: i.id, name: i.name, price: i.sale_price, category: i.category_slug, parent: i.parent_id ?? null, parent_id: i.parent_id ?? null, inherit_parent: i.inherit_parent ?? true, hidden: !i.active }))}
         categories={categories.map((c) => ({ slug: c.slug, name: c.name }))}
         locations={knownLocations}
         showRoad={trackStock}

@@ -10,7 +10,7 @@ export default function ContributionForm({
   categories,
 }: {
   members: string[];
-  items: { id: string; name: string; cost: number; category: string }[];
+  items: { id: string; name: string; cost: number; category: string; hidden?: boolean }[];
   categories: { slug: string; name: string }[];
 }) {
   const [withItems, setWithItems] = useState(false);
@@ -92,7 +92,7 @@ export default function ContributionForm({
                 value={r.itemId} onChange={(e) => setRow(r.key, { itemId: e.target.value })}
                 aria-label="Contributed item"
               >
-                {inCat(r.cat).map((m) => <option key={m.id} value={m.id}>{m.name} ({g(m.cost)}g)</option>)}
+                {inCat(r.cat).map((m) => <option key={m.id} value={m.id}>{m.name}{m.hidden ? " (not listed)" : ""} ({g(m.cost)}g)</option>)}
               </select>
               <input
                 name="contrib_qty" type="number" min={0.01} step="any" value={r.qty}

@@ -7,6 +7,7 @@ export interface PickerItem {
   price: number;
   category: string;
   parent: string | null;
+  hidden?: boolean;
 }
 
 /** Item select with variants grouped under their parent. Standalone items list directly. */
@@ -38,7 +39,8 @@ export default function ItemPicker({
       standalone.push(i);
     }
   }
-  const label = (i: PickerItem) => (showPrice ? `${i.name} — ${g(i.price)}g` : i.name);
+  const label = (i: PickerItem) =>
+    `${i.name}${i.hidden ? " (not listed)" : ""}${showPrice ? ` — ${g(i.price)}g` : ""}`;
   return (
     <select
       name="item_id" className={className} value={value}
