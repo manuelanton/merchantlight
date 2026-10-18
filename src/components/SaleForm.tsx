@@ -57,6 +57,16 @@ export default function SaleForm({ items, categories, locations = DEFAULT_LOCATI
     return [{ key: 0, cat: "", itemId: f?.id || "", qty: "1", price: g(f?.price ?? 0), discount: "0" }];
   });
   const [n, setN] = useState(1);
+  const [showHidden, setShowHidden] = useState(false);
+
+  // Listed items only by default (raw materials are hidden from the public
+  // catalogue but still sellable via the "unlisted" toggle). A row's own pick
+  // always stays in its list so the selection never silently changes.
+  const pickerItems = (sel: string) =>
+    (showHidden ? priced : priced.filter((i) => !i.hidden || i.id === sel)).map((i) => ({
+      ...i,
+      parent: i.parent ? parentName(i.parent) : null,
+    }));
 
   const addRow = () => {
     const f = firstOf("");
@@ -104,7 +114,7 @@ export default function SaleForm({ items, categories, locations = DEFAULT_LOCATI
             {categories.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
           </select>
           <ItemPicker
-            items={priced.map((i) => ({ ...i, parent: i.parent ? parentName(i.parent) : null }))}
+            items={pickerItems(r.itemId)}
             cat={r.cat} value={r.itemId}
             onChange={(id) => setRow(r.key, { itemId: id })}
             showPrice className={showDiscount ? "input col-span-6 md:col-span-4" : "input col-span-6 md:col-span-5"}
@@ -119,8 +129,12 @@ export default function SaleForm({ items, categories, locations = DEFAULT_LOCATI
           </div>
         </div>
       ))}
-      <div className="flex items-center gap-3 pt-1">
+      <div className="flex flex-wrap items-center gap-3 pt-1">
         <button type="button" onClick={addRow} className="btn-ghost !py-1 text-sm">+ Add item</button>
+        <label className="flex items-center gap-2 text-xs text-[#8a7c64] cursor-pointer" title="Raw materials and other items hidden from the public catalogue">
+          <input type="checkbox" checked={showHidden} onChange={(e) => setShowHidden(e.target.checked)} className="accent-[#d97a1f]" />
+          Show unlisted items
+        </label>
         <span className="text-sm text-[#8a7c64] ml-auto">Total: <b className="text-[#e0bd4a]">{g(total)}g</b></span>
       </div>
       <div className="grid md:grid-cols-3 gap-3">

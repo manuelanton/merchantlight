@@ -8,24 +8,31 @@ export default function ContributionForm({
   members,
   items,
   categories,
+  showHidden = false,
 }: {
   members: string[];
   items: { id: string; name: string; cost: number; category: string; hidden?: boolean }[];
   categories: { slug: string; name: string }[];
+  showHidden?: boolean;
 }) {
+  const base = showHidden ? items : items.filter((i) => !i.hidden);
   const [withItems, setWithItems] = useState(false);
-  const [rows, setRows] = useState([{ key: 0, cat: "", itemId: items[0]?.id || "", qty: "1", value: "" }]);
+  const [rows, setRows] = useState([{ key: 0, cat: "", itemId: base[0]?.id || "", qty: "1", value: "" }]);
   const [n, setN] = useState(1);
   const [manual, setManual] = useState("0");
 
-  const inCat = (cat: string) => (cat ? items.filter((i) => i.category === cat) : items);
+  // Keep a row's own unlisted pick visible even when the toggle is off.
+  const inCat = (cat: string, sel = "") => {
+    const l = cat ? base.filter((i) => i.category === cat) : base;
+    return sel && !l.some((i) => i.id === sel) ? [...l, ...items.filter((i) => i.id === sel)] : l;
+  };
   const costOf = (id: string) => items.find((i) => i.id === id)?.cost || 0;
   const rowValue = (r: { itemId: string; qty: string; value: string }) =>
     (r.value !== "" ? num(r.value) : costOf(r.itemId));
   const autoTotal = rows.reduce((a, r) => a + num(r.qty) * rowValue(r), 0);
 
   const addRow = () => {
-    setRows((r) => [...r, { key: n, cat: "", itemId: items[0]?.id || "", qty: "1", value: "" }]);
+    setRows((r) => [...r, { key: n, cat: "", itemId: base[0]?.id || "", qty: "1", value: "" }]);
     setN((x) => x + 1);
   };
   const setRow = (key: number, patch: Partial<{ cat: string; itemId: string; qty: string; value: string }>) =>
@@ -92,7 +99,7 @@ export default function ContributionForm({
                 value={r.itemId} onChange={(e) => setRow(r.key, { itemId: e.target.value })}
                 aria-label="Contributed item"
               >
-                {inCat(r.cat).map((m) => <option key={m.id} value={m.id}>{m.name}{m.hidden ? " (not listed)" : ""} ({g(m.cost)}g)</option>)}
+                {inCat(r.cat, r.itemId).map((m) => <option key={m.id} value={m.id}>{m.name}{m.hidden ? " (not listed)" : ""} ({g(m.cost)}g)</option>)}
               </select>
               <input
                 name="contrib_qty" type="number" min={0.01} step="any" value={r.qty}

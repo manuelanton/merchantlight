@@ -17,15 +17,21 @@ interface PurchRow {
 function PurchaseRows({
   items,
   categories,
+  showHidden = false,
 }: {
   items: { id: string; name: string; category: string; hidden?: boolean }[];
   categories: { slug: string; name: string }[];
+  showHidden?: boolean;
 }) {
-  const [rows, setRows] = useState([{ key: 0, cat: "", itemId: items[0]?.id || "", qty: "1" }]);
+  const base = showHidden ? items : items.filter((i) => !i.hidden);
+  const [rows, setRows] = useState([{ key: 0, cat: "", itemId: base[0]?.id || "", qty: "1" }]);
   const [n, setN] = useState(1);
-  const inCat = (cat: string) => (cat ? items.filter((i) => i.category === cat) : items);
+  const inCat = (cat: string, sel = "") => {
+    const l = cat ? base.filter((i) => i.category === cat) : base;
+    return sel && !l.some((i) => i.id === sel) ? [...l, ...items.filter((i) => i.id === sel)] : l;
+  };
   const addRow = () => {
-    setRows((r) => [...r, { key: n, cat: "", itemId: items[0]?.id || "", qty: "1" }]);
+    setRows((r) => [...r, { key: n, cat: "", itemId: base[0]?.id || "", qty: "1" }]);
     setN((x) => x + 1);
   };
   const setRow = (key: number, patch: Partial<PurchRow>) =>
@@ -61,7 +67,7 @@ function PurchaseRows({
             value={r.itemId} onChange={(e) => setRow(r.key, { itemId: e.target.value })}
             aria-label="Purchased item"
           >
-            {inCat(r.cat).map((m) => <option key={m.id} value={m.id}>{m.name}{m.hidden ? " (not listed)" : ""}</option>)}
+            {inCat(r.cat, r.itemId).map((m) => <option key={m.id} value={m.id}>{m.name}{m.hidden ? " (not listed)" : ""}</option>)}
           </select>
           <input
             name="purch_qty" type="number" min={0.01} step="any" value={r.qty}
@@ -92,6 +98,7 @@ export default function LedgerAddForm({
 }) {
   const [type, setType] = useState("contribution");
   const [coffers, setCoffers] = useState(false);
+  const [showHidden, setShowHidden] = useState(false);
   const [formKey, setFormKey] = useState(0);
   const [flash, setFlash] = useState("");
 
@@ -120,7 +127,7 @@ export default function LedgerAddForm({
       </div>
       {type === "contribution" ? (
         <>
-          <ContributionForm members={members} items={items} categories={categories} />
+          <ContributionForm members={members} items={items} categories={categories} showHidden={showHidden} />
           <div><label className="lbl">Description</label><input name="description" className="input" placeholder="e.g. opening stock from Cyllian" /></div>
         </>
       ) : (
@@ -135,9 +142,13 @@ export default function LedgerAddForm({
             <div><label className="lbl">Category</label><input name="category" className="input" placeholder="rent / materials / thread" /></div>
             <div><label className="lbl">Description</label><input name="description" className="input" placeholder="e.g. Darkwater Crossing rent, Morndas" /></div>
           </div>
-          {showPurchase && <PurchaseRows items={items} categories={categories} />}
+          {showPurchase && <PurchaseRows items={items} categories={categories} showHidden={showHidden} />}
         </>
       )}
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input type="checkbox" checked={showHidden} onChange={(e) => setShowHidden(e.target.checked)} className="accent-[#d97a1f]" />
+        Show unlisted items (raw materials not on the public catalogue)
+      </label>
       <div className="flex justify-end">
         <button className="btn-gold !py-2 !px-5 text-sm" type="submit">Add entry</button>
       </div>
