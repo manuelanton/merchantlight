@@ -5,7 +5,7 @@ import { effectivePrice } from "@/lib/cost";
 import { g, num } from "@/lib/format";
 import { SHOP } from "@/shop/config";
 import LocationSelect from "./LocationSelect";
-import ItemPicker from "./ItemPicker";
+import ItemSearch from "./ItemSearch";
 import NumInput from "./NumInput";
 
 export interface CatalogOption {
@@ -57,16 +57,19 @@ export default function SaleForm({ items, categories, locations = DEFAULT_LOCATI
     return [{ key: 0, cat: "", itemId: f?.id || "", qty: "1", price: g(f?.price ?? 0), discount: "0" }];
   });
   const [n, setN] = useState(1);
-  const [showHidden, setShowHidden] = useState(false);
 
-  // Listed items only by default (raw materials are hidden from the public
-  // catalogue but still sellable via the "unlisted" toggle). A row's own pick
-  // always stays in its list so the selection never silently changes.
-  const pickerItems = (sel: string) =>
-    (showHidden ? priced : priced.filter((i) => !i.hidden || i.id === sel)).map((i) => ({
-      ...i,
-      parent: i.parent ? parentName(i.parent) : null,
-    }));
+  const searchItems = useMemo(
+    () =>
+      priced.map((i) => ({
+        id: i.id,
+        name: i.name,
+        price: i.price,
+        category: i.category,
+        hidden: i.hidden,
+        parentName: i.parent ? parentName(i.parent) : null,
+      })),
+    [priced]
+  );
 
   const addRow = () => {
     const f = firstOf("");
@@ -78,12 +81,7 @@ export default function SaleForm({ items, categories, locations = DEFAULT_LOCATI
       rs.map((r) => {
         if (r.key !== key) return r;
         const next = { ...r, ...patch };
-        if (patch.cat !== undefined) {
-          // Category changed: jump to its first item + base price.
-          const f = firstOf(patch.cat);
-          next.itemId = f?.id || "";
-          next.price = String(f?.price ?? 0);
-        } else if (patch.itemId !== undefined && patch.price === undefined) {
+        if (patch.itemId !== undefined && patch.price === undefined) {
           next.price = priceStr(patch.itemId);
         }
         return next;
@@ -96,33 +94,29 @@ export default function SaleForm({ items, categories, locations = DEFAULT_LOCATI
   return (
     <form action={recordSaleAction} className="card p-4 space-y-2">
       <div className="hidden md:grid grid-cols-12 gap-2 text-xs uppercase tracking-wider text-[#8a7c64]">
-        <span className="col-span-3">Section</span>
-        <span className={showDiscount ? "col-span-4" : "col-span-5"}>Item</span>
+        <span className={showDiscount ? "col-span-7" : "col-span-8"}>Item</span>
         <span className="col-span-1">Qty</span>
         <span className="col-span-2">Price (g)</span>
         {showDiscount && <span className="col-span-1">Disc (g)</span>}
         <span className="col-span-1" />
       </div>
       {rows.map((r) => (
-        <div key={r.key} className="grid grid-cols-12 gap-2 items-center">
-          <select
-            className="input col-span-6 md:col-span-3" value={r.cat}
-            onChange={(e) => setRow(r.key, { cat: e.target.value })}
-            aria-label="Section"
-          >
-            <option value="">All sections</option>
-            {categories.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
-          </select>
-          <ItemPicker
-            items={pickerItems(r.itemId)}
-            cat={r.cat} value={r.itemId}
-            onChange={(id) => setRow(r.key, { itemId: id })}
-            showPrice className={showDiscount ? "input col-span-6 md:col-span-4" : "input col-span-6 md:col-span-5"}
-          />
-          <NumInput name="qty" value={r.qty} onValueChange={(v) => setRow(r.key, { qty: v })} className="input col-span-5 md:col-span-1" ariaLabel="Quantity" />
-          <NumInput name="unit_sale_price" value={r.price} onValueChange={(v) => setRow(r.key, { price: v })} className="input col-span-5 md:col-span-2" title="Base price auto-filled — edit for discounts" ariaLabel="Price each" />
+        <div key={r.key} className="grid grid-cols-12 gap-2 items-start md:items-center">
+          <div className={showDiscount ? "col-span-12 md:col-span-7" : "col-span-12 md:col-span-8"}>
+            <ItemSearch
+              items={searchItems}
+              categories={categories}
+              value={r.itemId}
+              onSelect={(id) => setRow(r.key, { itemId: id })}
+              category={r.cat}
+              onCategory={(slug) => setRow(r.key, { cat: slug })}
+              showPrice
+            />
+          </div>
+          <NumInput name="qty" value={r.qty} onValueChange={(v) => setRow(r.key, { qty: v })} className="input col-span-3 md:col-span-1" ariaLabel="Quantity" />
+          <NumInput name="unit_sale_price" value={r.price} onValueChange={(v) => setRow(r.key, { price: v })} className="input col-span-4 md:col-span-2" title="Base price auto-filled — edit for discounts" ariaLabel="Price each" />
           {showDiscount && (
-            <NumInput name="discount" value={r.discount} onValueChange={(v) => setRow(r.key, { discount: v })} className="input col-span-4 md:col-span-1" title="Flat discount on this line — revenue is price minus discount" ariaLabel="Discount (g)" />
+            <NumInput name="discount" value={r.discount} onValueChange={(v) => setRow(r.key, { discount: v })} className="input col-span-3 md:col-span-1" title="Flat discount on this line — revenue is price minus discount" ariaLabel="Discount (g)" />
           )}
           <div className="col-span-2 md:col-span-1 flex md:justify-end">
             <button type="button" onClick={() => removeRow(r.key)} className="btn-ghost !px-3 w-10 shrink-0" title="Remove row">✕</button>
@@ -131,10 +125,6 @@ export default function SaleForm({ items, categories, locations = DEFAULT_LOCATI
       ))}
       <div className="flex flex-wrap items-center gap-3 pt-1">
         <button type="button" onClick={addRow} className="btn-ghost !py-1 text-sm">+ Add item</button>
-        <label className="flex items-center gap-2 text-xs text-[#8a7c64] cursor-pointer" title="Raw materials and other items hidden from the public catalogue">
-          <input type="checkbox" checked={showHidden} onChange={(e) => setShowHidden(e.target.checked)} className="accent-[#d97a1f]" />
-          Show unlisted items
-        </label>
         <span className="text-sm text-[#8a7c64] ml-auto">Total: <b className="text-[#e0bd4a]">{g(total)}g</b></span>
       </div>
       <div className="grid md:grid-cols-3 gap-3">
