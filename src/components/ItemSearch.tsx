@@ -63,6 +63,12 @@ export default function ItemSearch({
         if (!showUnlisted && i.hidden && i.id !== value) return false;
         if (category && i.category !== category) return false;
         if (needle && !i.name.toLowerCase().includes(needle)) return false;
+        // Only show generic Soul Gem (empty) and Soul Gem (Full) in sales picker
+        if (/soul gem/i.test(i.name)) {
+          if (i.name !== "Soul Gem (empty)" && i.name !== "Soul Gem (Full)") {
+            return false;
+          }
+        }
         return true;
       })
       .sort((a, b) => a.name.localeCompare(b.name))
