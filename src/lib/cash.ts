@@ -6,7 +6,7 @@ export async function getCash(): Promise<{ pots: { name: string; balance: number
   const db = await getDb();
   const [pots, moves, floorRows] = await Promise.all([
     db.select().from(cashPots),
-    db.select().from(cashMoves).orderBy(desc(cashMoves.timestamp)).limit(50),
+    db.select().from(cashMoves).orderBy(desc(cashMoves.timestamp)).limit(200),
     db.select().from(settings).where(eq(settings.key, "coffers_floor")).limit(1),
   ]);
   const bals = new Map<string, number>();
