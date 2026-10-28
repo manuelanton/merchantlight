@@ -71,7 +71,10 @@ export async function getBooks(): Promise<Books> {
   const memberRows = await getMembers();
   const activeMembers = memberRows.filter((m) => m.active).map((m) => m.name);
   const activeSet = new Set(activeMembers);
-  const balances = [...bal.entries()].filter(([m]) => activeSet.has(m)).sort((a, b) => b[1] - a[1]);
+  const balances = [...bal.entries()]
+    .filter(([m]) => activeSet.has(m))
+    .map(([m, v]) => [m, Math.floor(v)] as [string, number])
+    .sort((a, b) => b[1] - a[1]);
   // Roster = active registered members. History is untouched by roster changes.
   const roster = activeMembers;
 
