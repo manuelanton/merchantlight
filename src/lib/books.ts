@@ -69,7 +69,7 @@ export async function getBooks(): Promise<Books> {
     bal.set(e.member, (bal.get(e.member) || 0) + e.amountGold);
   }
   const memberRows = await getMembers();
-  const activeMembers = memberRows.filter((m) => m.active).map((m) => m.name);
+  const activeMembers = memberRows.filter((m) => m.active && m.role !== "worker").map((m) => m.name);
   const activeSet = new Set(activeMembers);
   const balances = [...bal.entries()]
     .filter(([m]) => activeSet.has(m))
