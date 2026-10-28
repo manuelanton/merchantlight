@@ -68,10 +68,10 @@ export async function getBooks(): Promise<Books> {
     if (!e.member.trim()) continue; // unattributed rows affect the total, not a member
     bal.set(e.member, (bal.get(e.member) || 0) + e.amountGold);
   }
-  const balances = [...bal.entries()].sort((a, b) => b[1] - a[1]);
-
   const memberRows = await getMembers();
   const activeMembers = memberRows.filter((m) => m.active).map((m) => m.name);
+  const activeSet = new Set(activeMembers);
+  const balances = [...bal.entries()].filter(([m]) => activeSet.has(m)).sort((a, b) => b[1] - a[1]);
   // Roster = active registered members. History is untouched by roster changes.
   const roster = activeMembers;
 
