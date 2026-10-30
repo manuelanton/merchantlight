@@ -958,12 +958,12 @@ export async function setMemberActiveAction(formData: FormData) {
   revalidatePath("/admin", "layout");
 }
 
-/** Owner-only: set a member's role (owner | manager | worker). */
+/** Owner-only: set a member's role (owner | manager | member | worker | employee). */
 export async function setMemberRoleAction(formData: FormData) {
   const qm = await quartermaster();
   if (!isSuperAdmin(qm.discordId)) throw new Error("UNAUTHORIZED");
   const role = String(formData.get("role") || "");
-  if (role !== "owner" && role !== "manager" && role !== "worker") throw new Error("Bad role");
+  if (role !== "owner" && role !== "manager" && role !== "member" && role !== "worker" && role !== "employee") throw new Error("Bad role");
   const db = await getDb();
   await db.update(members).set({ role }).where(eq(members.id, String(formData.get("id"))));
   revalidatePath("/admin", "layout");

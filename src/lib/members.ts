@@ -3,7 +3,7 @@ import { getDb } from "@/db";
 import { members } from "@/db/schema";
 import { ledger } from "@/db/schema";
 
-export type MemberRole = "owner" | "manager" | "worker" | "employee";
+export type MemberRole = "owner" | "manager" | "member" | "worker" | "employee";
 
 export interface MemberRow {
   id: string;
@@ -32,7 +32,7 @@ export async function getMembers(): Promise<MemberRow[]> {
     id: r.id,
     name: r.name,
     active: r.active,
-    role: (r.role === "owner" || r.role === "manager" || r.role === "worker" || r.role === "employee" ? r.role : "worker") as MemberRole,
+    role: (r.role === "owner" || r.role === "manager" || r.role === "member" || r.role === "worker" || r.role === "employee" ? r.role : "member") as MemberRole,
     discordId: r.discordId,
   }));
 }
@@ -51,7 +51,7 @@ export async function getMemberForDiscord(discordId: string): Promise<MemberRow 
     id: r.id,
     name: r.name,
     active: r.active,
-    role: (r.role === "owner" || r.role === "manager" || r.role === "worker" || r.role === "employee" ? r.role : "worker") as MemberRole,
+    role: (r.role === "owner" || r.role === "manager" || r.role === "member" || r.role === "worker" || r.role === "employee" ? r.role : "member") as MemberRole,
     discordId: r.discordId,
   };
 }

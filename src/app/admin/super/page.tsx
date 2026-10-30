@@ -8,7 +8,7 @@ import { SHOP } from "@/shop/config";
 
 export const dynamic = "force-dynamic";
 
-const ROLES = ["owner", "manager", "worker"] as const;
+const ROLES = ["owner", "manager", "member", "worker", "employee"] as const;
 
 export default async function SuperPage() {
   if (!backofficeEnabled()) notFound();
