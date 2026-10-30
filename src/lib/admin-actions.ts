@@ -1057,45 +1057,32 @@ export async function approvePayrollRunAction(formData: FormData) {
   revalidatePath("/admin/payroll", "layout");
 }
 
-export async function markPayrollPaidAction(formData: FormData) {
-  const qm = await quartermaster();
+export async function logEmployeePurchaseAction(formData: FormData) {
+  const session = await auth();
+  const discordId = (session as unknown as { discordId?: string } | null)?.discordId;
+  if (!session?.user || !discordId) throw new Error('UNAUTHORIZED');
+  const member = await getMemberForDiscord(discordId);
+  if (!member || member.role !== 'employee') throw new Error('UNAUTHORIZED');
   const db = await getDb();
-  const runId = String(formData.get("run_id") || "");
-  if (!runId) throw new Error("Missing run_id");
-  const run = await db.select().from(payrollRuns).where(eq(payrollRuns.id, runId)).then((r) => r[0]);
-  if (!run || run.status !== "approved") throw new Error("Invalid run");
-  const entries = await db.select().from(payrollEntries).where(eq(payrollEntries.runId, runId));
-  for (const e of entries) {
-    if (Number(e.totalPay) !== 0) {
-      await db.insert(ledger).values({
-        id: "ld-" + randomUUID().slice(0, 12),
-        type: "expense",
-        amount: Number(e.totalPay),
-        reason: `Payroll ${run.weekStart.toISOString().slice(0,10)}-${run.weekEnd.toISOString().slice(0,10)} - ${e.employeeName}`,
-        actorDiscordId: qm.discordId,
-        actorName: qm.name,
-      });
-    }
-  }
-  const purchases = await db
-    .select()
-    .from(employeePurchases)
-    .where(and(gte(employeePurchases.createdAt, run.weekStart), lte(employeePurchases.createdAt, run.weekEnd)));
-  for (const p of purchases) {
-    if (Number(p.costTotal) !== 0) {
-      await db.insert(ledger).values({
-        id: "ld-" + randomUUID().slice(0, 12),
-        type: "expense",
-        amount: Number(p.costTotal),
-        reason: `Employee purchase - ${p.employeeName} - ${p.itemName}`,
-        actorDiscordId: qm.discordId,
-        actorName: qm.name,
-      });
-    }
-  }
-  await db.update(payrollRuns).set({ status: "paid", paidAt: new Date() }).where(eq(payrollRuns.id, runId));
-  await db.update(payrollEntries).set({ status: "paid", paidAt: new Date() }).where(eq(payrollEntries.runId, runId));
-  revalidatePath("/admin/payroll", "layout");
-  revalidatePath("/admin/ledger", "layout");
-  revalidatePath("/admin/reports", "layout");
+  const itemId = String(formData.get('item_id') || '') || null;
+  const itemName = String(formData.get('item_name') || '').trim();
+  const qty = Math.max(0, num(formData.get('qty') || '1'));
+  const unitCost = Math.max(0, num(formData.get('unit_cost') || '0'));
+  const costTotal = Math.round((Number(formData.get('cost_total')) || qty * unitCost) * 100) / 100;
+  const notes = String(formData.get('notes') || '').trim();
+  await db.insert(employeePurchases).values({
+    id: 'ep-' + randomUUID().slice(0, 12),
+    employeeDiscordId: discordId,
+    employeeName: member.name || session.user.name || '',
+    itemId,
+    itemName: itemName || 'Purchase',
+    qty,
+    unitCost,
+    costTotal,
+    category: '',
+    notes,
+    status: 'logged',
+  });
+  revalidatePath('/admin/purchases', 'layout');
+  revalidatePath('/admin/me', 'layout');
 }
