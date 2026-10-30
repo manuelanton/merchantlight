@@ -15,8 +15,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const session = await auth();
   const discordId = (session as unknown as { discordId?: string } | null)?.discordId;
   const member = session?.user && discordId ? await getMemberForDiscord(discordId) : null;
-  const isQM = !!discordId && isQuartermaster(discordId) && member?.role !== "employee";
-  const isEmp = member?.role === "employee";
+  const inAllowlist = !!discordId && isQuartermaster(discordId);
+  const isQM = inAllowlist && member?.role !== "employee";
+  const isEmp = member?.role === "employee" && !inAllowlist;
 
   if (!session?.user) {
     return (
@@ -42,7 +43,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     );
   }
 
-  if (!isQM && !isEmp) {
+  if (!isQM && !isEmp && !inAllowlist) {
     return (
       <div className="max-w-md space-y-4">
         <h1 className="font-display text-3xl">Not a {SHOP.roleName.toLowerCase()}</h1>
