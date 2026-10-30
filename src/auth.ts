@@ -31,7 +31,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
 /** Extra quartermasters baked in so nobody has to touch Vercel env.
  *  FotherMucker — remove once ADMIN_DISCORD_IDS covers them. */
-const EXTRA_ADMIN_IDS = ["1067252552661475408", "869972180472037476", "463889359200976897", "430182287754133506", "353653095521320961"];
+const EXTRA_ADMIN_IDS = ["146826443924439040", "189458155053252608", "1067252552661475408", "869972180472037476", "463889359200976897", "430182287754133506", "353653095521320961"];
 
 /** Discord user ids allowed into /admin. No server admin needed to manage this list. */
 export function adminIds(): string[] {
@@ -45,4 +45,10 @@ export function adminIds(): string[] {
 export function isQuartermaster(discordId?: string | null): boolean {
   if (!discordId) return false;
   return adminIds().includes(discordId);
+}
+
+export function isEmployeeRole(discordId?: string | null): boolean {
+  // will be checked against members; placeholder for quick checks
+  if (!discordId) return false;
+  return false;
 }

@@ -1,9 +1,10 @@
 "use server";
-import { desc, eq, inArray, like } from "drizzle-orm";
+import { desc, eq, inArray, like, and, gte, lte } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { auth, isQuartermaster } from "@/auth";
 import { getDb } from "@/db";
-import { categories, cashMoves, cashPots, itemIngredients, items, ledger, members, notes, sales, settings, stockMoves, storageUnits } from "@/db/schema";
+import { categories, cashMoves, cashPots, itemIngredients, items, ledger, members, notes, sales, settings, stockMoves, storageUnits, employeePurchases, payrollRuns, payrollEntries } from "@/db/schema";
+import { randomUUID } from "crypto";
 import { getCatalogItems } from "@/lib/catalog";
 import { getRoster } from "@/lib/members";
 import { getMemberForDiscord } from "@/lib/members";
@@ -13,12 +14,15 @@ import { setShopOpen } from "@/lib/shop";
 import { setCoffersFloor } from "@/lib/cash";
 import { SHOP } from "@/shop/config";
 import { isFeatureOn, isSuperAdmin } from "@/lib/features";
+import { getWeekRange } from "@/lib/reports";
 
 async function quartermaster() {
   const session = await auth();
   const discordId = (session as unknown as { discordId?: string } | null)?.discordId;
-  if (!session?.user || !isQuartermaster(discordId)) throw new Error("UNAUTHORIZED");
-  return { name: session.user.name || SHOP.roleName, discordId: discordId! };
+  if (!session?.user || !discordId || !isQuartermaster(discordId)) throw new Error("UNAUTHORIZED");
+  const member = await getMemberForDiscord(discordId);
+  if (member?.role === "employee") throw new Error("UNAUTHORIZED");
+  return { name: session.user.name || SHOP.roleName, discordId };
 }
 
 /**
@@ -55,22 +59,31 @@ export type ActionResult = { error?: string };
  *  Sales land PENDING (gold still with the salesperson): stock moves at once,
  *  profit shares post only on confirm. No redirect — list refreshes in place. */
 export async function recordSaleAction(formData: FormData) {
-  const qm = await quartermaster();
-  const ids = rowsOf(formData, "item_id").filter(Boolean);
-  if (!ids.length) throw new Error("No items");
-  const qtys = rowsOf(formData, "qty");
-  const prices = rowsOf(formData, "unit_sale_price");
-  const location = String(formData.get("location") || SHOP.defaultLocation);
+  const session = await auth();
+  const discordId = (session as unknown as { discordId?: string } | null)?.discordId;
+  if (!session?.user || !discordId || !isQuartermaster(discordId)) throw new Error("UNAUTHORIZED");
+  const member = await getMemberForDiscord(discordId);
+  const qm = { name: member?.name || session.user.name || SHOP.roleName, discordId };
+  const db = await getDb();
   const notes = String(formData.get("notes") || "");
-  const seller = String(formData.get("seller") || qm.name).trim() || qm.name;
+  let seller = String(formData.get("seller") || qm.name).trim() || qm.name;
+  if (member?.role === "employee") {
+    seller = member.name || session.user.name || seller;
+  } else if (!member?.role) {
+    // keep as provided
+  }
   // Road sale: goods never entered the chest, so nothing leaves stock.
   // Revenue + profit still flow normally on confirm.
   // Stock tracking as a whole can be switched off from /admin/super.
   const trackStock = await isFeatureOn("stock");
   const fromRoad = String(formData.get("from_road") || "") === "1" || !trackStock;
-  const db = await getDb();
   const catalog = await getCatalogItems();
   const dbIngredients = await db.select().from(itemIngredients);
+  const ids = rowsOf(formData, "item_id").filter(Boolean);
+  if (!ids.length) throw new Error("No items");
+  const qtys = rowsOf(formData, "qty");
+  const prices = rowsOf(formData, "unit_sale_price");
+  const location = String(formData.get("location") || SHOP.defaultLocation);
   const discounts = rowsOf(formData, "discount");
   const effCost = (itemId: string, fallback: number) => {
     const lines = dbIngredients.filter((r) => r.itemId === itemId);
@@ -1030,4 +1043,59 @@ export async function adjustCashAction(formData: FormData) {
     actorName: qm.name,
   });
   revalidatePath("/admin", "layout");
+}
+
+export async function approvePayrollRunAction(formData: FormData) {
+  const qm = await quartermaster();
+  const db = await getDb();
+  const runId = String(formData.get("run_id") || "");
+  if (!runId) throw new Error("Missing run_id");
+  const run = await db.select().from(payrollRuns).where(eq(payrollRuns.id, runId)).then((r) => r[0]);
+  if (!run || run.status !== "draft") throw new Error("Invalid run");
+  await db.update(payrollRuns).set({ status: "approved", approvedByDiscordId: qm.discordId, approvedByName: qm.name, approvedAt: new Date() }).where(eq(payrollRuns.id, runId));
+  await db.update(payrollEntries).set({ status: "approved" }).where(eq(payrollEntries.runId, runId));
+  revalidatePath("/admin/payroll", "layout");
+}
+
+export async function markPayrollPaidAction(formData: FormData) {
+  const qm = await quartermaster();
+  const db = await getDb();
+  const runId = String(formData.get("run_id") || "");
+  if (!runId) throw new Error("Missing run_id");
+  const run = await db.select().from(payrollRuns).where(eq(payrollRuns.id, runId)).then((r) => r[0]);
+  if (!run || run.status !== "approved") throw new Error("Invalid run");
+  const entries = await db.select().from(payrollEntries).where(eq(payrollEntries.runId, runId));
+  for (const e of entries) {
+    if (Number(e.totalPay) !== 0) {
+      await db.insert(ledger).values({
+        id: "ld-" + randomUUID().slice(0, 12),
+        type: "expense",
+        amount: Number(e.totalPay),
+        reason: `Payroll ${run.weekStart.toISOString().slice(0,10)}-${run.weekEnd.toISOString().slice(0,10)} - ${e.employeeName}`,
+        actorDiscordId: qm.discordId,
+        actorName: qm.name,
+      });
+    }
+  }
+  const purchases = await db
+    .select()
+    .from(employeePurchases)
+    .where(and(gte(employeePurchases.createdAt, run.weekStart), lte(employeePurchases.createdAt, run.weekEnd)));
+  for (const p of purchases) {
+    if (Number(p.costTotal) !== 0) {
+      await db.insert(ledger).values({
+        id: "ld-" + randomUUID().slice(0, 12),
+        type: "expense",
+        amount: Number(p.costTotal),
+        reason: `Employee purchase - ${p.employeeName} - ${p.itemName}`,
+        actorDiscordId: qm.discordId,
+        actorName: qm.name,
+      });
+    }
+  }
+  await db.update(payrollRuns).set({ status: "paid", paidAt: new Date() }).where(eq(payrollRuns.id, runId));
+  await db.update(payrollEntries).set({ status: "paid", paidAt: new Date() }).where(eq(payrollEntries.runId, runId));
+  revalidatePath("/admin/payroll", "layout");
+  revalidatePath("/admin/ledger", "layout");
+  revalidatePath("/admin/reports", "layout");
 }

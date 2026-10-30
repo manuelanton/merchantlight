@@ -5,6 +5,7 @@ import { backofficeEnabled } from "@/lib/flags";
 import { isFeatureOn, isSuperAdmin } from "@/lib/features";
 import { SHOP } from "@/shop/config";
 import CopyId from "@/components/CopyId";
+import { getMemberForDiscord } from "@/lib/members";
 
 // Books must never prerender: auth + data are per-request.
 export const dynamic = "force-dynamic";
@@ -13,6 +14,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!backofficeEnabled()) notFound();
   const session = await auth();
   const discordId = (session as unknown as { discordId?: string } | null)?.discordId;
+  const member = session?.user && discordId ? await getMemberForDiscord(discordId) : null;
+  const isQM = !!discordId && isQuartermaster(discordId) && member?.role !== "employee";
+  const isEmp = member?.role === "employee";
 
   if (!session?.user) {
     return (
@@ -38,7 +42,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     );
   }
 
-  if (!isQuartermaster(discordId)) {
+  if (!isQM && !isEmp) {
     return (
       <div className="max-w-md space-y-4">
         <h1 className="font-display text-3xl">Not a {SHOP.roleName.toLowerCase()}</h1>
@@ -69,25 +73,28 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           {SHOP.roleName}: <b className="text-[#e8dcc4]">{session.user.name}</b>
         </span>
         <nav className="flex flex-wrap gap-3 ml-auto">
-          <Link href="/admin" className="hover:text-[#c9a227]">Dashboard</Link>
-          <Link href="/admin/items" className="hover:text-[#c9a227]">Items</Link>
+          {isQM && <Link href="/admin" className="hover:text-[#c9a227]">Dashboard</Link>}
+          {isQM && <Link href="/admin/items" className="hover:text-[#c9a227]">Items</Link>}
           <Link href="/admin/sales" className="hover:text-[#c9a227]">Sales</Link>
-          {(await isFeatureOn("stock")) && (
+          {isQM && (await isFeatureOn("stock")) && (
             <Link href="/admin/stock" className="hover:text-[#c9a227]">Stock</Link>
           )}
-          {(await isFeatureOn("storage")) && (
+          {isQM && (await isFeatureOn("storage")) && (
             <Link href="/admin/storage" className="hover:text-[#c9a227]">Storage</Link>
           )}
-          <Link href="/admin/ledger" className="hover:text-[#c9a227]">Ledger</Link>
-          {(await isFeatureOn("notes")) && (
+          {isQM && <Link href="/admin/ledger" className="hover:text-[#c9a227]">Ledger</Link>}
+          {isQM && (await isFeatureOn("notes")) && (
             <Link href="/admin/notes" className="hover:text-[#c9a227]">Board</Link>
           )}
-          {(await isFeatureOn("guide")) && (
+          {isQM && (await isFeatureOn("guide")) && (
             <Link href="/admin/guide" className="hover:text-[#c9a227]">Guide</Link>
           )}
-          <Link href="/admin/v2" className="hover:text-[#c9a227]" title="v2 pilot surfaces">✨v2</Link>
-          {isSuperAdmin(discordId) && (
-            <Link href="/admin/super" className="hover:text-[#c9a227]" title="Superadmin playground">⚙️</Link>
+          {isQM && <Link href="/admin/reports" className="hover:text-[#c9a227]">Reports</Link>}
+          {isEmp && <Link href="/admin/purchases" className="hover:text-[#c9a227]">Purchases</Link>}
+          {isEmp && <Link href="/admin/me" className="hover:text-[#c9a227]">My Portal</Link>}
+          {isQM && <Link href="/admin/v2" className="hover:text-[#c9a227]" title="v2 pilot surfaces">v2</Link>}
+          {isQM && isSuperAdmin(discordId) && (
+            <Link href="/admin/super" className="hover:text-[#c9a227]" title="Superadmin playground">*</Link>
           )}
         </nav>
         <form

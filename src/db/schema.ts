@@ -143,8 +143,58 @@ export const members = pgTable("members", {
   name: text("name").notNull().unique(),
   active: boolean("active").notNull().default(true),
   joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
-  /** owner | manager | worker. New rows start least-privileged. */
+  /** owner | manager | worker | employee. New rows start least-privileged. */
   role: text("role").notNull().default("worker"),
   /** Discord account linked by the Owner. Null = cannot pass role gates. */
   discordId: text("discord_id"),
+});
+
+/** Purchases logged by employees. */
+export const employeePurchases = pgTable("employee_purchases", {
+  id: text("id").primaryKey(),
+  employeeDiscordId: text("employee_discord_id").notNull(),
+  employeeName: text("employee_name").notNull(),
+  itemId: text("item_id"),
+  itemName: text("item_name").notNull().default(""),
+  qty: real("qty").notNull().default(1),
+  unitCost: real("unit_cost").notNull().default(0),
+  costTotal: real("cost_total").notNull().default(0),
+  category: text("category").notNull().default(""),
+  notes: text("notes").notNull().default(""),
+  status: text("status").notNull().default("logged"), // logged
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Weekly payroll runs. */
+export const payrollRuns = pgTable("payroll_runs", {
+  id: text("id").primaryKey(),
+  weekStart: timestamp("week_start", { withTimezone: true }).notNull(),
+  weekEnd: timestamp("week_end", { withTimezone: true }).notNull(),
+  status: text("status").notNull().default("draft"), // draft | approved | paid
+  createdByDiscordId: text("created_by_discord_id").notNull().default(""),
+  createdByName: text("created_by_name").notNull().default(""),
+  approvedByDiscordId: text("approved_by_discord_id").notNull().default(""),
+  approvedByName: text("approved_by_name").notNull().default(""),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+  notes: text("notes").notNull().default(""),
+});
+
+/** Per-employee payroll entries. */
+export const payrollEntries = pgTable("payroll_entries", {
+  id: text("id").primaryKey(),
+  runId: text("run_id").notNull(),
+  employeeDiscordId: text("employee_discord_id").notNull(),
+  employeeName: text("employee_name").notNull(),
+  salesProfit: real("sales_profit").notNull().default(0),
+  salesCount: integer("sales_count").notNull().default(0),
+  commissionRate: real("commission_rate").notNull().default(0.5),
+  commission: real("commission").notNull().default(0),
+  basePay: real("base_pay").notNull().default(0),
+  purchasesTotal: real("purchases_total").notNull().default(0),
+  adjustments: real("adjustments").notNull().default(0),
+  totalPay: real("total_pay").notNull().default(0),
+  ledgerId: text("ledger_id"),
+  status: text("status").notNull().default("pending"), // pending | paid
+  notes: text("notes").notNull().default(""),
 });

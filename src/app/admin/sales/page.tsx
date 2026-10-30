@@ -1,13 +1,22 @@
-import { getCatalogue } from "@/lib/catalog";
+import { auth, isQuartermaster } from "@/auth";
+import { getDb } from "@/db";
+import { sales, items, categories } from "@/db/schema";
+import { recordSaleAction, confirmSaleAction, deleteSaleAction } from "@/lib/admin-actions";
 import { getBooks } from "@/lib/books";
+import { desc, eq } from "drizzle-orm";
 import { isFeatureOn } from "@/lib/features";
 import { SHOP } from "@/shop/config";
+import { getMemberForDiscord } from "@/lib/members";
+import { getCatalogue } from "@/lib/catalog";
 import SaleForm from "@/components/SaleForm";
 import SalesTables from "@/components/SalesTables";
 
 export const dynamic = "force-dynamic";
 
 export default async function SalesPage() {
+  const session = await auth();
+  const discordId = (session as unknown as { discordId?: string } | null)?.discordId;
+  const member = session?.user && discordId ? await getMemberForDiscord(discordId) : null;
   const [{ categories, items }, books] = await Promise.all([getCatalogue(), getBooks()]);
   const trackStock = await isFeatureOn("stock");
   const knownLocations: string[] = [...SHOP.locations];
