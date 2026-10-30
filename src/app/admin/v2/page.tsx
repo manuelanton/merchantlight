@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { requireQuartermasterPage } from "@/lib/page-auth";
 
 export const dynamic = "force-dynamic";
 
 /** v2 pilot hub: the new surfaces, side by side with v1. Same books underneath. */
 export default async function V2HubPage() {
+  await requireQuartermasterPage();
   const cards = [
     { href: "/admin/v2/sales", title: "Record a sale (v2)", desc: "Same form plus a per-line discount column. Revenue is price minus discount." },
     { href: "/admin/v2/ledger", title: "Ledger + purchases (v2)", desc: "Expenses can log what goods came in, in the same submit — one step instead of two." },

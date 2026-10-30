@@ -4,10 +4,12 @@ import { getBooks } from "@/lib/books";
 import { isFeatureOn } from "@/lib/features";
 import StockForm from "@/components/StockForm";
 import StockManager from "@/components/StockManager";
+import { requireQuartermasterPage } from "@/lib/page-auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function StockPage() {
+  await requireQuartermasterPage();
   if (!(await isFeatureOn("stock"))) notFound();
   const [{ categories, items }, books] = await Promise.all([getCatalogue(), getBooks()]);
   const itemCategory: Record<string, string> = {};

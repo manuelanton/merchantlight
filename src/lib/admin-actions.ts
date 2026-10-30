@@ -61,16 +61,30 @@ export type ActionResult = { error?: string };
 export async function recordSaleAction(formData: FormData) {
   const session = await auth();
   const discordId = (session as unknown as { discordId?: string } | null)?.discordId;
-  if (!session?.user || !discordId || !isQuartermaster(discordId)) throw new Error("UNAUTHORIZED");
+  if (!session?.user || !discordId) throw new Error("UNAUTHORIZED");
   const member = await getMemberForDiscord(discordId);
+  const isEmp = member?.role === "employee";
+  if (!isQuartermaster(discordId) && !isEmp) throw new Error("UNAUTHORIZED");
   const qm = { name: member?.name || session.user.name || SHOP.roleName, discordId };
   const db = await getDb();
   const notes = String(formData.get("notes") || "");
-  let seller = String(formData.get("seller") || qm.name).trim() || qm.name;
-  if (member?.role === "employee") {
-    seller = member.name || session.user.name || seller;
-  } else if (!member?.role) {
-    // keep as provided
+  // Employees always sell as themselves; quartermasters may attribute a sale
+  // to a linked member (e.g. an employee) via seller_discord_id.
+  let seller = qm.name;
+  let soldByDiscordId = discordId;
+  if (isEmp) {
+    seller = member!.name || session.user.name || seller;
+  } else {
+    const sellerDiscordId = String(formData.get("seller_discord_id") || "").trim();
+    if (sellerDiscordId && sellerDiscordId !== discordId) {
+      const sellerMember = await getMemberForDiscord(sellerDiscordId);
+      if (sellerMember) {
+        seller = sellerMember.name;
+        soldByDiscordId = sellerDiscordId;
+      }
+    } else {
+      seller = String(formData.get("seller") || qm.name).trim() || qm.name;
+    }
   }
   // Road sale: goods never entered the chest, so nothing leaves stock.
   // Revenue + profit still flow normally on confirm.
@@ -117,7 +131,7 @@ export async function recordSaleAction(formData: FormData) {
       totalProfit: Math.round((revenue - itemCost * qty) * 100) / 100,
       discount,
       location,
-      soldByDiscordId: qm.discordId,
+      soldByDiscordId,
       soldByName: seller,
       notes,
       status: "pending",
@@ -958,15 +972,17 @@ export async function setMemberActiveAction(formData: FormData) {
   revalidatePath("/admin", "layout");
 }
 
-/** Owner-only: set a member's role (owner | manager | member | worker | employee). */
+/** Quartermaster can assign member/worker/employee roles; only the Owner
+ *  may grant owner/manager (privilege escalation guard). */
 export async function setMemberRoleAction(formData: FormData) {
   const qm = await quartermaster();
-  if (!isSuperAdmin(qm.discordId)) throw new Error("UNAUTHORIZED");
   const role = String(formData.get("role") || "");
   if (role !== "owner" && role !== "manager" && role !== "member" && role !== "worker" && role !== "employee") throw new Error("Bad role");
+  if ((role === "owner" || role === "manager") && !isSuperAdmin(qm.discordId)) throw new Error("UNAUTHORIZED");
   const db = await getDb();
   await db.update(members).set({ role }).where(eq(members.id, String(formData.get("id"))));
   revalidatePath("/admin", "layout");
+  revalidatePath("/admin/employees", "layout");
 }
 
 /** Owner-only: link a Discord account (seen acting in the books) to a member
@@ -1045,6 +1061,76 @@ export async function adjustCashAction(formData: FormData) {
   revalidatePath("/admin", "layout");
 }
 
+export async function createPayrollRunAction() {
+  const qm = await quartermaster();
+  const db = await getDb();
+  const { start, end } = getWeekRange();
+  const existing = await db
+    .select()
+    .from(payrollRuns)
+    .where(and(gte(payrollRuns.weekStart, start), lte(payrollRuns.weekStart, end)));
+  if (existing.length) throw new Error("A payroll run already exists for this week");
+  const id = "pr-" + randomUUID().slice(0, 12);
+  await db.insert(payrollRuns).values({
+    id,
+    weekStart: start,
+    weekEnd: end,
+    status: "draft",
+    createdByDiscordId: qm.discordId,
+    createdByName: qm.name,
+    approvedByDiscordId: "",
+    approvedByName: "",
+  });
+  const empMembers = await db.select().from(members).where(eq(members.role, "employee"));
+  for (const m of empMembers) {
+    if (!m.discordId) continue;
+    const [salesRows, purchases] = await Promise.all([
+      db
+        .select()
+        .from(sales)
+        .where(
+          and(
+            eq(sales.soldByDiscordId, m.discordId),
+            eq(sales.status, "confirmed"),
+            gte(sales.timestamp, start),
+            lte(sales.timestamp, end)
+          )
+        ),
+      db
+        .select()
+        .from(employeePurchases)
+        .where(
+          and(
+            eq(employeePurchases.employeeDiscordId, m.discordId),
+            gte(employeePurchases.createdAt, start),
+            lte(employeePurchases.createdAt, end)
+          )
+        ),
+    ]);
+    const counted = purchases.filter((p) => p.status !== "rejected");
+    const salesProfit = salesRows.reduce((a, s) => a + Number(s.totalProfit || 0), 0);
+    const commission = Math.round(salesProfit * 0.5 * 100) / 100;
+    const purchasesTotal = counted.reduce((a, p) => a + Number(p.costTotal || 0), 0);
+    const totalPay = Math.round((commission - purchasesTotal) * 100) / 100;
+    await db.insert(payrollEntries).values({
+      id: "pe-" + randomUUID().slice(0, 12),
+      runId: id,
+      employeeDiscordId: m.discordId,
+      employeeName: m.name,
+      salesProfit,
+      salesCount: salesRows.length,
+      commissionRate: 0.5,
+      commission,
+      basePay: 0,
+      purchasesTotal,
+      adjustments: 0,
+      totalPay,
+      status: "pending",
+    });
+  }
+  revalidatePath("/admin/payroll", "layout");
+}
+
 export async function approvePayrollRunAction(formData: FormData) {
   const qm = await quartermaster();
   const db = await getDb();
@@ -1052,9 +1138,85 @@ export async function approvePayrollRunAction(formData: FormData) {
   if (!runId) throw new Error("Missing run_id");
   const run = await db.select().from(payrollRuns).where(eq(payrollRuns.id, runId)).then((r) => r[0]);
   if (!run || run.status !== "draft") throw new Error("Invalid run");
-  await db.update(payrollRuns).set({ status: "approved", approvedByDiscordId: qm.discordId, approvedByName: qm.name, approvedAt: new Date() }).where(eq(payrollRuns.id, runId));
+  await db
+    .update(payrollRuns)
+    .set({ status: "approved", approvedByDiscordId: qm.discordId, approvedByName: qm.name, approvedAt: new Date() })
+    .where(eq(payrollRuns.id, runId));
   await db.update(payrollEntries).set({ status: "approved" }).where(eq(payrollEntries.runId, runId));
   revalidatePath("/admin/payroll", "layout");
+}
+
+export async function markPayrollPaidAction(formData: FormData) {
+  const qm = await quartermaster();
+  const db = await getDb();
+  const runId = String(formData.get("run_id") || "");
+  if (!runId) throw new Error("Missing run_id");
+  const run = await db.select().from(payrollRuns).where(eq(payrollRuns.id, runId)).then((r) => r[0]);
+  if (!run || run.status !== "approved") throw new Error("Invalid run");
+  const entries = await db.select().from(payrollEntries).where(eq(payrollEntries.runId, runId));
+  for (const e of entries) {
+    if (Number(e.totalPay) === 0) continue;
+    const ledgerId = uid("lg");
+    await db.insert(ledger).values({
+      id: ledgerId,
+      type: "expense",
+      member: "",
+      amountGold: -Math.abs(Number(e.totalPay)),
+      category: "payroll",
+      description: `Payroll ${run.weekStart.toISOString().slice(0, 10)}–${run.weekEnd.toISOString().slice(0, 10)}: ${e.employeeName}`,
+      actorDiscordId: qm.discordId,
+    });
+    await db.update(payrollEntries).set({ ledgerId }).where(eq(payrollEntries.id, e.id));
+  }
+  const purchases = await db
+    .select()
+    .from(employeePurchases)
+    .where(
+      and(
+        gte(employeePurchases.createdAt, run.weekStart),
+        lte(employeePurchases.createdAt, run.weekEnd),
+        eq(employeePurchases.status, "logged")
+      )
+    );
+  for (const p of purchases) {
+    if (Number(p.costTotal) === 0) continue;
+    await db.insert(ledger).values({
+      id: uid("lg"),
+      type: "expense",
+      member: "",
+      amountGold: -Math.abs(Number(p.costTotal)),
+      category: "employee-purchase",
+      description: `Employee purchase: ${p.employeeName} — ${p.itemName}${p.notes ? ` (${p.notes})` : ""}`,
+      actorDiscordId: qm.discordId,
+    });
+    await db.update(employeePurchases).set({ status: "posted" }).where(eq(employeePurchases.id, p.id));
+  }
+  await db.update(payrollRuns).set({ status: "paid", paidAt: new Date() }).where(eq(payrollRuns.id, runId));
+  await db.update(payrollEntries).set({ status: "paid" }).where(eq(payrollEntries.runId, runId));
+  revalidatePath("/admin/payroll", "layout");
+  revalidatePath("/admin/ledger", "layout");
+  revalidatePath("/admin/reports", "layout");
+  revalidatePath("/admin/purchases", "layout");
+}
+
+export async function setPurchaseStatusAction(formData: FormData) {
+  await requireManager();
+  const db = await getDb();
+  const id = String(formData.get("id") || "");
+  const status = String(formData.get("status") || "");
+  if (!id) throw new Error("Missing id");
+  if (!["logged", "approved", "rejected", "posted"].includes(status)) throw new Error("Bad status");
+  await db.update(employeePurchases).set({ status }).where(eq(employeePurchases.id, id));
+  revalidatePath("/admin/purchases", "layout");
+}
+
+export async function deletePurchaseAction(formData: FormData) {
+  await requireManager();
+  const db = await getDb();
+  const id = String(formData.get("id") || "");
+  if (!id) throw new Error("Missing id");
+  await db.delete(employeePurchases).where(eq(employeePurchases.id, id));
+  revalidatePath("/admin/purchases", "layout");
 }
 
 export async function logEmployeePurchaseAction(formData: FormData) {

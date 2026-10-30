@@ -35,7 +35,7 @@ interface Row {
 
 const DEFAULT_LOCATIONS = [...SHOP.locations];
 
-export default function SaleForm({ items, categories, locations = DEFAULT_LOCATIONS, showRoad = true, showDiscount = false }: { items: CatalogOption[]; categories: CategoryOption[]; locations?: string[]; showRoad?: boolean; showDiscount?: boolean }) {
+export default function SaleForm({ items, categories, locations = DEFAULT_LOCATIONS, showRoad = true, showDiscount = false, sellers = [] }: { items: CatalogOption[]; categories: CategoryOption[]; locations?: string[]; showRoad?: boolean; showDiscount?: boolean; sellers?: { name: string; discordId: string }[] }) {
   // Kinds are counters: inheriting variants sell at their parent's price.
   const priced = useMemo(
     () =>
@@ -132,6 +132,15 @@ export default function SaleForm({ items, categories, locations = DEFAULT_LOCATI
         <LocationSelect locations={locations} />
         <div><label className="lbl">Notes</label><input name="notes" className="input" placeholder="Haggled, bundle…" /></div>
       </div>
+      {sellers.length > 0 && (
+        <div>
+          <label className="lbl">Sold by</label>
+          <select name="seller_discord_id" defaultValue="" className="input">
+            <option value="">Myself</option>
+            {sellers.map((s) => <option key={s.discordId} value={s.discordId}>{s.name}</option>)}
+          </select>
+        </div>
+      )}
       {showRoad && (
       <label className="flex items-center gap-2 text-sm cursor-pointer">
         <input type="checkbox" name="from_road" value="1" className="accent-[#d97a1f]" />

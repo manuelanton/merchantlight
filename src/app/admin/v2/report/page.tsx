@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getReport, RANGE_PRESETS } from "@/lib/report";
 import { g } from "@/lib/format";
+import { requireQuartermasterPage } from "@/lib/page-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,7 @@ export default async function V2ReportPage({
 }: {
   searchParams: Promise<{ range?: string }>;
 }) {
+  await requireQuartermasterPage();
   const { range = "30" } = await searchParams;
   const preset = RANGE_PRESETS.find((p) => p.key === range) || RANGE_PRESETS[2];
   const r = await getReport(preset.days);

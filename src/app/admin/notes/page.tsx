@@ -1,6 +1,7 @@
 import { deleteNoteAction, postNoteAction, resolveNoteAction } from "@/lib/admin-actions";
 import { getBooks } from "@/lib/books";
 import Collapsible from "@/components/Collapsible";
+import { requireQuartermasterPage } from "@/lib/page-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ const KINDS = [
 const KIND_ICON: Record<string, string> = { news: "📯", request: "🙏", todo: "☑️", stock: "📦" };
 
 export default async function NotesPage() {
+  await requireQuartermasterPage();
   const b = await getBooks();
   const open = b.noteRows.filter((n) => !n.resolved);
   const done = b.noteRows.filter((n) => n.resolved);

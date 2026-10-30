@@ -10,6 +10,7 @@ import {
 import { getStorage, type StorageUnit } from "@/lib/storage";
 import { g } from "@/lib/format";
 import { SHOP } from "@/shop/config";
+import { requireQuartermasterPage } from "@/lib/page-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -105,6 +106,7 @@ function UnitCard({ u }: { u: StorageUnit }) {
 }
 
 export default async function StoragePage() {
+  await requireQuartermasterPage();
   const s = await getStorage();
   const bySite = new Map<string, StorageUnit[]>();
   for (const u of s.units) {

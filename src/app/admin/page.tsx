@@ -9,12 +9,14 @@ import { getStorage } from "@/lib/storage";
 import { effectiveThreshold } from "@/lib/defaults";
 import { isFeatureOn } from "@/lib/features";
 import { SHOP } from "@/shop/config";
+import { requireQuartermasterPage } from "@/lib/page-auth";
 
 export const dynamic = "force-dynamic";
 
-const KIND_ICON: Record<string, string> = { news: "📯", request: "🙏", todo: "☑️", stock: "📦" };
+const KIND_ICON: Record<string, string> = { news: "📰", request: "🙏", todo: "📝", stock: "📦" };
 
 export default async function AdminHome() {
+  await requireQuartermasterPage();
   const b = await getBooks();
   const open = await isShopOpen();
   const st = await getStorage();

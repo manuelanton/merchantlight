@@ -16,10 +16,12 @@ import AddItemForm from "@/components/AddItemForm";
 import AddCategoryForm from "@/components/AddCategoryForm";
 import Collapsible from "@/components/Collapsible";
 import ItemsManager from "@/components/ItemsManager";
+import { requireQuartermasterPage } from "@/lib/page-auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function ItemsPage() {
+  await requireQuartermasterPage();
   const [{ categories, items }, books, db] = await Promise.all([getCatalogue(), getBooks(), getDb()]);
   const sorted = [...categories].sort((a, b) => a.sort_order - b.sort_order);
   const stock: Record<string, number> = {};
