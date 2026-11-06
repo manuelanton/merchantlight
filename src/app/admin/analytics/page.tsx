@@ -1,13 +1,12 @@
-import Link from "next/link";
 import { BalanceChart, SalesChart } from "@/components/AnalyticsCharts";
+import RangeBar from "@/components/RangeBar";
 import { Empty, PageHeader, Section, Stat } from "@/components/store-ui";
+import { resolveRange, type RangeParams } from "@/lib/date-range";
 import { g } from "@/lib/format";
 import { requireManager } from "@/lib/store-access";
-import { addDays, analytics, treasuryBalance, weekStart } from "@/lib/store-data";
+import { addDays, analytics, treasuryBalance } from "@/lib/store-data";
 
 export const dynamic = "force-dynamic";
-
-const isDay = (s?: string) => (s && /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null);
 
 function Rank({ rows, empty }: { rows: { name: string; sub?: string; value: number }[]; empty: string }) {
   if (!rows.length) return <Empty>{empty}</Empty>;
@@ -29,22 +28,12 @@ function Rank({ rows, empty }: { rows: { name: string; sub?: string; value: numb
   );
 }
 
-export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ range?: string; from?: string; to?: string }> }) {
+export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<RangeParams> }) {
   const access = await requireManager();
   const params = await searchParams;
   const today = new Date().toISOString().slice(0, 10);
-  const monday = weekStart();
-
-  const presets: Record<string, { label: string; from: string | null; to: string | null }> = {
-    today: { label: "Today", from: today, to: today },
-    week: { label: "Week", from: monday, to: addDays(monday, 6) },
-    "30d": { label: "30 days", from: addDays(today, -29), to: today },
-    all: { label: "All time", from: null, to: null },
-  };
-  const custom = !!(isDay(params.from) || isDay(params.to));
-  const key = custom ? "custom" : params.range && presets[params.range] ? params.range : "week";
-  const from = custom ? isDay(params.from) : presets[key].from;
-  const to = custom ? isDay(params.to) : presets[key].to;
+  const range = resolveRange(params);
+  const { from, to } = range;
 
   const [data, cash] = await Promise.all([analytics(access.profileId, from, to), treasuryBalance(access.profileId)]);
 
@@ -63,16 +52,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     <>
       <PageHeader title="Analytics" subtitle="How the store is doing." />
 
-      <div className="flex flex-wrap items-center gap-2 mb-6">
-        {Object.entries(presets).map(([k, p]) => (
-          <Link key={k} href={`/admin/analytics?range=${k}`} className={`${k === key ? "btn-gold" : "btn-ghost"} !py-1 text-sm`}>{p.label}</Link>
-        ))}
-        <form className="flex flex-wrap items-center gap-2">
-          <input type="date" name="from" defaultValue={custom ? from ?? "" : ""} className="input !w-auto !py-1 text-sm" aria-label="From" />
-          <input type="date" name="to" defaultValue={custom ? to ?? "" : ""} className="input !w-auto !py-1 text-sm" aria-label="To" />
-          <button className={`${custom ? "btn-gold" : "btn-ghost"} !py-1 text-sm`} type="submit">Custom</button>
-        </form>
-      </div>
+      <RangeBar path="/admin/analytics" range={range} />
 
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-3">
         <Stat label="Revenue" value={`${g(revenue)}g`} />

@@ -21,6 +21,7 @@ const LINKS: (NavLink & { managers?: boolean; owners?: boolean })[] = [
   { href: "/admin/analytics", label: "Analytics", managers: true },
   { href: "/admin/treasury", label: "Treasury", managers: true },
   { href: "/admin/users", label: "Users", owners: true },
+  { href: "/admin/settings", label: "Settings", owners: true },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

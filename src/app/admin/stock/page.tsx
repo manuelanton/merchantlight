@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Notice, PageHeader, Section, Stat } from "@/components/store-ui";
+import SuggestInput from "@/components/SuggestInput";
 import { g } from "@/lib/format";
 import { isManager, requireStaff } from "@/lib/store-access";
 import { setStockAction } from "@/lib/store-actions";
@@ -92,7 +93,7 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
       <PageHeader title="Stock" subtitle={manager ? "What is on the shelf. Sales and purchases update it on their own, corrections go here." : "What is on the shelf."}>
         <div className="flex flex-wrap gap-2">
           <form className="flex gap-2">
-            <input name="q" defaultValue={q} className="input !w-48 !py-2 text-sm" placeholder="Search stock" aria-label="Search stock" />
+            <SuggestInput name="q" defaultValue={q} options={all.map((r) => r.name)} className="w-48" placeholder="Search stock" label="Search stock" />
             <button className="btn-ghost !py-2 text-sm" type="submit">Search</button>
           </form>
           {manager && <Link href="/admin/purchases" className="btn-gold !py-2 text-sm">+ Buy stock</Link>}

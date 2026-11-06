@@ -1,59 +1,36 @@
-import { asc } from "drizzle-orm";
-import { getDb } from "@/db";
-import { categories, items } from "@/db/schema";
-import { dbCatalogueEnabled } from "./flags";
+import { asService } from "@/lib/merchant-db";
 import { UPCOMING_SECTIONS, getCatalogue as getSheetCatalogue } from "./sheets";
-import { SEED_CATEGORIES, SEED_ITEMS } from "./seed";
-import type { Category, Item } from "./types";
+import { ItemSchema, type Category, type Item } from "./types";
 
-/** Catalogue: Postgres when flagged, otherwise the Google Sheet (production default). */
+const slugOf = (name: string) => name.toLowerCase().replace(/&/g, " ").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+/** Public catalogue: whatever is switched on the menu in the backoffice. The Sheet only steps in when that is empty or down. */
 export async function getCatalogue(): Promise<{ categories: Category[]; items: Item[] }> {
-  if (!dbCatalogueEnabled()) return getSheetCatalogue();
   try {
-    const db = await getDb();
-    const [catRows, itemRows] = await Promise.all([
-      db.select().from(categories).orderBy(asc(categories.sortOrder)),
-      db.select().from(items).orderBy(asc(items.name)),
+    const [rows, known] = await Promise.all([
+      asService<{ id: string; name: string; category: string; price: number }>(
+        `select id::text, name, category, sell_price as price from merchant.goods where active and on_menu
+         union all
+         select id::text, name, 'Materials', coalesce(sell_price, buy_price) from merchant.materials where active and on_menu
+         order by name`,
+      ),
+      asService<Category>(`select id, name, slug, icon, sort_order from public.categories`),
     ]);
-    if (!itemRows.length) return { categories: SEED_CATEGORIES, items: SEED_ITEMS };
-    const cats: Category[] = catRows.map((c) => ({
-      id: c.id, name: c.name, slug: c.slug, icon: c.icon, sort_order: c.sortOrder,
-    }));
-    for (const u of UPCOMING_SECTIONS) if (!cats.some((c) => c.slug === u.slug)) cats.push(u);
-    // items whose category row is missing (shouldn't happen, but never vanish)
-    for (const it of itemRows) {
-      if (!cats.some((c) => c.slug === it.categorySlug)) {
-        cats.push({ id: it.categorySlug, name: it.categorySlug.replace(/-/g, " "), slug: it.categorySlug, icon: "📦", sort_order: 950 });
-      }
-    }
-    return {
-      categories: cats.sort((a, b) => a.sort_order - b.sort_order),
-      items: itemRows.map((i): Item => ({
-        id: i.id,
-        name: i.name,
-        category_slug: i.categorySlug,
-        description: i.description,
-        sale_price: i.salePrice,
-        cost_value: i.costValue,
-        stock: 0,
-        parent_id: i.parentId ?? null,
-        inherit_parent: i.inheritParent ?? true,
-        low_threshold: i.lowThreshold ?? null,
-        buy_price: i.buyPrice,
-        max_stock: i.maxStock ?? null,
-        image_url: "",
-        active: i.active,
-        created_by_char: i.createdByName,
-        updated_by_char: "",
-        updated_at: typeof i.updatedAt === "string" ? i.updatedAt : (i.updatedAt as Date).toISOString(),
-      })),
-    };
-  } catch {
-    return { categories: SEED_CATEGORIES, items: SEED_ITEMS };
-  }
-}
+    if (!rows.length) return getSheetCatalogue();
 
-export async function getCatalogItems() {
-  const { items } = await getCatalogue();
-  return items.filter((i) => i.active);
+    const categories = [...known];
+    for (const u of UPCOMING_SECTIONS) if (!categories.some((c) => c.slug === u.slug)) categories.push(u);
+    const items = rows.map((r) => {
+      let category = categories.find((c) => c.name === r.category);
+      if (!category) {
+        category = { id: slugOf(r.category), name: r.category, slug: slugOf(r.category), icon: "", sort_order: 99 };
+        categories.push(category);
+      }
+      return ItemSchema.parse({ id: r.id, name: r.name, category_slug: category.slug, sale_price: r.price });
+    });
+    return { categories: categories.sort((a, b) => a.sort_order - b.sort_order), items };
+  } catch (e) {
+    console.error("Catalogue falls back to the Sheet:", e);
+    return getSheetCatalogue();
+  }
 }

@@ -1,16 +1,19 @@
+import Link from "next/link";
 import ConfirmButton from "@/components/ConfirmButton";
+import CraftPanel from "@/components/CraftPanel";
 import { Empty, Notice, PageHeader, Section } from "@/components/store-ui";
+import SuggestInput from "@/components/SuggestInput";
 import { g } from "@/lib/format";
 import { isManager, requireStaff } from "@/lib/store-access";
-import { craftAction, deleteCraftAction } from "@/lib/store-actions";
+import { deleteCraftAction } from "@/lib/store-actions";
 import { listCrafts, listRecipes, type Recipe } from "@/lib/store-data";
 
 export const dynamic = "force-dynamic";
 
-export default async function Craft({ searchParams }: { searchParams: Promise<{ error?: string; q?: string }> }) {
+export default async function Craft({ searchParams }: { searchParams: Promise<{ error?: string; q?: string; recipe?: string }> }) {
   const access = await requireStaff();
   const manager = isManager(access);
-  const { error, q } = await searchParams;
+  const { error, q, recipe } = await searchParams;
   const search = q?.trim().toLowerCase();
   const [recipes, crafts] = await Promise.all([listRecipes(access.profileId), listCrafts(access.profileId)]);
 
@@ -25,11 +28,13 @@ export default async function Craft({ searchParams }: { searchParams: Promise<{ 
     <>
       <PageHeader title="Craft" subtitle="Materials come off the shelf, the finished item goes on it.">
         <form className="flex gap-2">
-          <input name="q" defaultValue={q} className="input !w-48 !py-2 text-sm" placeholder="Search recipes" aria-label="Search recipes" />
+          <SuggestInput name="q" defaultValue={q} options={recipes.flatMap((r) => [r.name, ...r.lines.map((l) => l.name)])} className="w-48" placeholder="Filter by name or part" label="Filter recipes" />
           <button className="btn-ghost !py-2 text-sm" type="submit">Search</button>
         </form>
       </PageHeader>
       <Notice error={error} />
+
+      {recipes.length > 0 && <CraftPanel key={recipe} recipes={recipes} initial={recipe} />}
 
       {!trades.size && <div className="panel mb-8"><Empty>{search ? "No recipe matches." : "No recipes yet. Add one to an item on the Items page."}</Empty></div>}
       {[...trades.entries()].map(([trade, list]) => (
@@ -45,11 +50,7 @@ export default async function Craft({ searchParams }: { searchParams: Promise<{ 
                     In stock {g(r.stock)} · {r.max_qty ? `materials for ${r.max_qty}` : `not enough ${r.limiting ?? "materials"}`}
                   </span>
                 </span>
-                <form action={craftAction} className="flex gap-2">
-                  <input type="hidden" name="id" value={r.id} />
-                  <input name="qty" inputMode="decimal" defaultValue={g(r.craft_yield)} className="input !w-16 !py-1 text-sm" aria-label={`How many ${r.name}`} />
-                  <button className="btn-gold !py-1 text-sm" type="submit">Craft</button>
-                </form>
+                <Link href={`/admin/craft?${new URLSearchParams({ ...(q && { q }), recipe: r.id })}`} className="btn-ghost !py-1 text-sm" aria-label={`Select ${r.name}`}>Select</Link>
               </div>
             ))}
           </div>

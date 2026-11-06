@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Sigil from "@/components/Sigil";
-import { UPCOMING_SECTIONS, isSheetsConfigured } from "@/lib/sheets";
+import { UPCOMING_SECTIONS } from "@/lib/sheets";
 import { getCatalogue } from "@/lib/catalog";
 import { g } from "@/lib/format";
 import { isShopOpen } from "@/lib/shop";
@@ -49,11 +49,6 @@ export default async function Home() {
           <p className="mt-2 text-[#cbbfa5] max-w-2xl">
             {SHOP.tagline}
           </p>
-          {!isSheetsConfigured() && (
-            <p className="mt-4 text-xs text-[#8a7c64]">
-              Running on built-in seed data. Connect a Google Sheet (SHEET_ID) to edit stock without redeploying.
-            </p>
-          )}
         </div>
       </section>
 

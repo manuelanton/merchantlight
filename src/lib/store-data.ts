@@ -1,5 +1,8 @@
 import { asService, asUser } from "@/lib/merchant-db";
 
+const PAGE_SIZE = 50;
+const utcDay = (column: string) => `(${column} at time zone 'UTC')::date`;
+
 // Reads for the backoffice. Everything runs as the signed-in user, so RLS decides what comes back.
 
 export interface SaleRow {
@@ -78,17 +81,62 @@ export function todaysSales(profileId: string) {
   );
 }
 
-export function listSales(profileId: string, filter: { q?: string; status?: string }) {
-  const status = filter.status === "posted" || filter.status === "draft" ? filter.status : null;
+export interface SaleFilter {
+  q?: string;
+  status?: string;
+  seller?: string;
+  from?: string | null;
+  to?: string | null;
+  page?: number;
+}
+
+const SALE_WHERE = `
+  where ($1::text is null or s.status::text = $1)
+    and ($2::text is null or s.receipt_no::text = $2 or s.customer ilike '%' || $2 || '%'
+         or coalesce(p.display_name, p.username, '') ilike '%' || $2 || '%')
+    and ($3::uuid is null or s.seller_id = $3)
+    and ($4::date is null or ${utcDay("s.sale_date")} >= $4::date)
+    and ($5::date is null or ${utcDay("s.sale_date")} <= $5::date)`;
+
+const saleParams = (f: SaleFilter) => [
+  f.status === "posted" || f.status === "draft" ? f.status : null,
+  f.q?.trim() || null,
+  f.seller && /^[0-9a-f-]{36}$/.test(f.seller) ? f.seller : null,
+  f.from ?? null,
+  f.to ?? null,
+];
+
+export function listSales(profileId: string, filter: SaleFilter) {
   return asUser<SaleRow>(
     profileId,
-    `${SALE_SELECT}
-     where ($1::text is null or s.status::text = $1)
-       and ($2::text is null or s.receipt_no::text = $2 or s.customer ilike '%' || $2 || '%'
-            or coalesce(p.display_name, p.username, '') ilike '%' || $2 || '%')
-     order by s.sale_date desc limit 200`,
-    [status, filter.q?.trim() || null],
+    `${SALE_SELECT} ${SALE_WHERE} order by s.sale_date desc limit ${PAGE_SIZE} offset $6`,
+    [...saleParams(filter), (filter.page ?? 0) * PAGE_SIZE],
   );
+}
+
+/** Each day's totals under the same filters, so a day's header is right on every page. */
+export function salesDays(profileId: string, filter: SaleFilter) {
+  return asUser<{ day: string; receipts: number; revenue: number; profit: number }>(
+    profileId,
+    `select ${utcDay("r.sale_date")}::text as day, count(*)::int as receipts,
+            coalesce(sum(r.total) filter (where r.status = 'posted'), 0) as revenue,
+            coalesce(sum(r.profit) filter (where r.status = 'posted'), 0) as profit
+     from (${SALE_SELECT} ${SALE_WHERE}) r group by 1 order by 1 desc`,
+    saleParams(filter),
+  );
+}
+
+/** Who can be filtered by, and the names the search can suggest. */
+export async function saleOptions(profileId: string) {
+  const [sellers, customers] = await Promise.all([
+    asUser<{ id: string; name: string }>(
+      profileId,
+      `select s.seller_id as id, max(coalesce(p.display_name, p.username, s.seller_name, 'Unknown')) as name
+       from merchant.sales s left join merchant.profiles p on p.id = s.seller_id group by 1 order by 2`,
+    ),
+    asUser<{ customer: string }>(profileId, `select distinct customer from merchant.sales where btrim(coalesce(customer, '')) <> '' order by 1 limit 200`),
+  ]);
+  return { sellers, customers: customers.map((c) => c.customer) };
 }
 
 export async function getSale(profileId: string, id: string) {
@@ -175,7 +223,6 @@ export interface Analytics {
   materials_value: number;
 }
 
-const utcDay = (column: string) => `(${column} at time zone 'UTC')::date`;
 const inRange = (column: string) => `($1::date is null or ${utcDay(column)} >= $1::date) and ($2::date is null or ${utcDay(column)} <= $2::date)`;
 
 /** Everything the Analytics page shows for a range; either end may stay open. */
@@ -235,14 +282,14 @@ export async function analytics(profileId: string, from: string | null, to: stri
   };
 }
 
-export type ItemRow = Good & { unit_cost: number | null; cost_error: string | null };
+export type ItemRow = Good & { unit_cost: number | null; cost_error: string | null; on_menu: boolean };
 
 /** Goods with what they cost: the recipe if there is one, otherwise the purchase price. */
 export function listItems(profileId: string) {
   return asUser<ItemRow>(
     profileId,
     `select g.id, g.name, g.category, g.sell_price, g.buy_price, g.stock, g.min_stock, g.is_bundle, g.profession, g.craft_yield,
-            c.unit_cost, c.cost_error,
+            c.unit_cost, c.cost_error, g.on_menu,
             (select count(*)::int from merchant.recipe_components r where r.good_id = g.id) as parts
      from merchant.goods g left join merchant.good_costs() c on c.good_id = g.id
      where g.active order by g.name`,
@@ -260,15 +307,56 @@ export function partnerBalances(profileId: string) {
   return asUser<PartnerBalance>(profileId, `select * from merchant.partner_balances()`);
 }
 
-export function treasuryEntries(profileId: string, category?: string) {
+export interface TreasuryFilter {
+  category?: string;
+  direction?: string;
+  q?: string;
+  from?: string | null;
+  to?: string | null;
+  page?: number;
+}
+
+const TREASURY_WHERE = `
+  where ($1::text is null or category = $1)
+    and ($2::text is null or ($2 = 'in' and money_in > 0) or ($2 = 'out' and money_out > 0))
+    and ($3::text is null or description ilike '%' || $3 || '%' or category ilike '%' || $3 || '%')
+    and ($4::date is null or ${utcDay("entry_date")} >= $4::date)
+    and ($5::date is null or ${utcDay("entry_date")} <= $5::date)`;
+
+const treasuryParams = (f: TreasuryFilter) => [
+  f.category || null,
+  f.direction === "in" || f.direction === "out" ? f.direction : null,
+  f.q?.trim() || null,
+  f.from ?? null,
+  f.to ?? null,
+];
+
+export function treasuryEntries(profileId: string, filter: TreasuryFilter = {}) {
   return asUser<TreasuryRow>(
     profileId,
     `select id, entry_date, category, description, money_in, money_out, ref_type
-     from merchant.treasury_entries
-     where ($1::text is null or category = $1)
-     order by entry_date desc, id desc limit 50`,
-    [category ?? null],
+     from merchant.treasury_entries ${TREASURY_WHERE}
+     order by entry_date desc, id desc limit ${PAGE_SIZE} offset $6`,
+    [...treasuryParams(filter), (filter.page ?? 0) * PAGE_SIZE],
   );
+}
+
+export async function treasuryTotals(profileId: string, filter: TreasuryFilter) {
+  const [row] = await asUser<{ entries: number; money_in: number; money_out: number }>(
+    profileId,
+    `select count(*)::int as entries, coalesce(sum(money_in), 0) as money_in, coalesce(sum(money_out), 0) as money_out
+     from merchant.treasury_entries ${TREASURY_WHERE}`,
+    treasuryParams(filter),
+  );
+  return row;
+}
+
+export async function treasuryOptions(profileId: string) {
+  const [categories, notes] = await Promise.all([
+    asUser<{ name: string }>(profileId, `select name from merchant.treasury_categories order by sort_order`),
+    asUser<{ description: string }>(profileId, `select distinct description from merchant.treasury_entries where btrim(coalesce(description, '')) <> '' order by 1 limit 200`),
+  ]);
+  return { categories: categories.map((c) => c.name), notes: notes.map((n) => n.description) };
 }
 
 export async function treasuryBalance(profileId: string) {
@@ -303,6 +391,8 @@ export interface Material {
   name: string;
   category: string;
   buy_price: number;
+  sell_price: number | null;
+  on_menu: boolean;
   stock: number;
   min_stock: number;
 }
@@ -310,7 +400,7 @@ export interface Material {
 export function listMaterials(profileId: string) {
   return asUser<Material>(
     profileId,
-    `select id, name, category, buy_price, stock, min_stock from merchant.materials where active order by category, name`,
+    `select id, name, category, buy_price, sell_price, on_menu, stock, min_stock from merchant.materials where active order by category, name`,
   );
 }
 
@@ -398,10 +488,10 @@ export async function rentalSpace(site: string) {
 // Recipes and crafting -----------------------------------------------------------
 
 export async function getGood(profileId: string, id: string) {
-  const [good] = await asUser<Good & { unit_cost: number | null; cost_error: string | null }>(
+  const [good] = await asUser<Good & { unit_cost: number | null; cost_error: string | null; on_menu: boolean }>(
     profileId,
     `select g.id, g.name, g.category, g.sell_price, g.buy_price, g.stock, g.min_stock, g.is_bundle, g.profession, g.craft_yield,
-            c.unit_cost, c.cost_error
+            c.unit_cost, c.cost_error, g.on_menu
      from merchant.goods g
      left join merchant.good_costs() c on c.good_id = g.id
      where g.id = $1`,
@@ -431,6 +521,7 @@ export interface Recipe {
   stock: number;
   craft_yield: number;
   parts: string;
+  lines: { name: string; quantity: number; stock: number }[];
   max_qty: number;
   limiting: string | null;
 }
@@ -444,7 +535,12 @@ export function listRecipes(profileId: string) {
              from merchant.recipe_components r
              left join merchant.materials m on m.id = r.material_id
              left join merchant.goods c on c.id = r.component_good_id
-             where r.good_id = g.id) as parts
+             where r.good_id = g.id) as parts,
+            (select jsonb_agg(jsonb_build_object('name', coalesce(m.name, c.name), 'quantity', r.quantity, 'stock', coalesce(m.stock, c.stock)) order by r.created_at)
+             from merchant.recipe_components r
+             left join merchant.materials m on m.id = r.material_id
+             left join merchant.goods c on c.id = r.component_good_id
+             where r.good_id = g.id) as lines
      from merchant.goods g
      left join merchant.craft_capacity() cap on cap.good_id = g.id
      where g.active and not g.is_bundle

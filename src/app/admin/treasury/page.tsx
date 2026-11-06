@@ -1,19 +1,30 @@
-import { Empty, Notice, PageHeader, Section, Stat } from "@/components/store-ui";
+import RangeBar from "@/components/RangeBar";
+import { Empty, Notice, PageHeader, Pager, Section, Stat } from "@/components/store-ui";
+import SuggestInput from "@/components/SuggestInput";
+import { pageHref, rangeParams, resolveRange, type RangeParams } from "@/lib/date-range";
 import { g } from "@/lib/format";
 import { requireManager } from "@/lib/store-access";
 import { addTreasuryEntryAction } from "@/lib/store-actions";
-import { treasuryBalance, treasuryCategories, treasuryEntries } from "@/lib/store-data";
+import { treasuryBalance, treasuryCategories, treasuryEntries, treasuryOptions, treasuryTotals } from "@/lib/store-data";
 
 export const dynamic = "force-dynamic";
 
-export default async function Treasury({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+export default async function Treasury({ searchParams }: { searchParams: Promise<RangeParams & { error?: string; q?: string; category?: string; direction?: string; page?: string }> }) {
   const access = await requireManager();
-  const { error } = await searchParams;
-  const [balance, entries, categories] = await Promise.all([
+  const params = await searchParams;
+  const { error, q, category, direction } = params;
+  const range = resolveRange(params);
+  const page = Math.max(0, Math.floor(Number(params.page)) || 0);
+  const filter = { q, category, direction, from: range.from, to: range.to };
+  const [balance, entries, totals, categories, options] = await Promise.all([
     treasuryBalance(access.profileId),
-    treasuryEntries(access.profileId),
+    treasuryEntries(access.profileId, { ...filter, page }),
+    treasuryTotals(access.profileId, filter),
     treasuryCategories(access.profileId),
+    treasuryOptions(access.profileId),
   ]);
+  const filters = { q, category, direction };
+  const dated = rangeParams(range);
 
   return (
     <>
@@ -21,6 +32,9 @@ export default async function Treasury({ searchParams }: { searchParams: Promise
       <Notice error={error} />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
         <Stat label="Balance" value={`${g(balance)}g`} tone={balance < 0 ? "bad" : undefined} />
+        <Stat label="Money in" value={`${g(totals.money_in)}g`} />
+        <Stat label="Money out" value={`${g(totals.money_out)}g`} />
+        <Stat label="Net" value={`${g(totals.money_in - totals.money_out)}g`} tone={totals.money_in < totals.money_out ? "bad" : undefined} />
       </div>
 
       <Section title="Add an entry">
@@ -50,7 +64,24 @@ export default async function Treasury({ searchParams }: { searchParams: Promise
         </form>
       </Section>
 
-      <Section title="Latest entries">
+      <RangeBar path="/admin/treasury" range={range} keep={filters} />
+
+      <form className="flex flex-wrap gap-3 mb-6">
+        {Object.entries(dated).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
+        <SuggestInput name="q" defaultValue={q} options={[...options.notes, ...options.categories]} className="w-56" placeholder="Search notes" label="Search" />
+        <select name="category" defaultValue={category ?? ""} className="input !w-44 !py-2 text-sm" aria-label="Category">
+          <option value="">All categories</option>
+          {options.categories.map((c) => <option key={c}>{c}</option>)}
+        </select>
+        <select name="direction" defaultValue={direction ?? ""} className="input !w-36 !py-2 text-sm" aria-label="Direction">
+          <option value="">In and out</option>
+          <option value="in">Money in</option>
+          <option value="out">Money out</option>
+        </select>
+        <button className="btn-ghost !py-2 text-sm" type="submit">Filter</button>
+      </form>
+
+      <Section title="Entries" aside={totals.entries === 1 ? "1 entry" : `${totals.entries} entries`}>
         <div className="panel overflow-x-auto">
           <table className="ledger min-w-[34rem]">
             <thead><tr><th>Date</th><th>Category</th><th>Note</th><th className="text-right">Amount</th></tr></thead>
@@ -65,8 +96,9 @@ export default async function Treasury({ searchParams }: { searchParams: Promise
               ))}
             </tbody>
           </table>
-          {!entries.length && <Empty>No entries yet.</Empty>}
+          {!entries.length && <Empty>No entries found.</Empty>}
         </div>
+        <Pager page={page} total={totals.entries} href={(p) => pageHref("/admin/treasury", { ...filters, ...dated, page: p ? String(p) : undefined })} />
       </Section>
     </>
   );

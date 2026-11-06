@@ -1,20 +1,34 @@
 import Link from "next/link";
-import { Empty, PageHeader, Section } from "@/components/store-ui";
+import RangeBar from "@/components/RangeBar";
+import { Empty, PageHeader, Pager, Section } from "@/components/store-ui";
+import SuggestInput from "@/components/SuggestInput";
+import { pageHref, rangeParams, resolveRange, type RangeParams } from "@/lib/date-range";
 import { g } from "@/lib/format";
 import { requireStaff } from "@/lib/store-access";
-import { listSales, type SaleRow } from "@/lib/store-data";
+import { listSales, saleOptions, salesDays, type SaleRow } from "@/lib/store-data";
 
 export const dynamic = "force-dynamic";
 
 const dayOf = (s: SaleRow) => new Date(s.sale_date).toISOString().slice(0, 10);
 
-export default async function Sales({ searchParams }: { searchParams: Promise<{ q?: string; status?: string }> }) {
+export default async function Sales({ searchParams }: { searchParams: Promise<RangeParams & { q?: string; status?: string; seller?: string; page?: string }> }) {
   const access = await requireStaff();
-  const { q, status } = await searchParams;
-  const sales = await listSales(access.profileId, { q, status });
+  const params = await searchParams;
+  const { q, status, seller } = params;
+  const range = resolveRange(params);
+  const page = Math.max(0, Math.floor(Number(params.page)) || 0);
+  const filter = { q, status, seller, from: range.from, to: range.to };
+  const [sales, totals, options] = await Promise.all([
+    listSales(access.profileId, { ...filter, page }),
+    salesDays(access.profileId, filter),
+    saleOptions(access.profileId),
+  ]);
 
   const days = new Map<string, SaleRow[]>();
   for (const s of sales) days.set(dayOf(s), [...(days.get(dayOf(s)) ?? []), s]);
+  const total = totals.reduce((sum, d) => sum + d.receipts, 0);
+  const filters = { q, status, seller };
+  const dated = rangeParams(range);
 
   return (
     <>
@@ -22,9 +36,16 @@ export default async function Sales({ searchParams }: { searchParams: Promise<{ 
         <Link href="/admin/sales/new" className="btn-gold !py-2 text-sm">+ New receipt</Link>
       </PageHeader>
 
+      <RangeBar path="/admin/sales" range={range} keep={filters} />
+
       <form className="flex flex-wrap gap-3 mb-6">
-        <input name="q" defaultValue={q} className="input !w-56" placeholder="Receipt no., customer, seller" aria-label="Search" />
-        <select name="status" defaultValue={status ?? ""} className="input !w-36" aria-label="Status">
+        {Object.entries(dated).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
+        <SuggestInput name="q" defaultValue={q} options={[...options.customers, ...options.sellers.map((s) => s.name)]} className="w-56" placeholder="Receipt no., customer, seller" label="Search" />
+        <select name="seller" defaultValue={seller ?? ""} className="input !w-40 !py-2 text-sm" aria-label="Seller">
+          <option value="">All sellers</option>
+          {options.sellers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+        <select name="status" defaultValue={status ?? ""} className="input !w-36 !py-2 text-sm" aria-label="Status">
           <option value="">All</option>
           <option value="posted">Posted</option>
           <option value="draft">Draft</option>
@@ -34,11 +55,9 @@ export default async function Sales({ searchParams }: { searchParams: Promise<{ 
 
       {!sales.length && <div className="panel"><Empty>No receipts found.</Empty></div>}
       {[...days.entries()].map(([day, rows]) => {
-        const posted = rows.filter((r) => r.status === "posted");
-        const revenue = posted.reduce((sum, r) => sum + r.total, 0);
-        const profit = posted.reduce((sum, r) => sum + (r.profit ?? 0), 0);
+        const sum = totals.find((t) => t.day === day);
         return (
-          <Section key={day} title={day} aside={`${rows.length} ${rows.length === 1 ? "receipt" : "receipts"} · ${g(revenue)}g · profit ${g(profit)}g`}>
+          <Section key={day} title={day} aside={sum && `${sum.receipts} ${sum.receipts === 1 ? "receipt" : "receipts"} · ${g(sum.revenue)}g · profit ${g(sum.profit)}g`}>
             <div className="panel divide-y divide-[#1c2b31]">
               {rows.map((r) => (
                 <Link key={r.id} href={`/admin/sales/${r.id}`} className="grid grid-cols-[4rem_minmax(0,1fr)_auto_3.5rem] gap-3 px-4 py-3 items-center hover:bg-[#1d1a16]">
@@ -52,6 +71,7 @@ export default async function Sales({ searchParams }: { searchParams: Promise<{ 
           </Section>
         );
       })}
+      <Pager page={page} total={total} href={(p) => pageHref("/admin/sales", { ...filters, ...dated, page: p ? String(p) : undefined })} />
     </>
   );
 }

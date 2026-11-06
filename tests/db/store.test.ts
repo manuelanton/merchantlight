@@ -175,6 +175,18 @@ describe('partner split', () => {
     expect(rows.find((r) => r.name === 'Mira')?.balance).toBe(12)
   })
 
+  it('rounds each share down to whole gold', async () => {
+    const [gain, loss] = ['2026-06-01', '2026-06-08']
+    await t.db.query(`insert into merchant.treasury_entries (entry_date, category, description, money_in) values ($1, 'Rental income', 'odd', 100)`, [`${gain} 10:00+00`])
+    await t.db.query(`insert into merchant.treasury_entries (entry_date, category, description, money_out) values ($1, 'Rent', 'odd', 100)`, [`${loss} 10:00+00`])
+    expect((await week(manager, gain)).w).toMatchObject({ net: 100, per_partner: 33 })
+    expect((await week(manager, loss)).w).toMatchObject({ net: -100, per_partner: -34 })
+    await close(manager, gain)
+    expect(await t.rows(`select distinct amount from merchant.partner_shares where week_start = $1`, [gain])).toEqual([{ amount: 33 }])
+    await t.as(owner, () => t.db.query(`select merchant.reopen_partner_week($1)`, [gain]))
+    await t.db.query(`delete from merchant.treasury_entries where description = 'odd'`)
+  })
+
   it('lets only the Owner reopen a week', async () => {
     await expect(t.as(manager, () => t.db.query(`select merchant.reopen_partner_week($1)`, [NEXT]))).rejects.toThrow(/Not allowed/)
     await t.as(owner, () => t.db.query(`select merchant.reopen_partner_week($1)`, [NEXT]))

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 // The few building blocks every backoffice page shares.
@@ -38,6 +39,24 @@ export function Section({ title, aside, children }: { title: string; aside?: Rea
 export function Notice({ error }: { error?: string }) {
   if (!error) return null;
   return <p role="alert" className="panel border-[#7a2430] text-[#e08a8a] text-sm px-4 py-3 mb-4">{error}</p>;
+}
+
+export const PAGE_SIZE = 50;
+
+/** "1–50 of 120" with arrows; `href` builds the link to a page, counted from 0. */
+export function Pager({ page, total, href }: { page: number; total: number; href: (page: number) => string }) {
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (pages === 1) return null;
+  return (
+    <div className="flex items-center justify-between gap-3 text-sm muted py-3">
+      <span className="tabular-nums">{page * PAGE_SIZE + 1}–{Math.min(total, (page + 1) * PAGE_SIZE)} of {total}</span>
+      <span className="flex items-center gap-2">
+        {page > 0 && <Link className="btn-ghost !py-1 !px-3" href={href(page - 1)} aria-label="Previous page">←</Link>}
+        <span className="tabular-nums">Page {page + 1} / {pages}</span>
+        {page < pages - 1 && <Link className="btn-ghost !py-1 !px-3" href={href(page + 1)} aria-label="Next page">→</Link>}
+      </span>
+    </div>
+  );
 }
 
 export function Empty({ children }: { children: ReactNode }) {

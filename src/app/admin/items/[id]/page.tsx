@@ -31,7 +31,7 @@ export default async function Item({ params, searchParams }: { params: Promise<{
       <Notice error={error ?? good.cost_error ?? undefined} />
 
       {manager && (
-        <form key={`${good.name}-${good.category}-${good.sell_price}-${good.buy_price}-${good.min_stock}`} action={saveItemAction} className="panel p-4 grid grid-cols-2 sm:grid-cols-[2fr_1.2fr_1fr_1fr_1fr_auto] gap-3 items-end mb-4">
+        <form key={`${good.name}-${good.category}-${good.sell_price}-${good.buy_price}-${good.min_stock}-${good.on_menu}`} action={saveItemAction} className="panel p-4 grid grid-cols-2 sm:grid-cols-[2fr_1.2fr_1fr_1fr_1fr_auto] gap-3 items-end mb-4">
           <input type="hidden" name="id" value={id} />
           <div><label className="lbl" htmlFor="item-name">Name</label><input id="item-name" name="name" defaultValue={good.name} className="input !py-1 text-sm" required /></div>
           <div><label className="lbl" htmlFor="item-category">Category</label><input id="item-category" name="category" list="item-categories" defaultValue={good.category} className="input !py-1 text-sm" /></div>
@@ -39,6 +39,10 @@ export default async function Item({ params, searchParams }: { params: Promise<{
           <div><label className="lbl" htmlFor="item-purchase">Purchase</label><input id="item-purchase" name="buy_price" inputMode="decimal" defaultValue={g(good.buy_price ?? 0)} className="input !py-1 text-sm" /></div>
           <div><label className="lbl" htmlFor="item-low">Low at</label><input id="item-low" name="min_stock" inputMode="decimal" defaultValue={g(good.min_stock)} className="input !py-1 text-sm" /></div>
           <button className="btn-gold !py-1 text-sm" type="submit">Save</button>
+          <label className="col-span-full flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" name="on_menu" value="1" defaultChecked={good.on_menu} className="accent-[#d97a1f]" />
+            On menu: shown in the public catalogue
+          </label>
           <datalist id="item-categories">{[...new Set(goods.map((i) => i.category))].map((c) => <option key={c} value={c} />)}</datalist>
         </form>
       )}
@@ -50,6 +54,7 @@ export default async function Item({ params, searchParams }: { params: Promise<{
         <Stat label="Margin" value={margin === null ? "—" : `${Math.round(margin * 100)}%`} tone={profit < 0 ? "bad" : undefined} />
       </div>
       <p className="muted text-xs mb-8">
+        {!manager && `${good.on_menu ? "On" : "Off"} the menu. `}
         {lines.length
           ? "Cost comes from the recipe, also for pieces bought in."
           : `No recipe lines. Cost falls back to the purchase price (${g(good.buy_price ?? 0)}g).`}
