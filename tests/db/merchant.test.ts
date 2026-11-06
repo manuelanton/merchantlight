@@ -22,7 +22,7 @@ beforeAll(async () => {
   await t.as(u.manager, async () => {
     for (const [name, price] of [['Iron ore', 5], ['Coal', 2], ['Leather', 4]] as const) {
       id[name] = (await t.one<{ id: string }>(
-        `insert into merchant.materials (name, buy_price, category) values ($1, $2, 'Raw') returning id`, [name, price])).id
+        `insert into merchant.materials (name, buy_price, category) values ($1, $2, 'Raw Materials') returning id`, [name, price])).id
     }
     for (const [name, price] of [['Iron ingot', 20], ['Sword', 120]] as const) {
       id[name] = (await t.one<{ id: string }>(

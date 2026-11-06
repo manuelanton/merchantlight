@@ -5,7 +5,7 @@ import SuggestInput from "@/components/SuggestInput";
 import { g } from "@/lib/format";
 import { isManager, requireStaff } from "@/lib/store-access";
 import { removeItemAction, saveItemAction, saveMaterialAction } from "@/lib/store-actions";
-import { listItems, listMaterials } from "@/lib/store-data";
+import { listCategories, listItems, listMaterials } from "@/lib/store-data";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,7 @@ export default async function Items({ searchParams }: { searchParams: Promise<{ 
   const access = await requireStaff();
   const manager = isManager(access);
   const { error, q, cat, sort, dir } = await searchParams;
-  const [goods, materials] = await Promise.all([listItems(access.profileId), listMaterials(access.profileId)]);
+  const [goods, materials, allCategories] = await Promise.all([listItems(access.profileId), listMaterials(access.profileId), listCategories(access.profileId)]);
   const search = q?.trim().toLowerCase();
   const shownMaterials = search ? materials.filter((m) => m.name.toLowerCase().includes(search)) : materials;
 
@@ -65,12 +65,11 @@ export default async function Items({ searchParams }: { searchParams: Promise<{ 
           <summary className="btn-ghost inline-block !py-2 text-sm cursor-pointer">+ New item</summary>
           <form action={saveItemAction} className="panel p-4 mt-3 grid sm:grid-cols-[2fr_1.2fr_1fr_1fr_1fr_auto] gap-3 items-end">
             <div><label className="lbl" htmlFor="name">Name</label><input id="name" name="name" className="input" required /></div>
-            <div><label className="lbl" htmlFor="category">Category</label><input id="category" name="category" className="input" list="categories" /></div>
+            <div><label className="lbl" htmlFor="category">Category</label><select id="category" name="category" className="input" required defaultValue=""><option value="" disabled>Choose…</option>{allCategories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></div>
             <div><label className="lbl" htmlFor="sell_price">Price</label><input id="sell_price" name="sell_price" inputMode="decimal" className="input" /></div>
             <div><label className="lbl" htmlFor="buy_price">Purchase</label><input id="buy_price" name="buy_price" inputMode="decimal" className="input" /></div>
             <div><label className="lbl" htmlFor="min_stock">Low at</label><input id="min_stock" name="min_stock" inputMode="decimal" className="input" /></div>
             <button className="btn-gold !py-2 text-sm" type="submit">Add</button>
-            <datalist id="categories">{categories.map((c) => <option key={c} value={c} />)}</datalist>
           </form>
         </details>
       )}

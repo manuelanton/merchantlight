@@ -16,7 +16,7 @@ beforeAll(async () => {
   employee = await t.createUser('employee', 'Employee')
   await t.as(manager, async () => {
     ore = (await t.one<{ id: string }>(
-      `insert into merchant.materials (name, category, buy_price, sell_price) values ('Iron Ore', 'Ore', 0.5, 1) returning id`)).id
+      `insert into merchant.materials (name, category, buy_price, sell_price) values ('Iron Ore', 'Raw Materials', 0.5, 1) returning id`)).id
     sword = (await t.one<{ id: string }>(`insert into merchant.goods (name, sell_price) values ('Sword', 20) returning id`)).id
     await t.db.query(`insert into merchant.recipe_components (good_id, material_id, quantity) values ($1, $2, 4)`, [sword, ore])
     await t.db.query(`select merchant.adjust_stock('material', $1, 100, 'Correction')`, [ore])
@@ -34,7 +34,7 @@ describe('selling raw materials', () => {
       return sid
     })
     const line = await t.one<{ good_name: string; category: string }>(`select good_name, category from merchant.sale_lines where material_id = $1`, [ore])
-    expect(line).toEqual({ good_name: 'Iron Ore', category: 'Ore' })
+    expect(line).toEqual({ good_name: 'Iron Ore', category: 'Raw Materials' })
   })
 
   it('posting deducts the ore, costs it at buy price and pays the employee', async () => {

@@ -264,6 +264,21 @@ export async function saveDailyRentAction(form: FormData) {
   );
 }
 
+export async function addCategoryAction(form: FormData) {
+  const access = await requireOwner();
+  await attempt("/admin/settings", () => asUser(access.profileId, `select merchant.add_category($1)`, [text(form, "name")]));
+}
+
+export async function renameCategoryAction(form: FormData) {
+  const access = await requireOwner();
+  await attempt("/admin/settings", () => asUser(access.profileId, `select merchant.rename_category($1, $2)`, [text(form, "id"), text(form, "name")]));
+}
+
+export async function removeCategoryAction(form: FormData) {
+  const access = await requireOwner();
+  await attempt("/admin/settings", () => asUser(access.profileId, `select merchant.remove_category($1)`, [text(form, "id")]));
+}
+
 export async function saveRentPaidUntilAction(form: FormData) {
   const access = await requireOwner();
   await attempt("/admin/rentals", () =>

@@ -23,6 +23,7 @@ beforeAll(async () => {
   t = await createDb()
   await t.db.exec(`update merchant.settings set employee_profit_share = 0, profit_split_from = '-infinity'`)
   manager = await t.createUser('manager', 'Mira')
+  await asUser(manager, `select merchant.add_category('Tools'), merchant.add_category('Odd Bits')`)
   employee = await t.createUser('employee', 'Erik')
   other = await t.createUser('employee', 'Olga')
   const [good] = await asUser<{ id: string }>(
@@ -107,6 +108,9 @@ describe('page reads', () => {
     expect(all.balances.at(-1)?.balance).toBe(await treasuryBalance(manager))
     expect((await analytics(manager, addDays(today, 1), null)).days).toEqual([])
     expect(all.goods_value).toBe(0) // Rope has been oversold
+    await t.db.query(`insert into merchant.treasury_entries (category, description, money_in, money_out) values ('Other', 'starting money', 2000, 0), ('Other', 'lent out', 0, 300)`)
+    expect((await analytics(manager, null, null)).net).toBe(all.net)
+    await t.db.exec(`delete from merchant.treasury_entries where category = 'Other'`)
   })
 
   it('reads the building rent and the team for their pages', async () => {
@@ -148,8 +152,6 @@ describe('page reads', () => {
   })
 
   it('shows what is on the menu in the public catalogue', async () => {
-    await t.db.exec(`create table if not exists public.categories (id text, name text, slug text, icon text, sort_order int);
-      insert into public.categories values ('tools', 'Tools', 'tools', '', 1)`)
     await asUser(manager, `insert into merchant.goods (name, category, sell_price) values ('Lantern', 'Tools', 12), ('Spare Key', 'Odd Bits', 1)`)
     await asUser(manager, `update merchant.goods set on_menu = false where name = 'Lantern'`)
     await asUser(manager, `insert into merchant.materials (name, buy_price, sell_price, on_menu) values ('Ruby', 5, 9, true), ('Secret Ore', 1, 2, false)`)

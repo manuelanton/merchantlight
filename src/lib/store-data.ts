@@ -253,8 +253,8 @@ export async function analytics(profileId: string, from: string | null, to: stri
     ),
     asUser<{ net: number }>(
       profileId,
-      `select coalesce(sum(money_in) filter (where category <> 'Deposit'), 0)
-             - coalesce(sum(money_out) filter (where category not in ('Withdrawal', 'Partner payout')), 0) as net
+      `select coalesce(sum(money_in) filter (where category not in ('Deposit', 'Other')), 0)
+             - coalesce(sum(money_out) filter (where category not in ('Withdrawal', 'Partner payout', 'Other')), 0) as net
        from merchant.treasury_entries where ${inRange("entry_date")}`,
       range,
     ),
@@ -403,6 +403,25 @@ export interface Material {
   on_menu: boolean;
   stock: number;
   min_stock: number;
+}
+
+export const RAW_MATERIALS = "Raw Materials";
+
+export interface ItemCategory {
+  id: string;
+  name: string;
+  is_system: boolean;
+  items: number;
+}
+
+export function listCategories(profileId: string) {
+  return asUser<ItemCategory>(
+    profileId,
+    `select c.id, c.name, c.is_system,
+            (select count(*) from merchant.goods g where g.category = c.name and g.active)::int
+            + (select count(*) from merchant.materials m where m.category = c.name and m.active)::int as items
+     from merchant.categories c order by c.sort_order, c.name`,
+  );
 }
 
 export function listMaterials(profileId: string) {
