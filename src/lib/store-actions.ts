@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { num } from "@/lib/format";
-import { asUser } from "@/lib/merchant-db";
+import { asService, asUser } from "@/lib/merchant-db";
 import { rpcError } from "@/lib/merchant-rpc";
 import { setShopOpen } from "@/lib/shop";
 import { requireManager, requireOwner, requireStaff } from "@/lib/store-access";
@@ -126,6 +126,49 @@ export async function saveRecipeAction(form: FormData) {
   await attempt(`/admin/items/${good}`, () =>
     asUser(access.profileId, `update merchant.goods set profession = $1, craft_yield = $2 where id = $3`, [text(form, "profession") || null, num(form.get("craft_yield"), 1), good]),
   );
+}
+
+export async function removeItemAction(form: FormData) {
+  const access = await requireManager();
+  const kind = text(form, "kind") === "material" ? "material" : "good";
+  const id = text(form, "id");
+  await attempt(kind === "good" ? `/admin/items/${id}` : "/admin/items", () => asUser(access.profileId, `select merchant.remove_item($1, $2)`, [kind, id]));
+  revalidatePath("/", "layout");
+  redirect("/admin/items");
+}
+
+export async function requestCraftAction(form: FormData) {
+  const access = await requireManager();
+  await attempt("/admin/craft", () =>
+    asUser(access.profileId, `select merchant.request_craft($1, $2, $3)`, [text(form, "good"), num(form.get("qty")), text(form, "note")]),
+  );
+  redirect("/admin/craft");
+}
+
+export async function cancelCraftRequestAction(form: FormData) {
+  const access = await requireManager();
+  await attempt("/admin/craft", () => asUser(access.profileId, `select merchant.cancel_craft_request($1)`, [text(form, "id")]));
+}
+
+/** The one action open to customers: it can only place an order, and the database limits those. */
+export async function placeCommissionAction(form: FormData) {
+  if (text(form, "website")) redirect("/commissions");
+  let placed = "";
+  await attempt("/commissions", async () => {
+    const [row] = await asService<{ item_name: string }>(`select item_name from merchant.place_eec_order($1, $2)`, [text(form, "customer"), text(form, "item") || null]);
+    placed = row.item_name;
+  });
+  redirect(`/commissions?placed=${encodeURIComponent(placed)}`);
+}
+
+export async function addCommissionAction(form: FormData) {
+  const access = await requireStaff();
+  await attempt("/admin/commissions", () => asUser(access.profileId, `select merchant.place_eec_order($1, $2)`, [text(form, "customer"), text(form, "item") || null]));
+}
+
+export async function setCommissionStatusAction(form: FormData) {
+  const access = await requireStaff();
+  await attempt("/admin/commissions", () => asUser(access.profileId, `select merchant.set_eec_order_status($1, $2)`, [text(form, "id"), text(form, "status")]));
 }
 
 export async function craftAction(form: FormData) {

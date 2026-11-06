@@ -1,9 +1,10 @@
 import Link from "next/link";
+import ConfirmButton from "@/components/ConfirmButton";
 import { Empty, Notice, PageHeader, Section } from "@/components/store-ui";
 import SuggestInput from "@/components/SuggestInput";
 import { g } from "@/lib/format";
 import { isManager, requireStaff } from "@/lib/store-access";
-import { saveItemAction, saveMaterialAction } from "@/lib/store-actions";
+import { removeItemAction, saveItemAction, saveMaterialAction } from "@/lib/store-actions";
 import { listItems, listMaterials } from "@/lib/store-data";
 
 export const dynamic = "force-dynamic";
@@ -55,7 +56,6 @@ export default async function Items({ searchParams }: { searchParams: Promise<{ 
         <form className="flex gap-2">
           {cat && <input type="hidden" name="cat" value={cat} />}
           <SuggestInput name="q" defaultValue={q} options={[...goods, ...materials].map((i) => i.name)} className="w-48" placeholder="Search items" label="Search items" />
-          <button className="btn-ghost !py-2 text-sm" type="submit">Search</button>
         </form>
       </PageHeader>
       <Notice error={error} />
@@ -125,7 +125,7 @@ export default async function Items({ searchParams }: { searchParams: Promise<{ 
                   <th className="text-right w-24">Price</th>
                   <th className="text-right w-24">Low at</th>
                   <th className="text-right w-16">Menu</th>
-                  {manager && <th className="w-20" />}
+                  {manager && <th className="w-28" />}
                 </tr>
               </thead>
               <tbody>
@@ -139,10 +139,17 @@ export default async function Items({ searchParams }: { searchParams: Promise<{ 
                       <td><input form={form} name="min_stock" inputMode="decimal" defaultValue={g(m.min_stock)} className="input !py-1 text-sm text-right" aria-label={`Low at of ${m.name}`} /></td>
                       <td className="text-right"><input form={form} type="checkbox" name="on_menu" value="1" defaultChecked={m.on_menu} className="accent-[#d97a1f]" aria-label={`${m.name} on the menu`} /></td>
                       <td>
-                        <form id={form} action={saveMaterialAction} className="flex justify-end">
-                          <input type="hidden" name="id" value={m.id} />
-                          <button className="btn-ghost !py-1 !px-2 text-sm" type="submit">Save</button>
-                        </form>
+                        <div className="flex justify-end gap-1">
+                          <form id={form} action={saveMaterialAction}>
+                            <input type="hidden" name="id" value={m.id} />
+                            <button className="btn-ghost !py-1 !px-2 text-sm" type="submit">Save</button>
+                          </form>
+                          <form action={removeItemAction}>
+                            <input type="hidden" name="kind" value="material" />
+                            <input type="hidden" name="id" value={m.id} />
+                            <ConfirmButton message={`Remove ${m.name}? It leaves every list, receipts keep their history.`} className="btn-ghost !py-1 !px-2 text-sm"><span aria-label={`Remove ${m.name}`}>×</span></ConfirmButton>
+                          </form>
+                        </div>
                       </td>
                     </tr>
                   ) : (

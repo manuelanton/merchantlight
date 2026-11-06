@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { getCatalogue } from '@/lib/catalog'
 import { asUser } from '@/lib/merchant-db'
 import {
-  addDays, analytics, buildingRent, saleOptions, salesDays, treasuryOptions, treasuryTotals, getGood, getSale, isLow, listCrafts, listGoods, listItems, listMaterials, listPurchases, listTeam, listRecipes, listSales, listUnits, partnerBalances, partnerWeek,
+  addDays, analytics, buildingRent, saleOptions, salesDays, treasuryOptions, treasuryTotals, getGood, getSale, isLow, listCrafts, listGoods, listItems, listMaterials, listPurchases, listTeam, listRecipes, listSales, listUnits, partnerLedger, partnerWeek,
   recipeLines, rentalHistory, rentalSpace, todaysSales, treasuryBalance, treasuryCategories, treasuryEntries, weekStart,
 } from '@/lib/store-data'
 import { createDb, type TestDb } from './harness'
@@ -169,7 +169,7 @@ describe('page reads', () => {
     const week = await partnerWeek(manager, weekStart())
     expect(week.sales_income).toBeGreaterThan(0)
     expect(week.partners.map((p) => p.name)).toEqual(['Mira'])
-    expect(await partnerBalances(manager)).toEqual([])
+    expect((await partnerLedger(manager, weekStart())).every((p) => !p.carried && !p.paid)).toBe(true)
   })
 
   it('offers only categories people may book by hand', async () => {

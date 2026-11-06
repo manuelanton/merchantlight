@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import ConfirmButton from "@/components/ConfirmButton";
 import { Empty, Notice, PageHeader, Section, Stat } from "@/components/store-ui";
 import { g } from "@/lib/format";
 import { isManager, requireStaff } from "@/lib/store-access";
-import { addRecipeLineAction, removeRecipeLineAction, saveItemAction, saveRecipeAction } from "@/lib/store-actions";
+import { addRecipeLineAction, removeItemAction, removeRecipeLineAction, saveItemAction, saveRecipeAction } from "@/lib/store-actions";
 import { getGood, listGoods, listMaterials, recipeLines } from "@/lib/store-data";
 
 export const dynamic = "force-dynamic";
@@ -122,6 +123,15 @@ export default async function Item({ params, searchParams }: { params: Promise<{
           </form>
         )}
       </Section>
+
+      {manager && (
+        <form action={removeItemAction} className="border-t border-[#2b4149] pt-4 mt-8 flex items-center justify-between gap-3">
+          <p className="muted text-xs">Removing takes it out of every list and the catalogue. Receipts and crafts keep their history.</p>
+          <input type="hidden" name="kind" value="good" />
+          <input type="hidden" name="id" value={id} />
+          <ConfirmButton message={`Remove ${good.name}?`} className="btn-ghost !py-1 text-sm shrink-0">Remove item</ConfirmButton>
+        </form>
+      )}
     </div>
   );
 }

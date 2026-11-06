@@ -3,7 +3,7 @@ import { Empty, Notice, PageHeader, Section, Stat } from "@/components/store-ui"
 import { g } from "@/lib/format";
 import { requireManager } from "@/lib/store-access";
 import { closeWeekAction, payPartnerAction, reopenWeekAction } from "@/lib/store-actions";
-import { addDays, partnerBalances, partnerWeek, treasuryEntries, weekStart } from "@/lib/store-data";
+import { addDays, partnerLedger, partnerOpenWeeks, partnerWeek, treasuryEntries, weekStart } from "@/lib/store-data";
 
 export const dynamic = "force-dynamic";
 
@@ -12,17 +12,22 @@ export default async function Payments({ searchParams }: { searchParams: Promise
   const { week: asked, error } = await searchParams;
   const thisWeek = weekStart();
   const week = /^\d{4}-\d{2}-\d{2}$/.test(asked ?? "") ? weekStart(new Date(`${asked}T00:00:00Z`)) : thisWeek;
-  const [w, balances, payouts] = await Promise.all([
+  const [w, ledger, current, openWeeks, payouts] = await Promise.all([
     partnerWeek(access.profileId, week),
-    partnerBalances(access.profileId),
+    partnerLedger(access.profileId, week),
+    partnerLedger(access.profileId, thisWeek),
+    partnerOpenWeeks(access.profileId, addDays(thisWeek, 7)),
     treasuryEntries(access.profileId, { category: "Partner payout" }),
   ]);
 
   const over = addDays(week, 7) <= new Date().toISOString().slice(0, 10);
-  const balanceOf = (id: string) => balances.find((b) => b.partner_id === id)?.balance ?? 0;
-  const shareOf = (p: (typeof w.partners)[number]) => p.amount ?? w.per_partner ?? 0;
+  // What can be paid today, from any week's page: everything from finished weeks, less what went out since.
+  const payable = (id: string) => {
+    const r = current.find((c) => c.partner_id === id);
+    return r ? Math.max(0, r.carried - r.paid) : 0;
+  };
   // Former partners with gold left stay payable after they drop out of the week's list.
-  const others = balances.filter((b) => b.balance !== 0 && !w.partners.some((p) => p.id === b.partner_id));
+  const rows = ledger.filter((r) => r.carried || r.share || r.paid || payable(r.partner_id) || w.partners.some((p) => p.id === r.partner_id));
 
   return (
     <>
@@ -35,6 +40,14 @@ export default async function Payments({ searchParams }: { searchParams: Promise
         </div>
       </PageHeader>
       <Notice error={error} />
+      {openWeeks.length > 0 && (
+        <p className="panel px-4 py-3 mb-6 text-sm">
+          Finished but not closed yet, already counted below:{" "}
+          {openWeeks.map((d, i) => (
+            <span key={d}>{i > 0 && ", "}<Link className="underline hover:text-[#e0bd4a] tabular-nums" href={`/admin/payments?week=${d}`}>{d}</Link></span>
+          ))}
+        </p>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
         <Stat label="Income" value={`${g(w.sales_income + w.other_income)}g`} />
@@ -43,7 +56,7 @@ export default async function Payments({ searchParams }: { searchParams: Promise
         <Stat label="Per partner" value={w.per_partner === null ? "—" : `${g(w.per_partner)}g`} tone={(w.per_partner ?? 0) < 0 ? "bad" : undefined} />
       </div>
       <p className="muted text-xs mb-8">
-        Income is sales plus rent. Expenses include purchases, so what is bought this week counts this week. Deposits, withdrawals and payouts count for neither. Who shares is set under Users. Shares are rounded down to whole gold, the rest stays in the treasury. Weeks run Monday to Sunday, UTC.
+        Income is sales plus rent. Expenses include purchases, so what is bought this week counts this week. Deposits, withdrawals and payouts count for neither. Who shares is set under Users. Shares are rounded down to whole gold, the rest stays in the treasury. What isn't paid out carries over to the next week. Weeks run Monday to Sunday, UTC.
       </p>
 
       <Section
@@ -65,19 +78,21 @@ export default async function Payments({ searchParams }: { searchParams: Promise
         }
       >
         <div className="panel overflow-x-auto">
-          <table className="ledger min-w-[34rem]">
-            <thead><tr><th>Partner</th><th className="text-right">This week</th><th className="text-right">Balance</th><th className="text-right">Pay out</th></tr></thead>
+          <table className="ledger min-w-[42rem]">
+            <thead><tr><th>Partner</th><th className="text-right">Carried over</th><th className="text-right">This week</th><th className="text-right">Paid</th><th className="text-right">Owed</th><th className="text-right">Pay out</th></tr></thead>
             <tbody>
-              {[...w.partners.map((p) => ({ id: p.id, name: p.name, share: shareOf(p) })), ...others.map((b) => ({ id: b.partner_id, name: b.name, share: 0 }))].map((p) => (
-                <tr key={p.id}>
+              {rows.map((p) => (
+                <tr key={p.partner_id}>
                   <td>{p.name}</td>
+                  <td className="text-right tabular-nums">{g(p.carried)}g</td>
                   <td className="text-right tabular-nums">{g(p.share)}g</td>
-                  <td className="text-right tabular-nums">{g(balanceOf(p.id))}g</td>
+                  <td className="text-right tabular-nums">{g(p.paid)}g</td>
+                  <td className={`text-right tabular-nums ${p.carried + p.share - p.paid < 0 ? "text-[#e08a8a]" : ""}`}>{g(p.carried + p.share - p.paid)}g</td>
                   <td>
                     <form action={payPartnerAction} className="flex justify-end gap-2">
                       <input type="hidden" name="week" value={week} />
-                      <input type="hidden" name="partner" value={p.id} />
-                      <input key={balanceOf(p.id)} name="amount" inputMode="decimal" className="input !w-24 !py-1 text-sm" defaultValue={balanceOf(p.id) > 0 ? g(balanceOf(p.id)) : ""} placeholder="0" aria-label={`Amount for ${p.name}`} />
+                      <input type="hidden" name="partner" value={p.partner_id} />
+                      <input key={payable(p.partner_id)} name="amount" inputMode="decimal" className="input !w-24 !py-1 text-sm" defaultValue={payable(p.partner_id) > 0 ? g(payable(p.partner_id)) : ""} placeholder="0" aria-label={`Amount for ${p.name}`} />
                       <button className="btn-ghost !py-1 text-sm" type="submit">Pay</button>
                     </form>
                   </td>
@@ -85,7 +100,7 @@ export default async function Payments({ searchParams }: { searchParams: Promise
               ))}
             </tbody>
           </table>
-          {!w.partners.length && !others.length && <Empty>Nobody shares the profit yet.</Empty>}
+          {!rows.length && <Empty>Nobody shares the profit yet.</Empty>}
         </div>
       </Section>
 

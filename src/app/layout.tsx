@@ -34,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <nav className="ml-auto flex gap-3 text-sm whitespace-nowrap">
               <Link className="hover:text-[#c9a227]" href="/#sections">Catalogue</Link>
               <Link className="hover:text-[#c9a227]" href="/#find-us">Visit us</Link>
+              {backofficeEnabled() && <Link className="hover:text-[#c9a227]" href="/commissions">Commissions</Link>}
               {backofficeEnabled() && (
                 <Link className="hover:text-[#c9a227]" href="/admin">{SHOP.roleName}</Link>
               )}

@@ -69,8 +69,7 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
           <form className="flex gap-2">
             {cat && <input type="hidden" name="cat" value={cat} />}
             <SuggestInput name="q" defaultValue={q} options={all.map((r) => r.name)} className="w-48" placeholder="Search stock" label="Search stock" />
-            <button className="btn-ghost !py-2 text-sm" type="submit">Search</button>
-          </form>
+            </form>
           {manager && <Link href="/admin/purchases" className="btn-gold !py-2 text-sm">+ Buy stock</Link>}
         </div>
       </PageHeader>
