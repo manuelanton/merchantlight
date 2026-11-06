@@ -131,6 +131,11 @@ describe('partner split', () => {
     expect((await week(manager)).w).toMatchObject({ other_income: 20, net: 84, per_partner: 42 })
   })
 
+  it('leaves Other in and Other out out of the profit', async () => {
+    await t.db.query(`insert into merchant.treasury_entries (entry_date, category, description, money_in, money_out) values ($1, 'Other', 'starting money', 2000, 0), ($1, 'Other', 'lent out', 0, 300)`, [`${WEEK} 16:00+00`])
+    expect((await week(manager)).w).toMatchObject({ other_income: 20, net: 84, per_partner: 42 })
+  })
+
   it('keeps it from Employees', async () => {
     await expect(week(employee)).rejects.toThrow(/Not allowed/)
     await expect(close(employee)).rejects.toThrow(/Not allowed/)

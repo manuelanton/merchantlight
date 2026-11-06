@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import ConfirmButton from "@/components/ConfirmButton";
 import { Empty, Notice, PageHeader, Section, Stat } from "@/components/store-ui";
 import { g } from "@/lib/format";
 import { isManager, requireStaff } from "@/lib/store-access";
-import { addRecipeLineAction, removeRecipeLineAction, saveItemAction, saveRecipeAction } from "@/lib/store-actions";
-import { getGood, listGoods, listMaterials, recipeLines } from "@/lib/store-data";
+import { addRecipeLineAction, removeItemAction, removeRecipeLineAction, saveItemAction, saveRecipeAction } from "@/lib/store-actions";
+import { RAW_MATERIALS, getGood, listCategories, listGoods, listMaterials, recipeLines } from "@/lib/store-data";
 
 export const dynamic = "force-dynamic";
 
@@ -15,9 +16,13 @@ export default async function Item({ params, searchParams }: { params: Promise<{
   const { error } = await searchParams;
   const good = /^[0-9a-f-]{36}$/.test(id) ? await getGood(access.profileId, id) : null;
   if (!good) notFound();
-  const [lines, goods, materials] = await Promise.all([recipeLines(access.profileId, id), listGoods(access.profileId), listMaterials(access.profileId)]);
+  const [lines, goods, materials, categories] = await Promise.all([recipeLines(access.profileId, id), listGoods(access.profileId), listMaterials(access.profileId), listCategories(access.profileId)]);
 
-  const others = goods.filter((i) => i.id !== id);
+  const rawItems = goods.filter((i) => i.id !== id && i.category === RAW_MATERIALS);
+  const parts = [
+    ...materials.map((m) => ({ value: `material:${m.id}`, name: m.name })),
+    ...rawItems.map((i) => ({ value: `good:${i.id}`, name: i.name })),
+  ].sort((a, b) => a.name.localeCompare(b.name));
   const trades = [...new Set(goods.map((i) => i.profession).filter(Boolean))] as string[];
   const cost = good.unit_cost ?? 0;
   const profit = good.sell_price - cost;
@@ -34,7 +39,7 @@ export default async function Item({ params, searchParams }: { params: Promise<{
         <form key={`${good.name}-${good.category}-${good.sell_price}-${good.buy_price}-${good.min_stock}-${good.on_menu}`} action={saveItemAction} className="panel p-4 grid grid-cols-2 sm:grid-cols-[2fr_1.2fr_1fr_1fr_1fr_auto] gap-3 items-end mb-4">
           <input type="hidden" name="id" value={id} />
           <div><label className="lbl" htmlFor="item-name">Name</label><input id="item-name" name="name" defaultValue={good.name} className="input !py-1 text-sm" required /></div>
-          <div><label className="lbl" htmlFor="item-category">Category</label><input id="item-category" name="category" list="item-categories" defaultValue={good.category} className="input !py-1 text-sm" /></div>
+          <div><label className="lbl" htmlFor="item-category">Category</label><select id="item-category" name="category" defaultValue={good.category} className="input !py-1 text-sm">{categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></div>
           <div><label className="lbl" htmlFor="item-price">Sale price</label><input id="item-price" name="sell_price" inputMode="decimal" defaultValue={g(good.sell_price)} className="input !py-1 text-sm" /></div>
           <div><label className="lbl" htmlFor="item-purchase">Purchase</label><input id="item-purchase" name="buy_price" inputMode="decimal" defaultValue={g(good.buy_price ?? 0)} className="input !py-1 text-sm" /></div>
           <div><label className="lbl" htmlFor="item-low">Low at</label><input id="item-low" name="min_stock" inputMode="decimal" defaultValue={g(good.min_stock)} className="input !py-1 text-sm" /></div>
@@ -43,7 +48,6 @@ export default async function Item({ params, searchParams }: { params: Promise<{
             <input type="checkbox" name="on_menu" value="1" defaultChecked={good.on_menu} className="accent-[#d97a1f]" />
             On menu: shown in the public catalogue
           </label>
-          <datalist id="item-categories">{[...new Set(goods.map((i) => i.category))].map((c) => <option key={c} value={c} />)}</datalist>
         </form>
       )}
 
@@ -91,11 +95,10 @@ export default async function Item({ params, searchParams }: { params: Promise<{
           <form action={addRecipeLineAction} className="panel p-4 grid grid-cols-[1fr_5rem_auto] gap-3 items-end mb-3">
             <input type="hidden" name="good" value={id} />
             <div className="min-w-0">
-              <label className="lbl" htmlFor="part">Add a part</label>
+              <label className="lbl" htmlFor="part">Add a raw material</label>
               <select id="part" name="part" className="input" required defaultValue="">
                 <option value="" disabled>Choose…</option>
-                {materials.length > 0 && <optgroup label="Raw materials">{materials.map((m) => <option key={m.id} value={`material:${m.id}`}>{m.name}</option>)}</optgroup>}
-                {others.length > 0 && <optgroup label="Items">{others.map((i) => <option key={i.id} value={`good:${i.id}`}>{i.name}</option>)}</optgroup>}
+                {parts.map((p) => <option key={p.value} value={p.value}>{p.name}</option>)}
               </select>
             </div>
             <div>
@@ -122,6 +125,15 @@ export default async function Item({ params, searchParams }: { params: Promise<{
           </form>
         )}
       </Section>
+
+      {manager && (
+        <form action={removeItemAction} className="border-t border-[#2b4149] pt-4 mt-8 flex items-center justify-between gap-3">
+          <p className="muted text-xs">Removing takes it out of every list and the catalogue. Receipts and crafts keep their history.</p>
+          <input type="hidden" name="kind" value="good" />
+          <input type="hidden" name="id" value={id} />
+          <ConfirmButton message={`Remove ${good.name}?`} className="btn-ghost !py-1 text-sm shrink-0">Remove item</ConfirmButton>
+        </form>
+      )}
     </div>
   );
 }

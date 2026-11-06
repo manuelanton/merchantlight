@@ -15,7 +15,7 @@ beforeAll(async () => {
   manager = await t.createUser('manager', 'Manager')
   employee = await t.createUser('employee', 'Employee')
   await t.as(manager, async () => {
-    id['Leather'] = (await t.one<{ id: string }>(`insert into merchant.materials (name, category, buy_price, sell_price) values ('Leather', 'Leather', 3, 1) returning id`)).id
+    id['Leather'] = (await t.one<{ id: string }>(`insert into merchant.materials (name, category, buy_price, sell_price) values ('Leather', 'Raw Materials', 3, 1) returning id`)).id
     id['Leather Armor'] = (await t.one<{ id: string }>(`insert into merchant.goods (name, sell_price) values ('Leather Armor', 20) returning id`)).id
     id['Strips'] = (await t.one<{ id: string }>(`insert into merchant.goods (name, sell_price) values ('Leather Strips', 1) returning id`)).id
   })

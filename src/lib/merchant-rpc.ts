@@ -27,6 +27,7 @@ export function rpcError(e: unknown): { status: number; error: string } {
   if (code === "42883") return { status: 404, error: "Unknown function" };
   if (code === "42501") return { status: 403, error: message?.startsWith("Not allowed") ? message : "Not allowed" };
   if (code === "P0001") return { status: 400, error: message ?? "Rejected" };
+  if (code === "23503" && message?.includes("category_fk")) return { status: 400, error: "Pick one of the listed categories" };
   console.error("merchant rpc failed", e);
   return { status: 500, error: "Something went wrong" };
 }

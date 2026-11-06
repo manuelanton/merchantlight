@@ -7,10 +7,10 @@ import { craftAction } from "@/lib/store-actions";
 import type { Recipe } from "@/lib/store-data";
 
 /** Pick a recipe and an amount, see what it takes off the shelf before anything happens, as on the Tavern's Cook page. */
-export default function CraftPanel({ recipes, initial }: { recipes: Recipe[]; initial?: string }) {
+export default function CraftPanel({ recipes, initial, initialQty }: { recipes: Recipe[]; initial?: string; initialQty?: string }) {
   const [id, setId] = useState(initial ?? "");
   const recipe = recipes.find((r) => r.id === id);
-  const [qty, setQty] = useState(recipe ? g(recipe.craft_yield) : "1");
+  const [qty, setQty] = useState(initialQty ?? (recipe ? g(recipe.craft_yield) : "1"));
 
   const amount = num(qty);
   const perCraft = Math.max(recipe?.craft_yield ?? 1, 1);
@@ -21,9 +21,10 @@ export default function CraftPanel({ recipes, initial }: { recipes: Recipe[]; in
     <div className="panel p-4 mb-8">
       <div className="grid grid-cols-[minmax(0,1fr)_5rem_auto] gap-3 items-end">
         <div className="min-w-0">
-          <span className="lbl">Recipe</span>
+          <label className="lbl" htmlFor="craft-recipe">Recipe</label>
           <SuggestInput
             key={recipe?.name}
+            id="craft-recipe"
             label="Recipe"
             placeholder="Search recipes"
             defaultValue={recipe?.name}

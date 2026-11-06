@@ -1,10 +1,11 @@
 import Link from "next/link";
+import ConfirmButton from "@/components/ConfirmButton";
 import { Empty, Notice, PageHeader, Section } from "@/components/store-ui";
 import SuggestInput from "@/components/SuggestInput";
 import { g } from "@/lib/format";
 import { isManager, requireStaff } from "@/lib/store-access";
-import { saveItemAction, saveMaterialAction } from "@/lib/store-actions";
-import { listItems, listMaterials } from "@/lib/store-data";
+import { removeItemAction, saveItemAction, saveMaterialAction } from "@/lib/store-actions";
+import { listCategories, listItems, listMaterials } from "@/lib/store-data";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ export default async function Items({ searchParams }: { searchParams: Promise<{ 
   const access = await requireStaff();
   const manager = isManager(access);
   const { error, q, cat, sort, dir } = await searchParams;
-  const [goods, materials] = await Promise.all([listItems(access.profileId), listMaterials(access.profileId)]);
+  const [goods, materials, allCategories] = await Promise.all([listItems(access.profileId), listMaterials(access.profileId), listCategories(access.profileId)]);
   const search = q?.trim().toLowerCase();
   const shownMaterials = search ? materials.filter((m) => m.name.toLowerCase().includes(search)) : materials;
 
@@ -55,7 +56,6 @@ export default async function Items({ searchParams }: { searchParams: Promise<{ 
         <form className="flex gap-2">
           {cat && <input type="hidden" name="cat" value={cat} />}
           <SuggestInput name="q" defaultValue={q} options={[...goods, ...materials].map((i) => i.name)} className="w-48" placeholder="Search items" label="Search items" />
-          <button className="btn-ghost !py-2 text-sm" type="submit">Search</button>
         </form>
       </PageHeader>
       <Notice error={error} />
@@ -65,12 +65,11 @@ export default async function Items({ searchParams }: { searchParams: Promise<{ 
           <summary className="btn-ghost inline-block !py-2 text-sm cursor-pointer">+ New item</summary>
           <form action={saveItemAction} className="panel p-4 mt-3 grid sm:grid-cols-[2fr_1.2fr_1fr_1fr_1fr_auto] gap-3 items-end">
             <div><label className="lbl" htmlFor="name">Name</label><input id="name" name="name" className="input" required /></div>
-            <div><label className="lbl" htmlFor="category">Category</label><input id="category" name="category" className="input" list="categories" /></div>
+            <div><label className="lbl" htmlFor="category">Category</label><select id="category" name="category" className="input" required defaultValue=""><option value="" disabled>Choose…</option>{allCategories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></div>
             <div><label className="lbl" htmlFor="sell_price">Price</label><input id="sell_price" name="sell_price" inputMode="decimal" className="input" /></div>
             <div><label className="lbl" htmlFor="buy_price">Purchase</label><input id="buy_price" name="buy_price" inputMode="decimal" className="input" /></div>
             <div><label className="lbl" htmlFor="min_stock">Low at</label><input id="min_stock" name="min_stock" inputMode="decimal" className="input" /></div>
             <button className="btn-gold !py-2 text-sm" type="submit">Add</button>
-            <datalist id="categories">{categories.map((c) => <option key={c} value={c} />)}</datalist>
           </form>
         </details>
       )}
@@ -125,7 +124,7 @@ export default async function Items({ searchParams }: { searchParams: Promise<{ 
                   <th className="text-right w-24">Price</th>
                   <th className="text-right w-24">Low at</th>
                   <th className="text-right w-16">Menu</th>
-                  {manager && <th className="w-20" />}
+                  {manager && <th className="w-28" />}
                 </tr>
               </thead>
               <tbody>
@@ -139,10 +138,17 @@ export default async function Items({ searchParams }: { searchParams: Promise<{ 
                       <td><input form={form} name="min_stock" inputMode="decimal" defaultValue={g(m.min_stock)} className="input !py-1 text-sm text-right" aria-label={`Low at of ${m.name}`} /></td>
                       <td className="text-right"><input form={form} type="checkbox" name="on_menu" value="1" defaultChecked={m.on_menu} className="accent-[#d97a1f]" aria-label={`${m.name} on the menu`} /></td>
                       <td>
-                        <form id={form} action={saveMaterialAction} className="flex justify-end">
-                          <input type="hidden" name="id" value={m.id} />
-                          <button className="btn-ghost !py-1 !px-2 text-sm" type="submit">Save</button>
-                        </form>
+                        <div className="flex justify-end gap-1">
+                          <form id={form} action={saveMaterialAction}>
+                            <input type="hidden" name="id" value={m.id} />
+                            <button className="btn-ghost !py-1 !px-2 text-sm" type="submit">Save</button>
+                          </form>
+                          <form action={removeItemAction}>
+                            <input type="hidden" name="kind" value="material" />
+                            <input type="hidden" name="id" value={m.id} />
+                            <ConfirmButton message={`Remove ${m.name}? It leaves every list, receipts keep their history.`} className="btn-ghost !py-1 !px-2 text-sm"><span aria-label={`Remove ${m.name}`}>×</span></ConfirmButton>
+                          </form>
+                        </div>
                       </td>
                     </tr>
                   ) : (

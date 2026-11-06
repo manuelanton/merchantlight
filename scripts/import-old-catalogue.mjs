@@ -13,7 +13,7 @@ const COST = "(case when i.cost_value > 0 then i.cost_value else i.sale_price en
 
 const MATERIALS = `
   insert into merchant.materials (name, category, buy_price, sell_price, min_stock, active)
-  select btrim(i.name), 'Materials', ${COST}, i.sale_price::numeric::double precision, coalesce(i.low_threshold, 0),
+  select btrim(i.name), 'Raw Materials', ${COST}, i.sale_price::numeric::double precision, coalesce(i.low_threshold, 0),
          i.active or exists (select 1 from public.item_ingredients g join public.items o on o.id = g.item_id where g.material_item_id = i.id)
   from public.items i
   where i.category_slug = 'materials'
@@ -22,7 +22,7 @@ const MATERIALS = `
 // Variants with "inherit" took their parent's cost, so they get its cost and recipe here.
 const GOODS = `
   insert into merchant.goods (name, category, sell_price, buy_price, min_stock, active, profession)
-  select btrim(i.name), coalesce(c.name, 'Other'), i.sale_price::numeric::double precision,
+  select btrim(i.name), case c.name when 'Materials' then 'Raw Materials' else coalesce(c.name, 'Other') end, i.sale_price::numeric::double precision,
          case when p.id is not null then (select ${COST} from public.items i where i.id = p.id) else ${COST} end,
          coalesce(i.low_threshold, 0), i.active,
          case i.category_slug when 'clothes' then 'Tailor' when 'bags' then 'Tailor'

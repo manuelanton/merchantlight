@@ -128,6 +128,65 @@ export async function saveRecipeAction(form: FormData) {
   );
 }
 
+export async function removeItemAction(form: FormData) {
+  const access = await requireManager();
+  const kind = text(form, "kind") === "material" ? "material" : "good";
+  const id = text(form, "id");
+  await attempt(kind === "good" ? `/admin/items/${id}` : "/admin/items", () => asUser(access.profileId, `select merchant.remove_item($1, $2)`, [kind, id]));
+  revalidatePath("/", "layout");
+  redirect("/admin/items");
+}
+
+export async function requestCraftAction(form: FormData) {
+  const access = await requireManager();
+  await attempt("/admin/craft", () =>
+    asUser(access.profileId, `select merchant.request_craft($1, $2, $3)`, [text(form, "good"), num(form.get("qty")), text(form, "note")]),
+  );
+  redirect("/admin/craft");
+}
+
+export async function cancelCraftRequestAction(form: FormData) {
+  const access = await requireManager();
+  await attempt("/admin/craft", () => asUser(access.profileId, `select merchant.cancel_craft_request($1)`, [text(form, "id")]));
+}
+
+export async function addCommissionAction(form: FormData) {
+  const access = await requireStaff();
+  await attempt("/admin/commissions", () =>
+    asUser(access.profileId, `select merchant.create_eec_order($1, $2::jsonb)`, [text(form, "customer"), text(form, "lines") || "[]"]),
+  );
+}
+
+export async function setCommissionFulfilledAction(form: FormData) {
+  const access = await requireStaff();
+  await attempt("/admin/commissions", () => asUser(access.profileId, `select merchant.set_eec_fulfilled($1, $2)`, [text(form, "id"), text(form, "on") === "1"]));
+}
+
+export async function setCommissionPaidAction(form: FormData) {
+  const access = await requireStaff();
+  await attempt("/admin/commissions", () => asUser(access.profileId, `select merchant.set_eec_paid($1, $2)`, [text(form, "id"), text(form, "on") === "1"]));
+}
+
+export async function setCommissionCancelledAction(form: FormData) {
+  const access = await requireStaff();
+  await attempt("/admin/commissions", () => asUser(access.profileId, `select merchant.set_eec_cancelled($1, $2)`, [text(form, "id"), text(form, "on") === "1"]));
+}
+
+/** The whole price list in one go: every row sends its own `cost_<id>` and `price_<id>`. */
+export async function saveEecPricesAction(form: FormData) {
+  const access = await requireManager();
+  const ids = form.getAll("id").map(String);
+  await attempt("/admin/commissions", () =>
+    asUser(
+      access.profileId,
+      `update merchant.eec_items e set cost = v.cost, price = v.price
+       from unnest($1::uuid[], $2::double precision[], $3::double precision[]) as v (id, cost, price)
+       where e.id = v.id and (e.cost <> v.cost or e.price <> v.price)`,
+      [ids, ids.map((id) => num(form.get(`cost_${id}`))), ids.map((id) => num(form.get(`price_${id}`)))],
+    ),
+  );
+}
+
 export async function craftAction(form: FormData) {
   const access = await requireStaff();
   await attempt("/admin/craft", () => asUser(access.profileId, `select merchant.craft($1, $2)`, [text(form, "id"), num(form.get("qty"))]));
@@ -203,6 +262,21 @@ export async function saveDailyRentAction(form: FormData) {
   await attempt("/admin/settings", () =>
     asUser(access.profileId, `update merchant.settings set building_rent_per_day = $1`, [num(form.get("per_day"))]),
   );
+}
+
+export async function addCategoryAction(form: FormData) {
+  const access = await requireOwner();
+  await attempt("/admin/settings", () => asUser(access.profileId, `select merchant.add_category($1)`, [text(form, "name")]));
+}
+
+export async function renameCategoryAction(form: FormData) {
+  const access = await requireOwner();
+  await attempt("/admin/settings", () => asUser(access.profileId, `select merchant.rename_category($1, $2)`, [text(form, "id"), text(form, "name")]));
+}
+
+export async function removeCategoryAction(form: FormData) {
+  const access = await requireOwner();
+  await attempt("/admin/settings", () => asUser(access.profileId, `select merchant.remove_category($1)`, [text(form, "id")]));
 }
 
 export async function saveRentPaidUntilAction(form: FormData) {

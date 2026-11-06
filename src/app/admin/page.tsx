@@ -4,7 +4,7 @@ import { g } from "@/lib/format";
 import { isShopOpen } from "@/lib/shop";
 import { isManager, requireStaff } from "@/lib/store-access";
 import { setOpenAction } from "@/lib/store-actions";
-import { isLow, listGoods, listMaterials, partnerBalances, partnerWeek, todaysSales, weekStart } from "@/lib/store-data";
+import { eecOrderStats, isLow, listCraftRequests, listGoods, listMaterials, partnerLedger, partnerWeek, todaysSales, weekStart } from "@/lib/store-data";
 
 export const dynamic = "force-dynamic";
 
@@ -12,9 +12,10 @@ export default async function Today() {
   const access = await requireStaff();
   const manager = isManager(access);
   const [sales, goods, materials, open] = await Promise.all([todaysSales(access.profileId), listGoods(access.profileId), listMaterials(access.profileId), isShopOpen()]);
-  const [week, balances] = manager
-    ? await Promise.all([partnerWeek(access.profileId, weekStart()), partnerBalances(access.profileId)])
+  const [week, ledger] = manager
+    ? await Promise.all([partnerWeek(access.profileId, weekStart()), partnerLedger(access.profileId, weekStart())])
     : [null, []];
+  const [requests, commissions] = await Promise.all([listCraftRequests(access.profileId), eecOrderStats(access.profileId)]);
 
   const posted = sales.filter((s) => s.status === "posted");
   const drafts = sales.length - posted.length;
@@ -22,7 +23,6 @@ export default async function Today() {
   const profit = posted.reduce((sum, s) => sum + (s.profit ?? 0), 0);
   const items = posted.reduce((sum, s) => sum + s.items, 0);
   const low = [...goods, ...materials].filter(isLow);
-  const balanceOf = (id: string) => balances.find((b) => b.partner_id === id)?.balance ?? 0;
 
   return (
     <>
@@ -53,6 +53,16 @@ export default async function Today() {
           {drafts} {drafts === 1 ? "receipt is" : "receipts are"} still a draft and not in the books yet.
         </Link>
       )}
+      {requests.length > 0 && (
+        <Link href="/admin/craft" className="panel block px-4 py-3 mb-3 text-sm hover:bg-[#1d1a16]">
+          {requests.length} craft {requests.length === 1 ? "request is" : "requests are"} waiting on the Craft page.
+        </Link>
+      )}
+      {commissions.to_fulfil + commissions.to_collect > 0 && (
+        <Link href="/admin/commissions" className="panel block px-4 py-3 mb-3 text-sm hover:bg-[#1d1a16]">
+          Commissions: {commissions.to_fulfil} to fulfil, {commissions.to_collect} still unpaid.
+        </Link>
+      )}
       {low.length > 0 && (
         <Link href="/admin/stock" className="panel block px-4 py-3 mb-6 hover:bg-[#1d1a16]">
           <span className="text-sm text-[#e0bd4a]">{low.length} {low.length === 1 ? "item is" : "items are"} low on stock</span>
@@ -64,13 +74,13 @@ export default async function Today() {
         <Section title="This week's split" aside={`${g(week.net)}g net, shared by ${week.partners.length}`}>
           <div className="panel overflow-x-auto">
             <table className="ledger">
-              <thead><tr><th>Partner</th><th className="text-right">This week</th><th className="text-right">Balance</th></tr></thead>
+              <thead><tr><th>Partner</th><th className="text-right">This week</th><th className="text-right">Carried over</th></tr></thead>
               <tbody>
-                {week.partners.map((p) => (
-                  <tr key={p.id}>
+                {ledger.filter((p) => p.share || p.carried - p.paid || week.partners.some((w) => w.id === p.partner_id)).map((p) => (
+                  <tr key={p.partner_id}>
                     <td>{p.name}</td>
-                    <td className="text-right tabular-nums">{g(week.per_partner ?? 0)}g</td>
-                    <td className="text-right tabular-nums">{g(balanceOf(p.id))}g</td>
+                    <td className="text-right tabular-nums">{g(p.share)}g</td>
+                    <td className="text-right tabular-nums">{g(p.carried - p.paid)}g</td>
                   </tr>
                 ))}
               </tbody>

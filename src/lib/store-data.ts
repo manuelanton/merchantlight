@@ -42,12 +42,12 @@ export interface PartnerWeek {
   partners: { id: string; name: string; amount?: number }[];
 }
 
-export interface PartnerBalance {
+export interface PartnerLedger {
   partner_id: string;
   name: string;
-  earned: number;
+  carried: number;
+  share: number;
   paid: number;
-  balance: number;
 }
 
 export interface TreasuryRow {
@@ -253,8 +253,8 @@ export async function analytics(profileId: string, from: string | null, to: stri
     ),
     asUser<{ net: number }>(
       profileId,
-      `select coalesce(sum(money_in) filter (where category <> 'Deposit'), 0)
-             - coalesce(sum(money_out) filter (where category not in ('Withdrawal', 'Partner payout')), 0) as net
+      `select coalesce(sum(money_in) filter (where category not in ('Deposit', 'Other')), 0)
+             - coalesce(sum(money_out) filter (where category not in ('Withdrawal', 'Partner payout', 'Other')), 0) as net
        from merchant.treasury_entries where ${inRange("entry_date")}`,
       range,
     ),
@@ -305,8 +305,14 @@ export async function partnerWeek(profileId: string, week: string) {
   return row.w;
 }
 
-export function partnerBalances(profileId: string) {
-  return asUser<PartnerBalance>(profileId, `select * from merchant.partner_balances()`);
+/** Per partner in a week: carried in from before, the week's share, and what was paid in it. */
+export function partnerLedger(profileId: string, week: string) {
+  return asUser<PartnerLedger>(profileId, `select * from merchant.partner_ledger($1::date)`, [week]);
+}
+
+export async function partnerOpenWeeks(profileId: string, week: string) {
+  const rows = await asUser<{ week: string }>(profileId, `select w::text as week from merchant.partner_open_weeks($1::date) w`, [week]);
+  return rows.map((r) => r.week);
 }
 
 export interface TreasuryFilter {
@@ -397,6 +403,25 @@ export interface Material {
   on_menu: boolean;
   stock: number;
   min_stock: number;
+}
+
+export const RAW_MATERIALS = "Raw Materials";
+
+export interface ItemCategory {
+  id: string;
+  name: string;
+  is_system: boolean;
+  items: number;
+}
+
+export function listCategories(profileId: string) {
+  return asUser<ItemCategory>(
+    profileId,
+    `select c.id, c.name, c.is_system,
+            (select count(*) from merchant.goods g where g.category = c.name and g.active)::int
+            + (select count(*) from merchant.materials m where m.category = c.name and m.active)::int as items
+     from merchant.categories c order by c.sort_order, c.name`,
+  );
 }
 
 export function listMaterials(profileId: string) {
@@ -523,6 +548,7 @@ export interface Recipe {
   stock: number;
   craft_yield: number;
   parts: string;
+  min_stock: number;
   lines: { name: string; quantity: number; stock: number }[];
   max_qty: number;
   limiting: string | null;
@@ -532,7 +558,7 @@ export interface Recipe {
 export function listRecipes(profileId: string) {
   return asUser<Recipe>(
     profileId,
-    `select g.id, g.name, g.profession, g.stock, g.craft_yield, cap.max_qty, cap.limiting,
+    `select g.id, g.min_stock, g.name, g.profession, g.stock, g.craft_yield, cap.max_qty, cap.limiting,
             (select string_agg(r.quantity || '× ' || coalesce(m.name, c.name), ', ' order by r.created_at)
              from merchant.recipe_components r
              left join merchant.materials m on m.id = r.material_id
@@ -549,6 +575,84 @@ export function listRecipes(profileId: string) {
        and exists (select 1 from merchant.recipe_components r where r.good_id = g.id)
      order by g.profession nulls last, g.name`,
   );
+}
+
+export interface CraftRequest {
+  id: string;
+  good_id: string;
+  name: string;
+  stock: number;
+  quantity: number;
+  fulfilled: number;
+  note: string;
+  created_at: string | Date;
+  requested_by: string | null;
+}
+
+export function listCraftRequests(profileId: string) {
+  return asUser<CraftRequest>(
+    profileId,
+    `select r.id, r.good_id, g.name, g.stock, r.quantity, r.fulfilled, r.note, r.created_at,
+            coalesce(p.display_name, p.username) as requested_by
+     from merchant.craft_requests r
+     join merchant.goods g on g.id = r.good_id
+     left join merchant.profiles p on p.id = r.requested_by
+     where r.status = 'open' order by r.created_at`,
+  );
+}
+
+export interface EecItem {
+  id: string;
+  name: string;
+  category: string;
+  cost: number;
+  price: number;
+  weekly_limit: number | null;
+}
+
+export function listEecItems(profileId: string) {
+  return asUser<EecItem>(profileId, `select id, name, category, cost, price, weekly_limit from merchant.eec_items order by sort_order`);
+}
+
+export interface EecOrder {
+  id: string;
+  customer: string;
+  items: string;
+  total: number;
+  order_date: string | Date;
+  fulfilled: boolean;
+  paid: boolean;
+  cancelled: boolean;
+  sale_id: string | null;
+  receipt_no: number | null;
+}
+
+export async function listEecOrders(profileId: string, filter: { q?: string; status: string; page: number }) {
+  const rows = await asUser<EecOrder>(
+    profileId,
+    `select * from merchant.eec_order_list() r
+     where ($2::text is null or r.customer ilike '%' || $2 || '%' or r.items ilike '%' || $2 || '%')
+       and case $1 when 'all' then true
+                   when 'cancelled' then r.cancelled
+                   when 'done' then not r.cancelled and r.fulfilled and r.paid
+                   else not r.cancelled and not (r.fulfilled and r.paid) end`,
+    [filter.status, filter.q?.trim() || null],
+  );
+  return { rows: rows.slice(filter.page * PAGE_SIZE, (filter.page + 1) * PAGE_SIZE), total: rows.length };
+}
+
+export async function eecOrderStats(profileId: string) {
+  const [[stats], customers] = await Promise.all([
+    asUser<{ to_fulfil: number; to_collect: number; unpaid: number }>(
+      profileId,
+      `select count(*) filter (where not fulfilled)::int as to_fulfil,
+              count(*) filter (where not paid)::int as to_collect,
+              coalesce(sum(total) filter (where not paid), 0) as unpaid
+       from merchant.eec_order_list() where not cancelled`,
+    ),
+    asUser<{ customer: string }>(profileId, `select distinct customer from merchant.eec_orders order by 1 limit 200`),
+  ]);
+  return { ...stats, customers: customers.map((c) => c.customer) };
 }
 
 export function listCrafts(profileId: string) {
