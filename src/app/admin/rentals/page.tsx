@@ -48,7 +48,7 @@ function UnitCard({ u, manager }: { u: RentalUnit; manager: boolean }) {
         <div className="min-w-0">
           <div className="truncate">{u.name}</div>
           <div className="muted text-xs leading-snug">
-            {internal ? (u.notes ? `Company use · for ${u.notes}` : "Company use") : `${g(u.rate ?? u.weekly_price)}g per week`}
+            {internal ? (u.notes ? `For ${u.notes}` : "Company use") : `${g(u.rate ?? u.weekly_price)}g per week`}
             {u.secured ? " · locked" : ""}
           </div>
         </div>
@@ -66,11 +66,13 @@ function UnitCard({ u, manager }: { u: RentalUnit; manager: boolean }) {
 
       {manager && rented && (
         <div className="space-y-2">
-          <form action={extendRentalAction} className="flex items-center gap-2">
+          <form action={extendRentalAction} className="space-y-2">
             <input type="hidden" name="id" value={u.rental_id ?? ""} />
-            <input name="weeks" inputMode="numeric" defaultValue="1" className="input !w-14 !py-1 text-sm" aria-label={`Weeks to extend ${u.name}`} />
-            <span className="muted text-xs">weeks</span>
-            <button className="btn-gold !py-1 text-sm flex-1" type="submit">Extend</button>
+            <div className="flex items-center gap-2">
+              <input name="weeks" inputMode="numeric" defaultValue="1" className="input !w-14 !py-1 text-sm" aria-label={`Weeks to extend ${u.name}`} />
+              <span className="muted text-xs">weeks</span>
+            </div>
+            <button className="btn-gold !py-1 text-sm w-full" type="submit">Extend</button>
           </form>
           <form action={endRentalAction}>
             <input type="hidden" name="id" value={u.rental_id ?? ""} />
