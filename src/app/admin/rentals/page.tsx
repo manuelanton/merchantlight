@@ -47,7 +47,7 @@ function UnitCard({ u, manager }: { u: RentalUnit; manager: boolean }) {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="truncate">{u.name}</div>
-          <div className="muted text-xs truncate">
+          <div className="muted text-xs leading-snug">
             {internal ? (u.notes ? `Company use · for ${u.notes}` : "Company use") : `${g(u.rate ?? u.weekly_price)}g per week`}
             {u.secured ? " · locked" : ""}
           </div>
@@ -65,16 +65,16 @@ function UnitCard({ u, manager }: { u: RentalUnit; manager: boolean }) {
       )}
 
       {manager && rented && (
-        <div className="flex items-center justify-between gap-2">
+        <div className="space-y-2">
           <form action={extendRentalAction} className="flex items-center gap-2">
             <input type="hidden" name="id" value={u.rental_id ?? ""} />
             <input name="weeks" inputMode="numeric" defaultValue="1" className="input !w-14 !py-1 text-sm" aria-label={`Weeks to extend ${u.name}`} />
             <span className="muted text-xs">weeks</span>
-            <button className="btn-gold !py-1 text-sm" type="submit">Extend</button>
+            <button className="btn-gold !py-1 text-sm flex-1" type="submit">Extend</button>
           </form>
           <form action={endRentalAction}>
             <input type="hidden" name="id" value={u.rental_id ?? ""} />
-            <ConfirmButton className="btn-ghost !py-1 text-sm" message={`End the rental of ${u.name}? ${u.renter} moves out, paid amounts stay booked.`}>End</ConfirmButton>
+            <ConfirmButton className="btn-ghost !py-1 text-sm w-full" message={`End the rental of ${u.name}? ${u.renter} moves out, paid amounts stay booked.`}>End</ConfirmButton>
           </form>
         </div>
       )}
@@ -86,8 +86,8 @@ function UnitCard({ u, manager }: { u: RentalUnit; manager: boolean }) {
           <div className="flex items-center gap-2">
             <input name="weeks" inputMode="numeric" defaultValue="1" className="input !w-14 !py-1 text-sm" aria-label={`Weeks for ${u.name}`} />
             <span className="muted text-xs">weeks</span>
-            <button className="btn-gold !py-1 text-sm whitespace-nowrap ml-auto" type="submit">Rent out</button>
           </div>
+          <button className="btn-gold !py-1 text-sm w-full" type="submit">Rent out</button>
         </form>
       )}
 
