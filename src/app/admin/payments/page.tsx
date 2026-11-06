@@ -43,7 +43,7 @@ export default async function Payments({ searchParams }: { searchParams: Promise
         <Stat label="Per partner" value={w.per_partner === null ? "—" : `${g(w.per_partner)}g`} tone={(w.per_partner ?? 0) < 0 ? "bad" : undefined} />
       </div>
       <p className="muted text-xs mb-8">
-        Income is sales plus rent. Expenses include purchases, so what is bought this week counts this week. Deposits, withdrawals and payouts count for neither. Who shares is set under Users. Weeks run Monday to Sunday, UTC.
+        Income is sales plus rent. Expenses include purchases, so what is bought this week counts this week. Deposits, withdrawals and payouts count for neither. Who shares is set under Users. Shares are rounded down to whole gold, the rest stays in the treasury. Weeks run Monday to Sunday, UTC.
       </p>
 
       <Section
