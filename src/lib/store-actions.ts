@@ -153,11 +153,11 @@ export async function deletePurchaseAction(form: FormData) {
 export async function saveUnitAction(form: FormData) {
   const access = await requireManager();
   const id = text(form, "id");
-  const fields = [text(form, "name"), num(form.get("weekly_price")), text(form, "location"), text(form, "kind") === "internal" ? "internal" : "rental", form.get("secured") === "1"];
+  const fields = [text(form, "name"), num(form.get("weekly_price")), text(form, "location"), text(form, "kind") === "internal" ? "internal" : "rental", form.get("secured") === "1", text(form, "notes") || null];
   await attempt("/admin/rentals", () =>
     id
-      ? asUser(access.profileId, `update merchant.storage_units set name = $1, weekly_price = $2, location = $3, kind = $4, secured = $5 where id = $6`, [...fields, id])
-      : asUser(access.profileId, `insert into merchant.storage_units (name, weekly_price, location, kind, secured) values ($1, $2, $3, $4, $5)`, fields),
+      ? asUser(access.profileId, `update merchant.storage_units set name = $1, weekly_price = $2, location = $3, kind = $4, secured = $5, notes = $6 where id = $7`, [...fields, id])
+      : asUser(access.profileId, `insert into merchant.storage_units (name, weekly_price, location, kind, secured, notes) values ($1, $2, $3, $4, $5, $6)`, fields),
   );
 }
 

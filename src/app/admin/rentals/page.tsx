@@ -29,6 +29,7 @@ function UnitFields({ unit }: { unit?: RentalUnit }) {
           <option value="internal">Internal</option>
         </select>
       </div>
+      <div><label className="lbl" htmlFor={`for-${id}`}>For (company use)</label><input id={`for-${id}`} name="notes" defaultValue={unit?.notes ?? ""} className="input !py-1 text-sm" placeholder="Who is it for?" /></div>
       <label className="flex items-center gap-2 text-xs cursor-pointer">
         <input type="checkbox" name="secured" value="1" defaultChecked={unit?.secured} className="accent-[#d97a1f]" />
         Behind a locked door
@@ -42,13 +43,16 @@ function UnitCard({ u, manager }: { u: RentalUnit; manager: boolean }) {
   const overdue = rented && (u.days_left ?? 0) < 0;
   const internal = u.kind === "internal";
   return (
-    <div className={`panel p-4 space-y-3 ${overdue ? "border-[#7a2430]" : ""}`}>
+    <div className={`panel p-4 space-y-3 h-full flex flex-col ${overdue ? "border-[#7a2430]" : ""}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="truncate">{u.name}</div>
-          <div className="muted text-xs truncate">{internal ? "Company use" : `${g(u.rate ?? u.weekly_price)}g per week`}{u.secured ? " · locked" : ""}</div>
+          <div className="muted text-xs truncate">
+            {internal ? (u.notes ? `Company use · for ${u.notes}` : "Company use") : `${g(u.rate ?? u.weekly_price)}g per week`}
+            {u.secured ? " · locked" : ""}
+          </div>
         </div>
-        {!internal && <span className={overdue ? "badge border-[#7a2430] text-[#e08a8a]" : rented ? "badge badge-in" : "badge badge-out"}>{overdue ? "overdue" : rented ? "rented" : "free"}</span>}
+        {internal ? <span className="badge badge-out">company</span> : <span className={overdue ? "badge border-[#7a2430] text-[#e08a8a]" : rented ? "badge badge-in" : "badge badge-out"}>{overdue ? "overdue" : rented ? "rented" : "free"}</span>}
       </div>
 
       {rented && (
@@ -62,9 +66,10 @@ function UnitCard({ u, manager }: { u: RentalUnit; manager: boolean }) {
 
       {manager && rented && (
         <div className="flex items-center justify-between gap-2">
-          <form action={extendRentalAction} className="flex gap-2">
+          <form action={extendRentalAction} className="flex items-center gap-2">
             <input type="hidden" name="id" value={u.rental_id ?? ""} />
             <input name="weeks" inputMode="numeric" defaultValue="1" className="input !w-14 !py-1 text-sm" aria-label={`Weeks to extend ${u.name}`} />
+            <span className="muted text-xs">weeks</span>
             <button className="btn-gold !py-1 text-sm" type="submit">Extend</button>
           </form>
           <form action={endRentalAction}>
@@ -75,11 +80,14 @@ function UnitCard({ u, manager }: { u: RentalUnit; manager: boolean }) {
       )}
 
       {manager && !rented && !internal && (
-        <form action={rentOutAction} className="flex gap-2">
+        <form action={rentOutAction} className="space-y-2">
           <input type="hidden" name="id" value={u.id} />
-          <input name="renter" className="input !py-1 text-sm min-w-0" placeholder="Renter" aria-label={`Renter of ${u.name}`} required />
-          <input name="weeks" inputMode="numeric" defaultValue="1" className="input !w-14 !py-1 text-sm" aria-label={`Weeks for ${u.name}`} />
-          <button className="btn-gold !py-1 text-sm whitespace-nowrap" type="submit">Rent out</button>
+          <input name="renter" className="input !py-1 text-sm w-full" placeholder="Renter" aria-label={`Renter of ${u.name}`} required />
+          <div className="flex items-center gap-2">
+            <input name="weeks" inputMode="numeric" defaultValue="1" className="input !w-14 !py-1 text-sm" aria-label={`Weeks for ${u.name}`} />
+            <span className="muted text-xs">weeks</span>
+            <button className="btn-gold !py-1 text-sm whitespace-nowrap ml-auto" type="submit">Rent out</button>
+          </div>
         </form>
       )}
 
@@ -143,7 +151,7 @@ export default async function Rentals({ searchParams }: { searchParams: Promise<
       {manager && (
         <details className="mb-6">
           <summary className="btn-ghost inline-block !py-2 text-sm cursor-pointer">+ New unit</summary>
-          <form action={saveUnitAction} className="panel p-4 mt-3 grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
+          <form action={saveUnitAction} className="panel p-4 mt-3 grid grid-cols-2 md:grid-cols-7 gap-3 items-end">
             <UnitFields />
             <button className="btn-gold !py-2 text-sm" type="submit">Add</button>
           </form>
@@ -153,7 +161,7 @@ export default async function Rentals({ searchParams }: { searchParams: Promise<
       {!units.length && <div className="panel mb-8"><Empty>No storage units yet.</Empty></div>}
       {[...sites.entries()].map(([site, list]) => (
         <Section key={site} title={site}>
-          <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3 items-start">
+          <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
             {list.map((u) => <UnitCard key={u.id} u={u} manager={manager} />)}
           </div>
         </Section>
