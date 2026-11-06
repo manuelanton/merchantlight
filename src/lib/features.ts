@@ -19,8 +19,6 @@ export const RUNTIME_FEATURES = [
   { key: "storage", label: "Storage admin tab", desc: "Show the Storage section in the backoffice nav." },
   { key: "storagePublic", label: "Public storage teaser", desc: "Storage card + visit-us note on the public homepage." },
   { key: "upcomingTeasers", label: "Upcoming-section teasers", desc: "Cards for empty upcoming sections (e.g. Enchantments)." },
-  { key: "notes", label: "Board tab", desc: "Show the noticeboard in the backoffice nav." },
-  { key: "guide", label: "Guide tab", desc: "Show the quartermaster guide in the backoffice nav." },
 ] as const;
 
 export type RuntimeFeatureKey = (typeof RUNTIME_FEATURES)[number]["key"];
