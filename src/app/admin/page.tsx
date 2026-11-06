@@ -49,7 +49,7 @@ export default async function Today() {
       </div>
 
       {drafts > 0 && (
-        <Link href="/admin/sales?status=draft" className="panel block px-4 py-3 mb-3 text-sm hover:bg-[#1d1a16]">
+        <Link href="/admin/sales?status=draft&range=all" className="panel block px-4 py-3 mb-3 text-sm hover:bg-[#1d1a16]">
           {drafts} {drafts === 1 ? "receipt is" : "receipts are"} still a draft and not in the books yet.
         </Link>
       )}

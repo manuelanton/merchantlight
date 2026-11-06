@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Empty, Notice, PageHeader, Section } from "@/components/store-ui";
+import SuggestInput from "@/components/SuggestInput";
 import { g } from "@/lib/format";
 import { isManager, requireStaff } from "@/lib/store-access";
 import { saveItemAction, saveMaterialAction } from "@/lib/store-actions";
@@ -53,7 +54,7 @@ export default async function Items({ searchParams }: { searchParams: Promise<{ 
       <PageHeader title="Items" subtitle="Cost comes from the recipe. Margins under 30% are flagged.">
         <form className="flex gap-2">
           {cat && <input type="hidden" name="cat" value={cat} />}
-          <input name="q" defaultValue={q} className="input !w-48 !py-2 text-sm" placeholder="Search items" aria-label="Search items" />
+          <SuggestInput name="q" defaultValue={q} options={[...goods, ...materials].map((i) => i.name)} className="w-48" placeholder="Search items" label="Search items" />
           <button className="btn-ghost !py-2 text-sm" type="submit">Search</button>
         </form>
       </PageHeader>
@@ -99,7 +100,7 @@ export default async function Items({ searchParams }: { searchParams: Promise<{ 
               const low = !i.cost_error && i.margin !== null && i.margin < LOW_MARGIN;
               return (
                 <tr key={i.id}>
-                  <td><Link href={`/admin/items/${i.id}`} className="hover:text-[#e0bd4a]">{i.name}</Link>{i.is_bundle && <span className="muted text-xs"> · bundle</span>}</td>
+                  <td><Link href={`/admin/items/${i.id}`} className="hover:text-[#e0bd4a]">{i.name}</Link>{i.is_bundle && <span className="muted text-xs"> · bundle</span>}{!i.on_menu && <span className="muted text-xs"> · off menu</span>}</td>
                   <td className="muted text-sm">{i.category}</td>
                   <td className="text-right tabular-nums">{i.cost_error ? <span className="text-[#e08a8a]">circular</span> : `${g(i.cost)}g`}</td>
                   <td className="text-right tabular-nums">{g(i.price)}g</td>
@@ -114,14 +115,16 @@ export default async function Items({ searchParams }: { searchParams: Promise<{ 
       </div>
 
       {(manager || shownMaterials.length > 0) && (
-        <Section title="Raw materials" aside="Bought in and used in recipes, not sold.">
+        <Section title="Raw materials" aside="Bought in and used in recipes. Switched on the menu, they sell at their price.">
           <div className="panel overflow-x-auto">
-            <table className="ledger min-w-[30rem] table-fixed">
+            <table className="ledger min-w-[36rem] table-fixed">
               <thead>
                 <tr>
                   <th>Material</th>
                   <th className="text-right w-24">Cost</th>
+                  <th className="text-right w-24">Price</th>
                   <th className="text-right w-24">Low at</th>
+                  <th className="text-right w-16">Menu</th>
                   {manager && <th className="w-20" />}
                 </tr>
               </thead>
@@ -132,7 +135,9 @@ export default async function Items({ searchParams }: { searchParams: Promise<{ 
                     <tr key={m.id}>
                       <td><input form={form} name="name" defaultValue={m.name} className="input !py-1 text-sm" aria-label={`Name of ${m.name}`} required /></td>
                       <td><input form={form} name="buy_price" inputMode="decimal" defaultValue={g(m.buy_price)} className="input !py-1 text-sm text-right" aria-label={`Cost of ${m.name}`} /></td>
+                      <td><input form={form} name="sell_price" inputMode="decimal" defaultValue={g(m.sell_price ?? m.buy_price)} className="input !py-1 text-sm text-right" aria-label={`Price of ${m.name}`} /></td>
                       <td><input form={form} name="min_stock" inputMode="decimal" defaultValue={g(m.min_stock)} className="input !py-1 text-sm text-right" aria-label={`Low at of ${m.name}`} /></td>
+                      <td className="text-right"><input form={form} type="checkbox" name="on_menu" value="1" defaultChecked={m.on_menu} className="accent-[#d97a1f]" aria-label={`${m.name} on the menu`} /></td>
                       <td>
                         <form id={form} action={saveMaterialAction} className="flex justify-end">
                           <input type="hidden" name="id" value={m.id} />
@@ -144,7 +149,9 @@ export default async function Items({ searchParams }: { searchParams: Promise<{ 
                     <tr key={m.id}>
                       <td className="truncate">{m.name}</td>
                       <td className="text-right tabular-nums">{g(m.buy_price)}</td>
+                      <td className="text-right tabular-nums">{g(m.sell_price ?? m.buy_price)}</td>
                       <td className="text-right tabular-nums">{g(m.min_stock)}</td>
+                      <td className="text-right muted">{m.on_menu ? "Yes" : "No"}</td>
                     </tr>
                   );
                 })}
@@ -152,7 +159,9 @@ export default async function Items({ searchParams }: { searchParams: Promise<{ 
                   <tr>
                     <td><input form="material-new" name="name" className="input !py-1 text-sm" placeholder="New material" aria-label="New material" required /></td>
                     <td><input form="material-new" name="buy_price" inputMode="decimal" className="input !py-1 text-sm text-right" placeholder="0" aria-label="Cost of the new material" /></td>
+                    <td><input form="material-new" name="sell_price" inputMode="decimal" className="input !py-1 text-sm text-right" placeholder="0" aria-label="Price of the new material" /></td>
                     <td><input form="material-new" name="min_stock" inputMode="decimal" className="input !py-1 text-sm text-right" placeholder="0" aria-label="Low at of the new material" /></td>
+                    <td className="text-right"><input form="material-new" type="checkbox" name="on_menu" value="1" className="accent-[#d97a1f]" aria-label="New material on the menu" /></td>
                     <td>
                       <form id="material-new" action={saveMaterialAction} className="flex justify-end">
                         <button className="btn-gold !py-1 !px-2 text-sm" type="submit">Add</button>

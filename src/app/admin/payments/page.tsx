@@ -15,7 +15,7 @@ export default async function Payments({ searchParams }: { searchParams: Promise
   const [w, balances, payouts] = await Promise.all([
     partnerWeek(access.profileId, week),
     partnerBalances(access.profileId),
-    treasuryEntries(access.profileId, "Partner payout"),
+    treasuryEntries(access.profileId, { category: "Partner payout" }),
   ]);
 
   const over = addDays(week, 7) <= new Date().toISOString().slice(0, 10);

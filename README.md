@@ -1,7 +1,7 @@
 # Merchantlight Company — Gallow's Rock, Eastmarch (Keizaal)
 
-Customer-facing catalogue. The Google Sheet is the quartermaster:
-stock and prices are edited directly in the Sheet, the site only reads.
+Customer-facing catalogue and backoffice. The public catalogue shows what is switched
+"On menu" under Items in `/admin`. The Google Sheet only steps in when the database is empty or down.
 
 ## Run locally
 

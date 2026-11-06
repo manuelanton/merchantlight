@@ -1,7 +1,8 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { getCatalogue } from '@/lib/catalog'
 import { asUser } from '@/lib/merchant-db'
 import {
-  addDays, analytics, buildingRent, getGood, getSale, isLow, listCrafts, listGoods, listItems, listMaterials, listPurchases, listTeam, listRecipes, listSales, listUnits, partnerBalances, partnerWeek,
+  addDays, analytics, buildingRent, saleOptions, salesDays, treasuryOptions, treasuryTotals, getGood, getSale, isLow, listCrafts, listGoods, listItems, listMaterials, listPurchases, listTeam, listRecipes, listSales, listUnits, partnerBalances, partnerWeek,
   recipeLines, rentalHistory, rentalSpace, todaysSales, treasuryBalance, treasuryCategories, treasuryEntries, weekStart,
 } from '@/lib/store-data'
 import { createDb, type TestDb } from './harness'
@@ -123,6 +124,47 @@ describe('page reads', () => {
     expect(good).toMatchObject({ sell_price: 10, unit_cost: 4, cost_error: null, parts: 0 })
   })
 
+  it('filters sales by seller and date, and adds up each day', async () => {
+    const today = new Date().toISOString().slice(0, 10)
+    const { sellers } = await saleOptions(manager)
+    const olga = sellers.find((s) => s.name === 'Olga')?.id
+    expect((await listSales(manager, { seller: olga })).every((s) => s.seller === 'Olga')).toBe(true)
+    expect(await listSales(manager, { from: addDays(today, 1) })).toEqual([])
+    expect(await listSales(manager, { page: 1 })).toEqual([])
+    const [day] = await salesDays(manager, { to: today })
+    expect(day.day).toBe(today)
+    expect(day.receipts).toBe((await listSales(manager, {})).length)
+  })
+
+  it('filters the treasury by direction, text and date', async () => {
+    const today = new Date().toISOString().slice(0, 10)
+    await asUser(manager, `insert into merchant.treasury_entries (category, description, money_out) values ('Tools & upkeep', 'New anvil', 7)`)
+    expect((await treasuryEntries(manager, { q: 'anvil' })).map((e) => e.money_out)).toEqual([7])
+    expect(await treasuryEntries(manager, { q: 'anvil', direction: 'in' })).toEqual([])
+    expect(await treasuryEntries(manager, { q: 'anvil', to: addDays(today, -1) })).toEqual([])
+    expect(await treasuryTotals(manager, { q: 'anvil' })).toEqual({ entries: 1, money_in: 0, money_out: 7 })
+    expect((await treasuryOptions(manager)).notes).toContain('New anvil')
+    await asUser(manager, `delete from merchant.treasury_entries where description = 'New anvil'`)
+  })
+
+  it('shows what is on the menu in the public catalogue', async () => {
+    await t.db.exec(`create table if not exists public.categories (id text, name text, slug text, icon text, sort_order int);
+      insert into public.categories values ('tools', 'Tools', 'tools', '', 1)`)
+    await asUser(manager, `insert into merchant.goods (name, category, sell_price) values ('Lantern', 'Tools', 12), ('Spare Key', 'Odd Bits', 1)`)
+    await asUser(manager, `update merchant.goods set on_menu = false where name = 'Lantern'`)
+    await asUser(manager, `insert into merchant.materials (name, buy_price, sell_price, on_menu) values ('Ruby', 5, 9, true), ('Secret Ore', 1, 2, false)`)
+    const { items, categories } = await getCatalogue()
+    const names = items.map((i) => i.name)
+    expect(names).toEqual(expect.arrayContaining(['Rope', 'Spare Key', 'Ruby']))
+    expect(names).not.toContain('Lantern')
+    expect(names).not.toContain('Secret Ore')
+    expect(items.find((i) => i.name === 'Ruby')?.sale_price).toBe(9)
+    expect(items.find((i) => i.name === 'Rope')?.category_slug).toBe('tools')
+    expect(categories.map((c) => c.slug)).toContain('odd-bits')
+    await asUser(manager, `delete from merchant.goods where name in ('Lantern', 'Spare Key')`)
+    await asUser(manager, `delete from merchant.materials where name in ('Ruby', 'Secret Ore')`)
+  })
+
   it('gives the payments page its figures', async () => {
     const week = await partnerWeek(manager, weekStart())
     expect(week.sales_income).toBeGreaterThan(0)
@@ -134,7 +176,7 @@ describe('page reads', () => {
     const names = (await treasuryCategories(manager)).map((c) => c.name)
     expect(names).toContain('Rent')
     expect(names).not.toContain('Partner payout')
-    expect((await treasuryEntries(manager, 'Partner payout'))).toEqual([])
+    expect((await treasuryEntries(manager, { category: 'Partner payout' }))).toEqual([])
   })
 })
 
@@ -167,7 +209,7 @@ describe('rentals', () => {
     expect(rows.find((u) => u.name === 'Barrel 1')).toMatchObject({ renter: 'Lydia', rate: 60, days_left: 14, has_history: true })
     expect(rows.find((u) => u.name === 'Safe')).toMatchObject({ kind: 'internal', rental_id: null, has_history: false })
     expect(await rentalHistory(manager)).toMatchObject([{ unit: 'Barrel 1', renter: 'Lydia', paid: 120, ended: false }])
-    expect((await treasuryEntries(manager, 'Rental income'))[0].money_in).toBe(120)
+    expect((await treasuryEntries(manager, { category: 'Rental income' }))[0].money_in).toBe(120)
   })
 })
 

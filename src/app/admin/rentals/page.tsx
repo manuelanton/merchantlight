@@ -1,9 +1,10 @@
 import ConfirmButton from "@/components/ConfirmButton";
+import BuildingRentDialog from "@/components/BuildingRentDialog";
 import { Empty, Notice, PageHeader, Section, Stat } from "@/components/store-ui";
 import { g } from "@/lib/format";
 import { isManager, requireStaff } from "@/lib/store-access";
-import { deleteRentalAction, deleteUnitAction, endRentalAction, extendRentalAction, payBuildingRentAction, rentOutAction, saveBuildingRentAction, saveUnitAction } from "@/lib/store-actions";
-import { buildingRent, listUnits, rentalHistory, type BuildingRent, type RentalUnit } from "@/lib/store-data";
+import { deleteRentalAction, deleteUnitAction, endRentalAction, extendRentalAction, rentOutAction, saveUnitAction } from "@/lib/store-actions";
+import { buildingRent, listUnits, rentalHistory, type RentalUnit } from "@/lib/store-data";
 import { SHOP } from "@/shop/config";
 
 export const dynamic = "force-dynamic";
@@ -101,33 +102,6 @@ function UnitCard({ u, manager }: { u: RentalUnit; manager: boolean }) {
   );
 }
 
-function RentPanel({ rent, owner }: { rent: BuildingRent; owner: boolean }) {
-  const cap = rent.days_left_to_prepay;
-  return (
-    <details className="mb-6">
-      <summary className="btn-ghost inline-block !py-2 text-sm cursor-pointer">Pay building rent</summary>
-      <div className="panel p-4 mt-3 space-y-4 max-w-xl">
-        <p className="muted text-xs">
-          {g(rent.per_day)}g per day, prepaid at most 7 days ahead. Books a Rent expense to the treasury.{" "}
-          {cap > 0 ? `You can add up to ${cap} more ${cap === 1 ? "day" : "days"} right now.` : "Already prepaid 7 days ahead."}
-        </p>
-        <form action={payBuildingRentAction} className="grid grid-cols-[1fr_1fr_auto] gap-3 items-end">
-          <div><label className="lbl" htmlFor="rent-days">Days</label><input id="rent-days" name="days" inputMode="numeric" defaultValue={Math.max(1, cap)} className="input !py-1 text-sm" /></div>
-          <div><label className="lbl" htmlFor="rent-amount">Amount</label><input id="rent-amount" name="amount" inputMode="decimal" className="input !py-1 text-sm" placeholder="Days × rate" /></div>
-          <button className="btn-gold !py-1 text-sm" type="submit" disabled={cap <= 0}>Pay</button>
-        </form>
-        {owner && (
-          <form key={`${rent.per_day}-${rent.paid_until}`} action={saveBuildingRentAction} className="grid grid-cols-[1fr_1.4fr_auto] gap-3 items-end border-t border-[#2b4149] pt-4">
-            <div><label className="lbl" htmlFor="rent-rate">Per day</label><input id="rent-rate" name="per_day" inputMode="decimal" defaultValue={g(rent.per_day)} className="input !py-1 text-sm" /></div>
-            <div><label className="lbl" htmlFor="rent-until">Paid until (UTC)</label><input id="rent-until" name="paid_until" type="datetime-local" defaultValue={rent.paid_until_input ?? ""} className="input !py-1 text-sm" /></div>
-            <button className="btn-ghost !py-1 text-sm" type="submit">Save</button>
-          </form>
-        )}
-      </div>
-    </details>
-  );
-}
-
 export default async function Rentals({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const access = await requireStaff();
   const manager = isManager(access);
@@ -148,7 +122,9 @@ export default async function Rentals({ searchParams }: { searchParams: Promise<
 
   return (
     <>
-      <PageHeader title="Rentals" subtitle="Storage for rent, paid by the week. The income counts towards the weekly split." />
+      <PageHeader title="Rentals" subtitle="Storage for rent, paid by the week. The income counts towards the weekly split.">
+        {rent && <BuildingRentDialog key={`${rent.per_day}-${rent.days_left_to_prepay}-${rent.paid_until}`} rent={rent} owner={access.role === "owner"} />}
+      </PageHeader>
       <Notice error={error} />
 
       <div className={`grid gap-3 mb-6 ${rent ? "grid-cols-2 md:grid-cols-4" : "grid-cols-3"}`}>
@@ -164,7 +140,6 @@ export default async function Rentals({ searchParams }: { searchParams: Promise<
         </p>
       )}
 
-      {rent && <RentPanel rent={rent} owner={access.role === "owner"} />}
       {manager && (
         <details className="mb-6">
           <summary className="btn-ghost inline-block !py-2 text-sm cursor-pointer">+ New unit</summary>
