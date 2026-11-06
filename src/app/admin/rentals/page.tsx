@@ -1,7 +1,7 @@
 import ConfirmButton from "@/components/ConfirmButton";
 import BuildingRentDialog from "@/components/BuildingRentDialog";
 import { Empty, Notice, PageHeader, Section, Stat } from "@/components/store-ui";
-import { g } from "@/lib/format";
+import { g, rentCountdown, utcLabel } from "@/lib/format";
 import { isManager, requireStaff } from "@/lib/store-access";
 import { deleteRentalAction, deleteUnitAction, endRentalAction, extendRentalAction, rentOutAction, saveUnitAction } from "@/lib/store-actions";
 import { buildingRent, listUnits, rentalHistory, type RentalUnit } from "@/lib/store-data";
@@ -143,7 +143,8 @@ export default async function Rentals({ searchParams }: { searchParams: Promise<
       </div>
       {rent && (
         <p className="muted text-xs -mt-3 mb-6">
-          Building rent paid until {rent.paid_until ? `${rent.paid_until} UTC` : "not tracked yet"}
+          Building rent {rentCountdown(rent.minutes_left)}
+          {rent.paid_until && ` · due ${utcLabel(rent.paid_until)}`}
           {rent.payments.length > 0 && ` · last: ${rent.payments.map((p) => `${p.day} · ${g(p.amount)}g`).join(" / ")}`}
         </p>
       )}
@@ -161,7 +162,7 @@ export default async function Rentals({ searchParams }: { searchParams: Promise<
       {!units.length && <div className="panel mb-8"><Empty>No storage units yet.</Empty></div>}
       {[...sites.entries()].map(([site, list]) => (
         <Section key={site} title={site}>
-          <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
             {list.map((u) => <UnitCard key={u.id} u={u} manager={manager} />)}
           </div>
         </Section>

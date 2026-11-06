@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { g, num } from "@/lib/format";
+import { g, num, rentCountdown, utcLabel } from "@/lib/format";
 import { payBuildingRentAction, saveRentPaidUntilAction } from "@/lib/store-actions";
 import type { BuildingRent } from "@/lib/store-data";
 
@@ -34,8 +34,9 @@ export default function BuildingRentDialog({ rent, owner }: { rent: BuildingRent
             </p>
           </div>
           <div className="panel px-3 py-2.5 text-sm">
-            <div className="muted">Paid until</div>
-            <div className="tabular-nums">{rent.paid_until ? `${rent.paid_until} UTC` : "not tracked yet"}</div>
+            <div className="muted">Rent status</div>
+            <div className="tabular-nums">{rentCountdown(rent.minutes_left)}</div>
+            {rent.paid_until && <div className="muted text-xs mt-0.5">due {utcLabel(rent.paid_until)}</div>}
             <div className={`text-xs mt-0.5 ${cap > 0 ? "muted" : "text-[#e0bd4a]"}`}>
               {cap > 0 ? `You can add up to ${cap} more ${cap === 1 ? "day" : "days"} right now.` : "Already prepaid 7 days ahead, nothing more can be paid yet."}
             </div>

@@ -170,6 +170,7 @@ export interface BuildingRent {
   paid_until: string | null;
   paid_until_input: string | null;
   days_left_to_prepay: number;
+  minutes_left: number | null;
   payments: { day: string; amount: number }[];
 }
 
@@ -181,7 +182,8 @@ export async function buildingRent(profileId: string): Promise<BuildingRent> {
       `select building_rent_per_day as per_day,
               to_char(rent_paid_until at time zone 'UTC', 'YYYY-MM-DD HH24:MI') as paid_until,
               to_char(rent_paid_until at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI') as paid_until_input,
-              greatest(floor(extract(epoch from (now() + interval '7 days' - greatest(coalesce(rent_paid_until, now()), now()))) / 86400), 0)::int as days_left_to_prepay
+              greatest(floor(extract(epoch from (now() + interval '7 days' - greatest(coalesce(rent_paid_until, now()), now()))) / 86400), 0)::int as days_left_to_prepay,
+              floor(extract(epoch from (rent_paid_until - now())) / 60)::int as minutes_left
        from merchant.settings`,
     ),
     asUser<BuildingRent["payments"][number]>(
@@ -449,7 +451,7 @@ export function listUnits(profileId: string) {
             r.paid_until - current_date as days_left
      from merchant.storage_units u
      left join merchant.rentals r on r.unit_id = u.id and r.ended_at is null
-     where u.active order by u.location, u.kind, u.name`,
+     where u.active order by u.location, coalesce((substring(u.name from '\\d+'))::int, 2147483647), u.name`,
   );
 }
 
