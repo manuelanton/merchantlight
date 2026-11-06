@@ -3,26 +3,56 @@ import { Empty, Notice, PageHeader, Section } from "@/components/store-ui";
 import { g } from "@/lib/format";
 import { isManager, requireStaff } from "@/lib/store-access";
 import { saveItemAction, saveMaterialAction } from "@/lib/store-actions";
-import { listGoods, listMaterials, type Good } from "@/lib/store-data";
+import { listItems, listMaterials } from "@/lib/store-data";
 
 export const dynamic = "force-dynamic";
 
-export default async function Items({ searchParams }: { searchParams: Promise<{ error?: string; q?: string }> }) {
+const LOW_MARGIN = 0.3;
+const COLUMNS = [
+  { key: "name", label: "Item" },
+  { key: "category", label: "Category" },
+  { key: "cost", label: "Cost", number: true },
+  { key: "price", label: "Price", number: true },
+  { key: "profit", label: "Profit", number: true },
+  { key: "margin", label: "Margin", number: true },
+] as const;
+type SortKey = (typeof COLUMNS)[number]["key"];
+
+export default async function Items({ searchParams }: { searchParams: Promise<{ error?: string; q?: string; cat?: string; sort?: string; dir?: string }> }) {
   const access = await requireStaff();
   const manager = isManager(access);
-  const { error, q } = await searchParams;
-  const [goods, materials] = await Promise.all([listGoods(access.profileId), listMaterials(access.profileId)]);
+  const { error, q, cat, sort, dir } = await searchParams;
+  const [goods, materials] = await Promise.all([listItems(access.profileId), listMaterials(access.profileId)]);
   const search = q?.trim().toLowerCase();
-  const shown = search ? goods.filter((i) => i.name.toLowerCase().includes(search)) : goods;
   const shownMaterials = search ? materials.filter((m) => m.name.toLowerCase().includes(search)) : materials;
 
-  const groups = new Map<string, Good[]>();
-  for (const i of shown) groups.set(i.category, [...(groups.get(i.category) ?? []), i]);
+  const key: SortKey = COLUMNS.find((c) => c.key === sort)?.key ?? "name";
+  const down = dir === "desc";
+  const rows = goods
+    .filter((i) => (!cat || i.category === cat) && (!search || i.name.toLowerCase().includes(search)))
+    .map((i) => {
+      const cost = i.unit_cost ?? 0;
+      const profit = i.sell_price - cost;
+      return { ...i, cost, price: i.sell_price, profit, margin: i.sell_price ? profit / i.sell_price : null };
+    })
+    .sort((a, b) => {
+      const [x, y] = [a[key] ?? -1, b[key] ?? -1];
+      const order = typeof x === "string" || typeof y === "string" ? String(x).localeCompare(String(y)) : x - y;
+      return down ? -order : order;
+    });
+  const categories = [...new Set(goods.map((i) => i.category))].sort();
+
+  const link = (change: Record<string, string | undefined>) => {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries({ q, cat, sort, dir, ...change })) if (v) params.set(k, v);
+    return `/admin/items?${params}`;
+  };
 
   return (
     <>
-      <PageHeader title="Items" subtitle="What we sell, what it costs and how it is made.">
+      <PageHeader title="Items" subtitle="Cost comes from the recipe. Margins under 30% are flagged.">
         <form className="flex gap-2">
+          {cat && <input type="hidden" name="cat" value={cat} />}
           <input name="q" defaultValue={q} className="input !w-48 !py-2 text-sm" placeholder="Search items" aria-label="Search items" />
           <button className="btn-ghost !py-2 text-sm" type="submit">Search</button>
         </form>
@@ -36,69 +66,52 @@ export default async function Items({ searchParams }: { searchParams: Promise<{ 
             <div><label className="lbl" htmlFor="name">Name</label><input id="name" name="name" className="input" required /></div>
             <div><label className="lbl" htmlFor="category">Category</label><input id="category" name="category" className="input" list="categories" /></div>
             <div><label className="lbl" htmlFor="sell_price">Price</label><input id="sell_price" name="sell_price" inputMode="decimal" className="input" /></div>
-            <div><label className="lbl" htmlFor="buy_price">Cost</label><input id="buy_price" name="buy_price" inputMode="decimal" className="input" /></div>
+            <div><label className="lbl" htmlFor="buy_price">Purchase</label><input id="buy_price" name="buy_price" inputMode="decimal" className="input" /></div>
             <div><label className="lbl" htmlFor="min_stock">Low at</label><input id="min_stock" name="min_stock" inputMode="decimal" className="input" /></div>
             <button className="btn-gold !py-2 text-sm" type="submit">Add</button>
-            <datalist id="categories">{[...new Set(goods.map((i) => i.category))].map((c) => <option key={c} value={c} />)}</datalist>
+            <datalist id="categories">{categories.map((c) => <option key={c} value={c} />)}</datalist>
           </form>
         </details>
       )}
 
-      {!shown.length && <div className="panel"><Empty>{search ? "No item matches." : "No items yet."}</Empty></div>}
-      {[...groups.entries()].map(([category, items]) => (
-        <Section key={category} title={category} aside={items.length === 1 ? "1 item" : `${items.length} items`}>
-          <div className="panel overflow-x-auto">
-            <table className="ledger min-w-[38rem] table-fixed">
-              <thead>
-                <tr>
-                  <th>Item</th>
-                  <th className="text-right w-24">Price</th>
-                  <th className="text-right w-24">Cost</th>
-                  <th className="text-right w-24">Low at</th>
-                  <th className="text-right w-20">Recipe</th>
-                  {manager && <th className="w-20" />}
+      <div className="flex flex-wrap gap-2 mb-3">
+        <Link href={link({ cat: undefined })} className={`${cat ? "btn-ghost" : "btn-gold"} !py-1 text-sm`}>All</Link>
+        {categories.map((c) => (
+          <Link key={c} href={link({ cat: c })} className={`${c === cat ? "btn-gold" : "btn-ghost"} !py-1 text-sm`}>{c}</Link>
+        ))}
+      </div>
+
+      <div className="panel overflow-x-auto mb-8">
+        <table className="ledger min-w-[40rem]">
+          <thead>
+            <tr>
+              {COLUMNS.map((c) => (
+                <th key={c.key} className={"number" in c ? "text-right" : undefined} aria-sort={c.key === key ? (down ? "descending" : "ascending") : undefined}>
+                  <Link href={link({ sort: c.key, dir: c.key === key && !down ? "desc" : undefined })}>
+                    {c.label}{c.key === key ? (down ? " ↓" : " ↑") : ""}
+                  </Link>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((i) => {
+              const low = !i.cost_error && i.margin !== null && i.margin < LOW_MARGIN;
+              return (
+                <tr key={i.id}>
+                  <td><Link href={`/admin/items/${i.id}`} className="hover:text-[#e0bd4a]">{i.name}</Link>{i.is_bundle && <span className="muted text-xs"> · bundle</span>}</td>
+                  <td className="muted text-sm">{i.category}</td>
+                  <td className="text-right tabular-nums">{i.cost_error ? <span className="text-[#e08a8a]">circular</span> : `${g(i.cost)}g`}</td>
+                  <td className="text-right tabular-nums">{g(i.price)}g</td>
+                  <td className="text-right tabular-nums">{i.cost_error ? "—" : `${g(i.profit)}g`}</td>
+                  <td className={`text-right tabular-nums ${low ? "text-[#e0bd4a]" : ""}`}>{i.cost_error || i.margin === null ? "—" : `${Math.round(i.margin * 100)}%`}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {items.map((i) => {
-                  const form = `item-${i.id}`;
-                  const cell = (name: string, label: string, value: number | null) => (
-                    <td className="text-right tabular-nums">
-                      {manager
-                        ? <input form={form} name={name} inputMode="decimal" defaultValue={g(value ?? 0)} className="input !py-1 text-sm text-right" aria-label={`${label} of ${i.name}`} />
-                        : g(value ?? 0)}
-                    </td>
-                  );
-                  return (
-                    <tr key={i.id}>
-                      <td className="truncate">
-                        {manager
-                          ? <input form={form} name="name" defaultValue={i.name} className="input !py-1 text-sm" aria-label={`Name of ${i.name}`} required />
-                          : <>{i.name}{i.is_bundle && <span className="muted text-xs"> · bundle</span>}</>}
-                      </td>
-                      {cell("sell_price", "Price", i.sell_price)}
-                      {cell("buy_price", "Cost", i.buy_price)}
-                      {cell("min_stock", "Low at", i.min_stock)}
-                      <td className="text-right">
-                        <Link href={`/admin/items/${i.id}`} className="text-sm text-[#c9a227] hover:text-[#e8dcc4]">{i.parts ? `${i.parts} ${i.parts === 1 ? "part" : "parts"}` : manager ? "+ Add" : "—"}</Link>
-                      </td>
-                      {manager && (
-                        <td>
-                          <form id={form} action={saveItemAction} className="flex justify-end">
-                            <input type="hidden" name="id" value={i.id} />
-                            <input type="hidden" name="category" value={i.category} />
-                            <button className="btn-ghost !py-1 !px-2 text-sm" type="submit">Save</button>
-                          </form>
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </Section>
-      ))}
+              );
+            })}
+          </tbody>
+        </table>
+        {!rows.length && <Empty>{search || cat ? "No item matches." : "No items yet."}</Empty>}
+      </div>
 
       {(manager || shownMaterials.length > 0) && (
         <Section title="Raw materials" aside="Bought in and used in recipes, not sold.">

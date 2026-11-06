@@ -70,7 +70,7 @@ export async function saveItemAction(form: FormData) {
   const access = await requireManager();
   const id = text(form, "id");
   const fields = [text(form, "name"), text(form, "category") || "Other", num(form.get("sell_price")), num(form.get("buy_price")), num(form.get("min_stock"))];
-  await attempt("/admin/items", () =>
+  await attempt(id ? `/admin/items/${id}` : "/admin/items", () =>
     id
       ? asUser(access.profileId, `update merchant.goods set name = $1, category = $2, sell_price = $3, buy_price = $4, min_stock = $5 where id = $6`, [...fields, id])
       : asUser(access.profileId, `insert into merchant.goods (name, category, sell_price, buy_price, min_stock) values ($1, $2, $3, $4, $5)`, fields),

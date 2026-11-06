@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Empty, Notice, PageHeader, Section, Stat } from "@/components/store-ui";
 import { g } from "@/lib/format";
 import { isManager, requireStaff } from "@/lib/store-access";
-import { addRecipeLineAction, removeRecipeLineAction, saveRecipeAction } from "@/lib/store-actions";
+import { addRecipeLineAction, removeRecipeLineAction, saveItemAction, saveRecipeAction } from "@/lib/store-actions";
 import { getGood, listGoods, listMaterials, recipeLines } from "@/lib/store-data";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,9 @@ export default async function Item({ params, searchParams }: { params: Promise<{
 
   const others = goods.filter((i) => i.id !== id);
   const trades = [...new Set(goods.map((i) => i.profession).filter(Boolean))] as string[];
-  const margin = good.sell_price - (good.unit_cost ?? 0);
+  const cost = good.unit_cost ?? 0;
+  const profit = good.sell_price - cost;
+  const margin = good.sell_price ? profit / good.sell_price : null;
 
   return (
     <div className="max-w-3xl">
@@ -28,26 +30,41 @@ export default async function Item({ params, searchParams }: { params: Promise<{
       </PageHeader>
       <Notice error={error ?? good.cost_error ?? undefined} />
 
-      <div className="grid grid-cols-3 gap-3 mb-2">
-        <Stat label="Price" value={`${g(good.sell_price)}g`} />
-        <Stat label={lines.length ? "Recipe cost" : "Cost"} value={`${g(good.unit_cost ?? 0)}g`} />
-        <Stat label="Margin" value={`${g(margin)}g`} tone={margin < 0 ? "bad" : undefined} />
+      {manager && (
+        <form key={`${good.name}-${good.category}-${good.sell_price}-${good.buy_price}-${good.min_stock}`} action={saveItemAction} className="panel p-4 grid grid-cols-2 sm:grid-cols-[2fr_1.2fr_1fr_1fr_1fr_auto] gap-3 items-end mb-4">
+          <input type="hidden" name="id" value={id} />
+          <div><label className="lbl" htmlFor="item-name">Name</label><input id="item-name" name="name" defaultValue={good.name} className="input !py-1 text-sm" required /></div>
+          <div><label className="lbl" htmlFor="item-category">Category</label><input id="item-category" name="category" list="item-categories" defaultValue={good.category} className="input !py-1 text-sm" /></div>
+          <div><label className="lbl" htmlFor="item-price">Sale price</label><input id="item-price" name="sell_price" inputMode="decimal" defaultValue={g(good.sell_price)} className="input !py-1 text-sm" /></div>
+          <div><label className="lbl" htmlFor="item-purchase">Purchase</label><input id="item-purchase" name="buy_price" inputMode="decimal" defaultValue={g(good.buy_price ?? 0)} className="input !py-1 text-sm" /></div>
+          <div><label className="lbl" htmlFor="item-low">Low at</label><input id="item-low" name="min_stock" inputMode="decimal" defaultValue={g(good.min_stock)} className="input !py-1 text-sm" /></div>
+          <button className="btn-gold !py-1 text-sm" type="submit">Save</button>
+          <datalist id="item-categories">{[...new Set(goods.map((i) => i.category))].map((c) => <option key={c} value={c} />)}</datalist>
+        </form>
+      )}
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
+        <Stat label="Sale price" value={`${g(good.sell_price)}g`} />
+        <Stat label="Cost" value={`${g(cost)}g`} />
+        <Stat label="Profit" value={`${g(profit)}g`} tone={profit < 0 ? "bad" : undefined} />
+        <Stat label="Margin" value={margin === null ? "—" : `${Math.round(margin * 100)}%`} tone={profit < 0 ? "bad" : undefined} />
       </div>
       <p className="muted text-xs mb-8">
         {lines.length
-          ? "Sells, can be bought in and can be crafted. With a recipe, the profit counts the recipe cost, also for pieces bought in."
-          : "Sells and can be bought in. Add a recipe to make it craftable."}
+          ? "Cost comes from the recipe, also for pieces bought in."
+          : `No recipe lines. Cost falls back to the purchase price (${g(good.buy_price ?? 0)}g).`}
       </p>
 
       <Section title="Recipe" aside={good.craft_yield > 1 ? `makes ${g(good.craft_yield)} per craft` : undefined}>
         <div className="panel overflow-x-auto mb-3">
           <table className="ledger">
-            <thead><tr><th>Part</th><th className="text-right">Qty</th><th className="text-right">In stock</th>{manager && <th />}</tr></thead>
+            <thead><tr><th>Part</th><th className="text-right">Qty</th><th className="text-right">Line cost</th><th className="text-right">In stock</th>{manager && <th />}</tr></thead>
             <tbody>
               {lines.map((l) => (
                 <tr key={l.id}>
                   <td>{l.name}</td>
                   <td className="text-right tabular-nums">{g(l.quantity)}</td>
+                  <td className="text-right tabular-nums">{g(l.quantity * (l.unit_cost ?? 0))}g</td>
                   <td className="text-right tabular-nums">{g(l.stock)}</td>
                   {manager && (
                     <td className="text-right">

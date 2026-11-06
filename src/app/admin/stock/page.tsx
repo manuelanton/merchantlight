@@ -65,10 +65,11 @@ function StockTable({ rows, manager }: { rows: Row[]; manager: boolean }) {
   );
 }
 
-export default async function Stock({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+export default async function Stock({ searchParams }: { searchParams: Promise<{ error?: string; q?: string }> }) {
   const access = await requireStaff();
   const manager = isManager(access);
-  const { error } = await searchParams;
+  const { error, q } = await searchParams;
+  const search = q?.trim().toLowerCase();
   const [goods, materials] = await Promise.all([listGoods(access.profileId), listMaterials(access.profileId)]);
 
   const groups = new Map<string, Row[]>();
@@ -82,11 +83,20 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
     groups.set("Raw materials", materials.map((m) => ({ kind: "material", id: m.id, name: m.name, stock: m.stock, min_stock: m.min_stock, value: m.buy_price })));
   }
   const all = [...groups.values()].flat();
+  const shown = [...groups.entries()]
+    .map(([category, rows]) => [category, rows.filter((r) => !search || r.name.toLowerCase().includes(search))] as const)
+    .filter(([, rows]) => rows.length);
 
   return (
     <>
       <PageHeader title="Stock" subtitle={manager ? "What is on the shelf. Sales and purchases update it on their own, corrections go here." : "What is on the shelf."}>
-        {manager && <Link href="/admin/purchases" className="btn-gold !py-2 text-sm">+ Buy stock</Link>}
+        <div className="flex flex-wrap gap-2">
+          <form className="flex gap-2">
+            <input name="q" defaultValue={q} className="input !w-48 !py-2 text-sm" placeholder="Search stock" aria-label="Search stock" />
+            <button className="btn-ghost !py-2 text-sm" type="submit">Search</button>
+          </form>
+          {manager && <Link href="/admin/purchases" className="btn-gold !py-2 text-sm">+ Buy stock</Link>}
+        </div>
       </PageHeader>
       <Notice error={error} />
 
@@ -96,8 +106,8 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
         <Stat label="Below zero" value={g(all.filter((r) => r.stock < 0).length)} tone={all.some((r) => r.stock < 0) ? "bad" : undefined} />
       </div>
 
-      {!all.length && <p className="muted text-sm">No items yet.</p>}
-      {[...groups.entries()].map(([category, rows]) => (
+      {!shown.length && <p className="muted text-sm">{search ? "No item matches." : "No items yet."}</p>}
+      {shown.map(([category, rows]) => (
         <Section key={category} title={category} aside={`${g(total(rows))}g`}>
           <StockTable rows={rows} manager={manager} />
         </Section>

@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { asUser } from '@/lib/merchant-db'
 import {
-  addDays, analytics, buildingRent, getGood, getSale, isLow, listCrafts, listGoods, listMaterials, listPurchases, listTeam, listRecipes, listSales, listUnits, partnerBalances, partnerWeek,
+  addDays, analytics, buildingRent, getGood, getSale, isLow, listCrafts, listGoods, listItems, listMaterials, listPurchases, listTeam, listRecipes, listSales, listUnits, partnerBalances, partnerWeek,
   recipeLines, rentalHistory, rentalSpace, todaysSales, treasuryBalance, treasuryCategories, treasuryEntries, weekStart,
 } from '@/lib/store-data'
 import { createDb, type TestDb } from './harness'
@@ -116,6 +116,11 @@ describe('page reads', () => {
     await asUser(manager, `delete from merchant.treasury_entries where ref_type = 'building_rent'`)
     const team = await listTeam(manager)
     expect(team.map((u) => [u.name, u.shares])).toEqual([['Mira', true], ['Erik', false], ['Olga', false]])
+  })
+
+  it('lists items with what they cost, for Employees too', async () => {
+    const [good] = (await listItems(employee)).filter((g) => g.name === 'Rope')
+    expect(good).toMatchObject({ sell_price: 10, unit_cost: 4, cost_error: null, parts: 0 })
   })
 
   it('gives the payments page its figures', async () => {
