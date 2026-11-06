@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { asUser } from '@/lib/merchant-db'
 import {
-  addDays, analytics, getGood, getSale, isLow, listCrafts, listGoods, listMaterials, listPurchases, listRecipes, listSales, listUnits, partnerBalances, partnerWeek,
+  addDays, analytics, buildingRent, getGood, getSale, isLow, listCrafts, listGoods, listMaterials, listPurchases, listTeam, listRecipes, listSales, listUnits, partnerBalances, partnerWeek,
   recipeLines, rentalHistory, rentalSpace, todaysSales, treasuryBalance, treasuryCategories, treasuryEntries, weekStart,
 } from '@/lib/store-data'
 import { createDb, type TestDb } from './harness'
@@ -106,6 +106,16 @@ describe('page reads', () => {
     expect(all.balances.at(-1)?.balance).toBe(await treasuryBalance(manager))
     expect((await analytics(manager, addDays(today, 1), null)).days).toEqual([])
     expect(all.goods_value).toBe(0) // Rope has been oversold
+  })
+
+  it('reads the building rent and the team for their pages', async () => {
+    await asUser(manager, `select merchant.pay_building_rent(2)`)
+    const rent = await buildingRent(manager)
+    expect(rent).toMatchObject({ per_day: 100, days_left_to_prepay: 5, payments: [{ amount: 200 }] })
+    expect(rent.paid_until).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)
+    await asUser(manager, `delete from merchant.treasury_entries where ref_type = 'building_rent'`)
+    const team = await listTeam(manager)
+    expect(team.map((u) => [u.name, u.shares])).toEqual([['Mira', true], ['Erik', false], ['Olga', false]])
   })
 
   it('gives the payments page its figures', async () => {

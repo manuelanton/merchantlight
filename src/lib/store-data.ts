@@ -117,6 +117,53 @@ export function listGoods(profileId: string) {
   );
 }
 
+export interface BuildingRent {
+  per_day: number;
+  paid_until: string | null;
+  paid_until_input: string | null;
+  days_left_to_prepay: number;
+  payments: { day: string; amount: number }[];
+}
+
+/** The building rent, times in UTC. Managers only: employees can't read the books. */
+export async function buildingRent(profileId: string): Promise<BuildingRent> {
+  const [[rent], payments] = await Promise.all([
+    asUser<Omit<BuildingRent, "payments">>(
+      profileId,
+      `select building_rent_per_day as per_day,
+              to_char(rent_paid_until at time zone 'UTC', 'YYYY-MM-DD HH24:MI') as paid_until,
+              to_char(rent_paid_until at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI') as paid_until_input,
+              greatest(floor(extract(epoch from (now() + interval '7 days' - greatest(coalesce(rent_paid_until, now()), now()))) / 86400), 0)::int as days_left_to_prepay
+       from merchant.settings`,
+    ),
+    asUser<BuildingRent["payments"][number]>(
+      profileId,
+      `select ${utcDay("entry_date")}::text as day, money_out as amount from merchant.treasury_entries
+       where ref_type = 'building_rent' order by entry_date desc limit 3`,
+    ),
+  ]);
+  return { ...rent, payments };
+}
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  role: string;
+  in_guild: boolean;
+  shares: boolean;
+}
+
+/** Staff and who shares the profit, by the same rule as merchant._partners(). */
+export function listTeam(profileId: string) {
+  return asUser<TeamMember>(
+    profileId,
+    `select id, coalesce(display_name, username, 'Unknown') as name, role, in_guild,
+            in_guild and coalesce(profit_share, role in ('owner', 'manager')) as shares
+     from merchant.profiles where role in ('owner', 'manager', 'employee')
+     order by array_position(array['owner', 'manager', 'employee']::merchant.app_role[], role), 2`,
+  );
+}
+
 export interface Analytics {
   days: { day: string; revenue: number; profit: number; receipts: number }[];
   items: { name: string; revenue: number; quantity: number }[];

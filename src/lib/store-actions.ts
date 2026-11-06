@@ -6,7 +6,7 @@ import { num } from "@/lib/format";
 import { asUser } from "@/lib/merchant-db";
 import { rpcError } from "@/lib/merchant-rpc";
 import { setShopOpen } from "@/lib/shop";
-import { requireManager, requireStaff } from "@/lib/store-access";
+import { requireManager, requireOwner, requireStaff } from "@/lib/store-access";
 
 /** Runs a write; a refusal comes back to `path` as ?error=, shown by <Notice>. */
 async function attempt(path: string, write: () => Promise<unknown>) {
@@ -188,6 +188,32 @@ export async function endRentalAction(form: FormData) {
 export async function deleteRentalAction(form: FormData) {
   const access = await requireManager();
   await attempt("/admin/rentals", () => asUser(access.profileId, `delete from merchant.rentals where id = $1`, [text(form, "id")]));
+}
+
+export async function payBuildingRentAction(form: FormData) {
+  const access = await requireManager();
+  const amount = text(form, "amount");
+  await attempt("/admin/rentals", () =>
+    asUser(access.profileId, `select merchant.pay_building_rent($1, $2)`, [Math.floor(num(form.get("days"))), amount ? num(amount) : null]),
+  );
+}
+
+export async function saveBuildingRentAction(form: FormData) {
+  const access = await requireOwner();
+  await attempt("/admin/rentals", () =>
+    asUser(
+      access.profileId,
+      `update merchant.settings set building_rent_per_day = $1, rent_paid_until = $2::timestamp at time zone 'UTC'`,
+      [num(form.get("per_day")), text(form, "paid_until") || null],
+    ),
+  );
+}
+
+export async function setProfitShareAction(form: FormData) {
+  const access = await requireOwner();
+  await attempt("/admin/users", () =>
+    asUser(access.profileId, `select merchant.set_profit_share($1, $2)`, [text(form, "id"), text(form, "on") === "1"]),
+  );
 }
 
 export async function addTreasuryEntryAction(form: FormData) {

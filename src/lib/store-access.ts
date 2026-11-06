@@ -19,6 +19,12 @@ export async function requireStaff(): Promise<Access> {
   return access as Access;
 }
 
+export async function requireOwner(): Promise<Access> {
+  const access = await requireStaff();
+  if (access.role !== "owner") redirect("/admin");
+  return access;
+}
+
 export async function requireManager(): Promise<Access> {
   const access = await requireStaff();
   if (!isManager(access)) redirect("/admin");

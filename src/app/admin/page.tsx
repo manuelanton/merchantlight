@@ -75,7 +75,7 @@ export default async function Today() {
                 ))}
               </tbody>
             </table>
-            {!week.partners.length && <Empty>No Owner or Manager has signed in yet.</Empty>}
+            {!week.partners.length && <Empty>Nobody shares the profit yet.</Empty>}
           </div>
         </Section>
       )}

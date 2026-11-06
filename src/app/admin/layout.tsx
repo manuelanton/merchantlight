@@ -9,7 +9,7 @@ import { SHOP } from "@/shop/config";
 // Books must never prerender: auth + data are per-request.
 export const dynamic = "force-dynamic";
 
-const LINKS: (NavLink & { managers?: boolean })[] = [
+const LINKS: (NavLink & { managers?: boolean; owners?: boolean })[] = [
   { href: "/admin", label: "Today" },
   { href: "/admin/sales", label: "Sales" },
   { href: "/admin/items", label: "Items" },
@@ -20,6 +20,7 @@ const LINKS: (NavLink & { managers?: boolean })[] = [
   { href: "/admin/payments", label: "Payments", managers: true },
   { href: "/admin/analytics", label: "Analytics", managers: true },
   { href: "/admin/treasury", label: "Treasury", managers: true },
+  { href: "/admin/users", label: "Users", owners: true },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -75,7 +76,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     );
   }
 
-  const links = LINKS.filter((l) => !l.managers || isManager(access));
+  const links = LINKS.filter((l) => (!l.managers || isManager(access)) && (!l.owners || access?.role === "owner"));
   return (
     <div className="grid md:grid-cols-[11rem_minmax(0,1fr)] gap-4 md:gap-8">
       <aside className="md:sticky md:top-20 md:self-start min-w-0 space-y-4">
