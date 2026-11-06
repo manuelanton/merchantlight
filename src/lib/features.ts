@@ -1,6 +1,7 @@
 import { eq, like } from "drizzle-orm";
 import { getDb } from "@/db";
 import { settings } from "@/db/schema";
+import { isOwnerAccount } from "@/lib/discord";
 import { SHOP } from "@/shop/config";
 
 /**
@@ -54,10 +55,6 @@ export async function getFeatureStates(): Promise<{ key: RuntimeFeatureKey; labe
   }));
 }
 
-/** Superadmin gate: SUPERADMIN_DISCORD_ID env wins; falls back to WildCard
+/** Superadmin gate: SUPERADMIN_DISCORD_ID env wins; falls back to SHOP.discord.ownerId
  *  so no env wrangling is needed. Empty/mismatch = 404 everywhere. */
-const FALLBACK_SUPERADMIN = "146826443924439040"; // WildCard
-export function isSuperAdmin(discordId?: string | null): boolean {
-  const admin = (process.env.SUPERADMIN_DISCORD_ID || "").trim() || FALLBACK_SUPERADMIN;
-  return !!admin && !!discordId && discordId === admin;
-}
+export const isSuperAdmin = isOwnerAccount;

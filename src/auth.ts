@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import Discord from "next-auth/providers/discord";
+import { syncMember } from "@/lib/merchant-access";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
@@ -11,14 +12,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // Discord now sends `iss` with its OAuth response; without an explicit
       // issuer Auth.js expects a dummy fallback and rejects the callback.
       issuer: "https://discord.com",
-      // 'identify' scope is enough: id, username, avatar. No server access needed.
-      authorization: { params: { scope: "identify" } },
+      // guilds.members.read: the login's own token can read the user's server roles.
+      authorization: { params: { scope: "identify guilds.members.read" } },
     }),
   ],
   callbacks: {
     async jwt({ token, account }) {
       // Stable Discord user id (snowflake) for the allowlist + audit trail.
-      if (account?.providerAccountId) token.discordId = account.providerAccountId;
+      if (account?.providerAccountId) {
+        token.discordId = account.providerAccountId;
+        // A failed sync must not block login: accessFor() tries again with the bot.
+        await syncMember(account.providerAccountId, account.access_token).catch((e) =>
+          console.error("discord role sync failed at login", e),
+        );
+      }
       return token;
     },
     async session({ session, token }) {

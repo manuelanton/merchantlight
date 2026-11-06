@@ -4,7 +4,7 @@ import { UPCOMING_SECTIONS, isSheetsConfigured } from "@/lib/sheets";
 import { getCatalogue } from "@/lib/catalog";
 import { g } from "@/lib/format";
 import { isShopOpen } from "@/lib/shop";
-import { getStorage } from "@/lib/storage";
+import { rentalSpace } from "@/lib/store-data";
 import { isFeatureOn } from "@/lib/features";
 import { SHOP } from "@/shop/config";
 
@@ -12,7 +12,7 @@ export const revalidate = 60;
 
 export default async function Home() {
   const [showStorage, showUpcoming] = await Promise.all([isFeatureOn("storagePublic"), isFeatureOn("upcomingTeasers")]);
-  const [{ categories, items }, open, storage] = await Promise.all([getCatalogue(), isShopOpen(), getStorage(SHOP.homeLocation)]);
+  const [{ categories, items }, open, storage] = await Promise.all([getCatalogue(), isShopOpen(), rentalSpace(SHOP.homeLocation)]);
   const sorted = [...categories].sort((a, b) => a.sort_order - b.sort_order);
   const active = items.filter((i) => i.active && !i.parent_id);
   const sections = sorted
@@ -83,7 +83,7 @@ export default async function Home() {
             Barrels at our shop — ask about storage on offer
           </p>
           <p className="mt-2 text-[#e0bd4a]">
-            {storage.units.length ? (storage.free > 0 ? "Space available" : "Full right now") : "Ask for availability"}
+            {storage.units ? (storage.free > 0 ? "Space available" : "Full right now") : "Ask for availability"}
             <span className="text-sm text-[#c9a227] ml-2">Visit us →</span>
           </p>
         </Link>

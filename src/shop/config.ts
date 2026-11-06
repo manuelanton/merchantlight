@@ -48,9 +48,23 @@ export const SHOP = {
   // --- Backoffice ---
   roleName: "Quartermaster",
 
+  // --- Discord: server roles decide who may do what ---
+  discord: {
+    guildId: "1568044437890801795",
+    /** Highest privilege first; the first match wins. No match = visitor. */
+    roles: [
+      { discordRoleId: "1568052942840402081", role: "owner", label: "Owner" },
+      { discordRoleId: "1568044567004061807", role: "manager", label: "Manager" },
+      { discordRoleId: "1568044679264731188", role: "employee", label: "Employee" },
+      { discordRoleId: "1568044763762917458", role: "visitor", label: "Visitor" },
+    ],
+    /** Emergency access: always owner, whatever the server says. SUPERADMIN_DISCORD_ID env wins. */
+    ownerId: "146826443924439040", // WildCard
+  },
+
   /**
    * Feature toggles (all on = current behavior, except storagePublic).
-   * storage/notes/guide gate admin tabs; storagePublic gates the public
+   * storage gates the admin tab; storagePublic gates the public
    * storage teaser card + visit-us note. cash/recipes/variants are
    * engine-level and stay on for now (wiring gates = future work).
    */
@@ -63,8 +77,6 @@ export const SHOP = {
     cash: true,
     recipes: true,
     variants: true,
-    notes: true,
-    guide: true,
     /** Show teaser cards for empty upcoming sections (e.g. Enchantments). */
     upcomingTeasers: false,
   },

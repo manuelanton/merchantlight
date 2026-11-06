@@ -79,6 +79,13 @@ label.lbl { display: block; margin-bottom: 0.25rem; font-size: 0.8rem; text-tran
 table.ledger { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
 table.ledger th { text-align: left; color: #d8a05a; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.08em; padding: 0.5rem; border-bottom: 1px solid #2b4149; }
 table.ledger td { padding: 0.55rem 0.5rem; border-bottom: 1px solid #1c2b31; }
+/* Backoffice: flat and quiet, the ember .card stays for the public pages. */
+.panel { background: rgba(18, 24, 27, 0.72); border: 1px solid #2b4149; border-radius: 10px; }
+.eyebrow { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #d8a05a; }
+.muted { color: #a89a7d; }
+.nav-link { display: block; padding: 0.45rem 0.75rem; border-radius: 8px; color: #b8a888; white-space: nowrap; }
+.nav-link:hover { background: #1d1a16; color: var(--parchment); }
+.nav-link-on { background: #241d14; color: #e0bd4a; }
 .badge { font-size: 0.72rem; padding: 0.15rem 0.55rem; border-radius: 999px; border: 1px solid #2b4149; }
 /* Lit lantern: ember = open, glowing against the dark. */
 .badge-in { background: linear-gradient(180deg, #eda93f, #9a4d12); border-color: #d97a1f; color: #17100a; font-weight: 700; }

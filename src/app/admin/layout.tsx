@@ -1,31 +1,35 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { auth, isQuartermaster, signIn, signOut } from "@/auth";
-import { backofficeEnabled } from "@/lib/flags";
-import { isFeatureOn, isSuperAdmin } from "@/lib/features";
-import { SHOP } from "@/shop/config";
+import { auth, signIn, signOut } from "@/auth";
+import AdminNav, { type NavLink } from "@/components/AdminNav";
 import CopyId from "@/components/CopyId";
-import { getMemberForDiscord } from "@/lib/members";
+import { backofficeEnabled } from "@/lib/flags";
+import { isManager, isStaff, currentAccess } from "@/lib/store-access";
+import { SHOP } from "@/shop/config";
 
 // Books must never prerender: auth + data are per-request.
 export const dynamic = "force-dynamic";
+
+const LINKS: (NavLink & { managers?: boolean })[] = [
+  { href: "/admin", label: "Today" },
+  { href: "/admin/sales", label: "Sales" },
+  { href: "/admin/items", label: "Items" },
+  { href: "/admin/stock", label: "Stock" },
+  { href: "/admin/purchases", label: "Purchases", managers: true },
+  { href: "/admin/rentals", label: "Rentals" },
+  { href: "/admin/payments", label: "Payments", managers: true },
+  { href: "/admin/treasury", label: "Treasury", managers: true },
+];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   if (!backofficeEnabled()) notFound();
   const session = await auth();
   const discordId = (session as unknown as { discordId?: string } | null)?.discordId;
-  const member = session?.user && discordId ? await getMemberForDiscord(discordId) : null;
-  const inAllowlist = !!discordId && isQuartermaster(discordId);
-  const isQM = inAllowlist && member?.role !== "employee";
-  const isEmp = member?.role === "employee" && !inAllowlist;
 
   if (!session?.user) {
     return (
       <div className="max-w-md space-y-4">
-        <h1 className="font-display text-3xl">{SHOP.roleName} books</h1>
-        <p className="text-sm text-[#8a7c64]">
-          Sign in with Discord to open the company books. No passwords, no new accounts.
-        </p>
+        <h1 className="font-display text-3xl">{SHOP.company} books</h1>
+        <p className="muted text-sm">Sign in with Discord to open the company books. No passwords, no new accounts.</p>
         <form
           action={async () => {
             "use server";
@@ -35,82 +39,54 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <button className="btn-gold w-full" type="submit">Sign in with Discord</button>
         </form>
         {!process.env.DISCORD_CLIENT_ID && (
-          <p className="text-xs text-[#8a7c64]">
-            Discord login isn&apos;t configured yet (missing DISCORD_CLIENT_ID). See .env.example.
-          </p>
+          <p className="muted text-xs">Discord login isn&apos;t configured yet (missing DISCORD_CLIENT_ID). See .env.example.</p>
         )}
       </div>
     );
   }
 
-  if (!isQM && !isEmp && !inAllowlist) {
+  const signOutForm = (
+    <form
+      action={async () => {
+        "use server";
+        await signOut({ redirectTo: "/" });
+      }}
+    >
+      <button className="btn-ghost !py-1 text-sm" type="submit">Log out</button>
+    </form>
+  );
+
+  const access = await currentAccess();
+  if (!isStaff(access)) {
     return (
       <div className="max-w-md space-y-4">
-        <h1 className="font-display text-3xl">Not a {SHOP.roleName.toLowerCase()}</h1>
-        <p className="text-sm text-[#b8a888]">
-          Signed in as <b>{session.user.name}</b> ({discordId || "unknown id"}), but that Discord
-          account isn&apos;t on the {SHOP.roleName.toLowerCase()} list. Send this ID to whoever runs the books:
+        <h1 className="font-display text-3xl">No access yet</h1>
+        <p className="muted text-sm">
+          Signed in as <b>{session.user.name}</b>. The books open with a staff role on the {SHOP.shortName} Discord server. Ask an Owner or Manager and send them this ID:
         </p>
         <p className="flex items-center gap-2">
           <code className="text-sm text-[#e0bd4a] break-all">{discordId}</code>
           {discordId && <CopyId id={discordId} />}
         </p>
-        <form
-          action={async () => {
-            "use server";
-            await signOut({ redirectTo: "/" });
-          }}
-        >
-          <button className="btn-ghost" type="submit">Sign out</button>
-        </form>
+        {signOutForm}
       </div>
     );
   }
 
+  const links = LINKS.filter((l) => !l.managers || isManager(access));
   return (
-    <div className="space-y-4">
-      <div className="card p-3 flex flex-wrap items-center gap-3 text-sm">
-        <span className="text-[#8a7c64]">
-          {SHOP.roleName}: <b className="text-[#e8dcc4]">{session.user.name}</b>
-        </span>
-        <nav className="flex flex-wrap gap-3 ml-auto">
-          {isQM && <Link href="/admin" className="hover:text-[#c9a227]">Dashboard</Link>}
-          {isQM && <Link href="/admin/items" className="hover:text-[#c9a227]">Items</Link>}
-          <Link href="/admin/sales" className="hover:text-[#c9a227]">Sales</Link>
-          {isQM && (await isFeatureOn("stock")) && (
-            <Link href="/admin/stock" className="hover:text-[#c9a227]">Stock</Link>
-          )}
-          {isQM && (await isFeatureOn("storage")) && (
-            <Link href="/admin/storage" className="hover:text-[#c9a227]">Storage</Link>
-          )}
-          {isQM && <Link href="/admin/ledger" className="hover:text-[#c9a227]">Ledger</Link>}
-          {isQM && (await isFeatureOn("notes")) && (
-            <Link href="/admin/notes" className="hover:text-[#c9a227]">Board</Link>
-          )}
-          {isQM && (await isFeatureOn("guide")) && (
-            <Link href="/admin/guide" className="hover:text-[#c9a227]">Guide</Link>
-          )}
-          {isQM && <Link href="/admin/reports" className="hover:text-[#c9a227]">Reports</Link>}
-          {isQM && <Link href="/admin/employees" className="hover:text-[#c9a227]">Employees</Link>}
-          {isQM && <Link href="/admin/payroll" className="hover:text-[#c9a227]">Payroll</Link>}
-          {isQM && <Link href="/admin/purchases" className="hover:text-[#c9a227]">Purchases</Link>}
-          {isEmp && <Link href="/admin/purchases" className="hover:text-[#c9a227]">Purchases</Link>}
-          {isEmp && <Link href="/admin/me" className="hover:text-[#c9a227]">My Portal</Link>}
-          {isQM && <Link href="/admin/v2" className="hover:text-[#c9a227]" title="v2 pilot surfaces">v2</Link>}
-          {isQM && isSuperAdmin(discordId) && (
-            <Link href="/admin/super" className="hover:text-[#c9a227]" title="Superadmin playground">*</Link>
-          )}
-        </nav>
-        <form
-          action={async () => {
-            "use server";
-            await signOut({ redirectTo: "/" });
-          }}
-        >
-          <button className="btn-ghost !py-1" type="submit">Log out</button>
-        </form>
-      </div>
-      {children}
+    <div className="grid md:grid-cols-[11rem_minmax(0,1fr)] gap-4 md:gap-8">
+      <aside className="md:sticky md:top-20 md:self-start min-w-0 space-y-4">
+        <AdminNav links={links} />
+        <div className="flex md:block items-center justify-between gap-3 md:border-t border-[#2b4149] md:pt-3 md:space-y-2">
+          <p className="min-w-0 truncate text-sm">
+            {access?.name}
+            <span className="muted text-xs capitalize block">{access?.role}</span>
+          </p>
+          {signOutForm}
+        </div>
+      </aside>
+      <div className="min-w-0">{children}</div>
     </div>
   );
 }
