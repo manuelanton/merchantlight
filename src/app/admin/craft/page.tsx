@@ -7,24 +7,31 @@ import { listCrafts, listRecipes, type Recipe } from "@/lib/store-data";
 
 export const dynamic = "force-dynamic";
 
-export default async function Craft({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+export default async function Craft({ searchParams }: { searchParams: Promise<{ error?: string; q?: string }> }) {
   const access = await requireStaff();
   const manager = isManager(access);
-  const { error } = await searchParams;
+  const { error, q } = await searchParams;
+  const search = q?.trim().toLowerCase();
   const [recipes, crafts] = await Promise.all([listRecipes(access.profileId), listCrafts(access.profileId)]);
 
   const trades = new Map<string, Recipe[]>();
   for (const r of recipes) {
+    if (search && !`${r.name} ${r.parts}`.toLowerCase().includes(search)) continue;
     const trade = r.profession ?? "Other";
     trades.set(trade, [...(trades.get(trade) ?? []), r]);
   }
 
   return (
     <>
-      <PageHeader title="Craft" subtitle="Materials come off the shelf, the finished item goes on it." />
+      <PageHeader title="Craft" subtitle="Materials come off the shelf, the finished item goes on it.">
+        <form className="flex gap-2">
+          <input name="q" defaultValue={q} className="input !w-48 !py-2 text-sm" placeholder="Search recipes" aria-label="Search recipes" />
+          <button className="btn-ghost !py-2 text-sm" type="submit">Search</button>
+        </form>
+      </PageHeader>
       <Notice error={error} />
 
-      {!recipes.length && <div className="panel mb-8"><Empty>No recipes yet. Add one to an item on the Items page.</Empty></div>}
+      {!trades.size && <div className="panel mb-8"><Empty>{search ? "No recipe matches." : "No recipes yet. Add one to an item on the Items page."}</Empty></div>}
       {[...trades.entries()].map(([trade, list]) => (
         <Section key={trade} title={trade} aside={list.length === 1 ? "1 recipe" : `${list.length} recipes`}>
           <div className="panel divide-y divide-[#1c2b31]">

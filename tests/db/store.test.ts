@@ -181,3 +181,71 @@ describe('partner split', () => {
     expect((await week(owner, NEXT)).w).toMatchObject({ closed: false })
   })
 })
+
+describe('building rent', () => {
+  let manager: string, employee: string, owner: string
+  const pay = (user: string, days: number, amount: number | null = null) =>
+    t.as(user, () => t.db.query(`select merchant.pay_building_rent($1, $2)`, [days, amount]))
+
+  beforeAll(async () => {
+    t = await createDb()
+    owner = await t.createUser('owner', 'Olaf')
+    manager = await t.createUser('manager', 'Mira')
+    employee = await t.createUser('employee', 'Erik')
+  })
+
+  it('books a Rent expense and moves the paid-until date', async () => {
+    await pay(manager, 3)
+    expect(await t.one(`select category, money_out, description from merchant.treasury_entries`))
+      .toEqual({ category: 'Rent', money_out: 300, description: 'Building rent, 3 days' })
+    expect(await t.one(`select round(extract(epoch from rent_paid_until - now()) / 86400)::int as days from merchant.settings`)).toEqual({ days: 3 })
+  })
+
+  it('takes a different amount but stops 7 days ahead', async () => {
+    await pay(manager, 4, 50)
+    await expect(pay(manager, 1)).rejects.toThrow(/7 days ahead/)
+    expect(await t.one(`select sum(money_out) as total from merchant.treasury_entries`)).toEqual({ total: 350 })
+  })
+
+  it('is for Managers, and only the Owner changes the rate', async () => {
+    await expect(pay(employee, 1)).rejects.toThrow(/Not allowed/)
+    await t.as(manager, () => t.db.query(`update merchant.settings set building_rent_per_day = 1`))
+    expect(await t.one(`select building_rent_per_day from merchant.settings`)).toEqual({ building_rent_per_day: 100 })
+    await t.as(owner, () => t.db.query(`update merchant.settings set building_rent_per_day = 80, rent_paid_until = null`))
+    await pay(manager, 1)
+    expect(await t.one(`select money_out from merchant.treasury_entries order by created_at desc, money_out limit 1`)).toEqual({ money_out: 80 })
+  })
+})
+
+describe('profit switch', () => {
+  let manager: string, employee: string, owner: string
+  const names = async () => {
+    const { w } = await t.as(owner, () => t.one<{ w: { partners: { name: string }[] } }>(`select merchant.partner_week('2026-09-28') as w`))
+    return w.partners.map((p) => p.name).sort()
+  }
+  const flip = (user: string, who: string, on: boolean) => t.as(user, () => t.db.query(`select merchant.set_profit_share($1, $2)`, [who, on]))
+
+  beforeAll(async () => {
+    t = await createDb()
+    owner = await t.createUser('owner', 'Olaf')
+    manager = await t.createUser('manager', 'Mira')
+    employee = await t.createUser('employee', 'Erik')
+  })
+
+  it('follows the role until someone is switched', async () => {
+    expect(await names()).toEqual(['Mira', 'Olaf'])
+    await flip(owner, manager, false)
+    await flip(owner, employee, true)
+    expect(await names()).toEqual(['Erik', 'Olaf'])
+  })
+
+  it('leaves a closed week alone', async () => {
+    await t.as(owner, () => t.db.query(`select merchant.close_partner_week('2026-09-28')`))
+    await flip(owner, manager, true)
+    expect(await names()).toEqual(['Erik', 'Olaf'])
+  })
+
+  it('is for the Owner only', async () => {
+    await expect(flip(manager, manager, true)).rejects.toThrow(/Not allowed/)
+  })
+})

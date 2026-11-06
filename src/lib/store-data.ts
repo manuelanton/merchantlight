@@ -117,6 +117,53 @@ export function listGoods(profileId: string) {
   );
 }
 
+export interface BuildingRent {
+  per_day: number;
+  paid_until: string | null;
+  paid_until_input: string | null;
+  days_left_to_prepay: number;
+  payments: { day: string; amount: number }[];
+}
+
+/** The building rent, times in UTC. Managers only: employees can't read the books. */
+export async function buildingRent(profileId: string): Promise<BuildingRent> {
+  const [[rent], payments] = await Promise.all([
+    asUser<Omit<BuildingRent, "payments">>(
+      profileId,
+      `select building_rent_per_day as per_day,
+              to_char(rent_paid_until at time zone 'UTC', 'YYYY-MM-DD HH24:MI') as paid_until,
+              to_char(rent_paid_until at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI') as paid_until_input,
+              greatest(floor(extract(epoch from (now() + interval '7 days' - greatest(coalesce(rent_paid_until, now()), now()))) / 86400), 0)::int as days_left_to_prepay
+       from merchant.settings`,
+    ),
+    asUser<BuildingRent["payments"][number]>(
+      profileId,
+      `select ${utcDay("entry_date")}::text as day, money_out as amount from merchant.treasury_entries
+       where ref_type = 'building_rent' order by entry_date desc limit 3`,
+    ),
+  ]);
+  return { ...rent, payments };
+}
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  role: string;
+  in_guild: boolean;
+  shares: boolean;
+}
+
+/** Staff and who shares the profit, by the same rule as merchant._partners(). */
+export function listTeam(profileId: string) {
+  return asUser<TeamMember>(
+    profileId,
+    `select id, coalesce(display_name, username, 'Unknown') as name, role, in_guild,
+            in_guild and coalesce(profit_share, role in ('owner', 'manager')) as shares
+     from merchant.profiles where role in ('owner', 'manager', 'employee')
+     order by array_position(array['owner', 'manager', 'employee']::merchant.app_role[], role), 2`,
+  );
+}
+
 export interface Analytics {
   days: { day: string; revenue: number; profit: number; receipts: number }[];
   items: { name: string; revenue: number; quantity: number }[];
@@ -186,6 +233,20 @@ export async function analytics(profileId: string, from: string | null, to: stri
     balances,
     ...stock,
   };
+}
+
+export type ItemRow = Good & { unit_cost: number | null; cost_error: string | null };
+
+/** Goods with what they cost: the recipe if there is one, otherwise the purchase price. */
+export function listItems(profileId: string) {
+  return asUser<ItemRow>(
+    profileId,
+    `select g.id, g.name, g.category, g.sell_price, g.buy_price, g.stock, g.min_stock, g.is_bundle, g.profession, g.craft_yield,
+            c.unit_cost, c.cost_error,
+            (select count(*)::int from merchant.recipe_components r where r.good_id = g.id) as parts
+     from merchant.goods g left join merchant.good_costs() c on c.good_id = g.id
+     where g.active order by g.name`,
+  );
 }
 
 export const isLow = (item: { stock: number; min_stock: number }) => item.min_stock > 0 && item.stock <= item.min_stock;
@@ -350,12 +411,14 @@ export async function getGood(profileId: string, id: string) {
 }
 
 export function recipeLines(profileId: string, goodId: string) {
-  return asUser<{ id: string; name: string; quantity: number; stock: number }>(
+  return asUser<{ id: string; name: string; quantity: number; stock: number; unit_cost: number | null }>(
     profileId,
-    `select r.id, coalesce(m.name, c.name) as name, r.quantity, coalesce(m.stock, c.stock) as stock
+    `select r.id, coalesce(m.name, c.name) as name, r.quantity, coalesce(m.stock, c.stock) as stock,
+            coalesce(m.buy_price, k.unit_cost) as unit_cost
      from merchant.recipe_components r
      left join merchant.materials m on m.id = r.material_id
      left join merchant.goods c on c.id = r.component_good_id
+     left join merchant.good_costs() k on k.good_id = r.component_good_id
      where r.good_id = $1 order by r.created_at`,
     [goodId],
   );
