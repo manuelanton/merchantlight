@@ -1,6 +1,7 @@
 import { eq, like } from "drizzle-orm";
 import { getDb } from "@/db";
 import { settings } from "@/db/schema";
+import { isOwnerAccount } from "@/lib/discord";
 import { SHOP } from "@/shop/config";
 
 /**
@@ -18,8 +19,6 @@ export const RUNTIME_FEATURES = [
   { key: "storage", label: "Storage admin tab", desc: "Show the Storage section in the backoffice nav." },
   { key: "storagePublic", label: "Public storage teaser", desc: "Storage card + visit-us note on the public homepage." },
   { key: "upcomingTeasers", label: "Upcoming-section teasers", desc: "Cards for empty upcoming sections (e.g. Enchantments)." },
-  { key: "notes", label: "Board tab", desc: "Show the noticeboard in the backoffice nav." },
-  { key: "guide", label: "Guide tab", desc: "Show the quartermaster guide in the backoffice nav." },
 ] as const;
 
 export type RuntimeFeatureKey = (typeof RUNTIME_FEATURES)[number]["key"];
@@ -54,10 +53,6 @@ export async function getFeatureStates(): Promise<{ key: RuntimeFeatureKey; labe
   }));
 }
 
-/** Superadmin gate: SUPERADMIN_DISCORD_ID env wins; falls back to WildCard
+/** Superadmin gate: SUPERADMIN_DISCORD_ID env wins; falls back to SHOP.discord.ownerId
  *  so no env wrangling is needed. Empty/mismatch = 404 everywhere. */
-const FALLBACK_SUPERADMIN = "146826443924439040"; // WildCard
-export function isSuperAdmin(discordId?: string | null): boolean {
-  const admin = (process.env.SUPERADMIN_DISCORD_ID || "").trim() || FALLBACK_SUPERADMIN;
-  return !!admin && !!discordId && discordId === admin;
-}
+export const isSuperAdmin = isOwnerAccount;

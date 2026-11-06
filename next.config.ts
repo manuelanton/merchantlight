@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // PGlite loads its wasm/data files via URL, which breaks when bundled.
+  serverExternalPackages: ["@electric-sql/pglite"],
 };
 
 export default nextConfig;

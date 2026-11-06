@@ -1,119 +1,57 @@
-import { auth, isQuartermaster } from "@/auth";
-import { getDb } from "@/db";
-import { sales } from "@/db/schema";
-import { recordSaleAction } from "@/lib/admin-actions";
-import { getBooks } from "@/lib/books";
-import { desc, eq } from "drizzle-orm";
-import { isFeatureOn } from "@/lib/features";
-import { SHOP } from "@/shop/config";
-import { getMemberForDiscord, getMembers } from "@/lib/members";
-import { getCatalogue } from "@/lib/catalog";
+import Link from "next/link";
+import { Empty, PageHeader, Section } from "@/components/store-ui";
 import { g } from "@/lib/format";
-import SaleForm from "@/components/SaleForm";
-import SalesTables from "@/components/SalesTables";
+import { requireStaff } from "@/lib/store-access";
+import { listSales, type SaleRow } from "@/lib/store-data";
 
 export const dynamic = "force-dynamic";
 
-export default async function SalesPage() {
-  const session = await auth();
-  const discordId = (session as unknown as { discordId?: string } | null)?.discordId;
-  const member = session?.user && discordId ? await getMemberForDiscord(discordId) : null;
-  const isEmp = member?.role === "employee" && !isQuartermaster(discordId);
-  const [{ categories, items }, trackStock, allMembers] = await Promise.all([
-    getCatalogue(),
-    isFeatureOn("stock"),
-    getMembers(),
-  ]);
-  const formItems = items.map((i) => ({
-    id: i.id,
-    name: i.name,
-    price: i.sale_price,
-    category: i.category_slug,
-    parent: i.parent_id ?? null,
-    parent_id: i.parent_id ?? null,
-    inherit_parent: i.inherit_parent ?? true,
-    hidden: !i.active,
-  }));
-  const formCategories = categories.map((c) => ({ slug: c.slug, name: c.name }));
+const dayOf = (s: SaleRow) => new Date(s.sale_date).toISOString().slice(0, 10);
 
-  if (isEmp && discordId) {
-    const db = await getDb();
-    const mine = await db
-      .select()
-      .from(sales)
-      .where(eq(sales.soldByDiscordId, discordId))
-      .orderBy(desc(sales.timestamp));
-    const knownLocations: string[] = [...SHOP.locations];
-    for (const s of mine) if (s.location && !knownLocations.includes(s.location)) knownLocations.push(s.location);
-    return (
-      <div className="space-y-6">
-        <h1 className="font-display text-3xl">Record a sale</h1>
-        <p className="text-sm text-[#8a7c64]">Your sales land pending until a quartermaster confirms the deposit.</p>
-        <SaleForm
-          items={formItems}
-          categories={formCategories}
-          locations={knownLocations}
-          showRoad={trackStock}
-        />
-        <div className="card p-4 overflow-x-auto">
-          <h2 className="font-display text-lg mb-2">My sales</h2>
-          <table className="ledger min-w-[640px]">
-            <thead><tr><th>When</th><th>Item</th><th>Qty</th><th>Price</th><th>Profit</th><th>Status</th></tr></thead>
-            <tbody>
-              {mine.map((s) => (
-                <tr key={s.id}>
-                  <td className="text-xs">{new Date(s.timestamp).toLocaleString()}</td>
-                  <td>{s.itemName}</td>
-                  <td>{s.qty}</td>
-                  <td>{g(s.unitSalePrice)}g</td>
-                  <td className="text-[#7fd08a]">{s.status === "confirmed" ? `+${g(s.totalProfit)}g` : "—"}</td>
-                  <td className="text-xs">{s.status === "confirmed" ? "✓ deposited" : "pending"}</td>
-                </tr>
-              ))}
-              {!mine.length && <tr><td colSpan={6} className="text-[#8a7c64]">No sales yet.</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  }
+export default async function Sales({ searchParams }: { searchParams: Promise<{ q?: string; status?: string }> }) {
+  const access = await requireStaff();
+  const { q, status } = await searchParams;
+  const sales = await listSales(access.profileId, { q, status });
 
-  const books = await getBooks();
-  const knownLocations: string[] = [...SHOP.locations];
-  for (const s of books.salesRows) {
-    if (s.location && !knownLocations.includes(s.location)) knownLocations.push(s.location);
-  }
-  const row = (s: (typeof books.salesRows)[number]) => ({
-    id: s.id,
-    timestamp: String(s.timestamp),
-    itemName: s.itemName,
-    qty: s.qty,
-    unitSalePrice: s.unitSalePrice,
-    totalProfit: s.totalProfit,
-    discount: s.discount || 0,
-    deductedStock: s.deductedStock,
-    location: s.location,
-    soldByName: s.soldByName,
-  });
-  const pending = books.salesRows.filter((s) => s.status !== "confirmed").map(row);
-  const done = books.salesRows.filter((s) => s.status === "confirmed").map(row);
-  const sellers = allMembers
-    .filter((m) => m.discordId && m.active)
-    .map((m) => ({ name: m.name, discordId: m.discordId! }));
+  const days = new Map<string, SaleRow[]>();
+  for (const s of sales) days.set(dayOf(s), [...(days.get(dayOf(s)) ?? []), s]);
 
   return (
-    <div className="space-y-6">
-      <h1 className="font-display text-3xl">Record a sale</h1>
-      <p className="text-sm text-[#8a7c64]">Sales land pending — gold splits only once someone confirms the deposit.</p>
-      <SaleForm
-        items={formItems}
-        categories={formCategories}
-        locations={knownLocations}
-        showRoad={trackStock}
-        sellers={sellers}
-      />
+    <>
+      <PageHeader title="Sales">
+        <Link href="/admin/sales/new" className="btn-gold !py-2 text-sm">+ New receipt</Link>
+      </PageHeader>
 
-      <SalesTables pending={pending} done={done} />
-    </div>
+      <form className="flex flex-wrap gap-3 mb-6">
+        <input name="q" defaultValue={q} className="input !w-56" placeholder="Receipt no., customer, seller" aria-label="Search" />
+        <select name="status" defaultValue={status ?? ""} className="input !w-36" aria-label="Status">
+          <option value="">All</option>
+          <option value="posted">Posted</option>
+          <option value="draft">Draft</option>
+        </select>
+        <button className="btn-ghost !py-2 text-sm" type="submit">Filter</button>
+      </form>
+
+      {!sales.length && <div className="panel"><Empty>No receipts found.</Empty></div>}
+      {[...days.entries()].map(([day, rows]) => {
+        const posted = rows.filter((r) => r.status === "posted");
+        const revenue = posted.reduce((sum, r) => sum + r.total, 0);
+        const profit = posted.reduce((sum, r) => sum + (r.profit ?? 0), 0);
+        return (
+          <Section key={day} title={day} aside={`${rows.length} ${rows.length === 1 ? "receipt" : "receipts"} · ${g(revenue)}g · profit ${g(profit)}g`}>
+            <div className="panel divide-y divide-[#1c2b31]">
+              {rows.map((r) => (
+                <Link key={r.id} href={`/admin/sales/${r.id}`} className="grid grid-cols-[4rem_minmax(0,1fr)_auto_3.5rem] gap-3 px-4 py-3 items-center hover:bg-[#1d1a16]">
+                  <span className="tabular-nums">#{r.receipt_no}</span>
+                  <span className="muted text-sm truncate">{r.seller}{r.customer ? ` · ${r.customer}` : ""}</span>
+                  <span className="tabular-nums text-sm">{g(r.total)}g</span>
+                  <span className={`text-xs text-right ${r.status === "draft" ? "text-[#e0bd4a]" : "muted"}`}>{r.status}</span>
+                </Link>
+              ))}
+            </div>
+          </Section>
+        );
+      })}
+    </>
   );
 }
