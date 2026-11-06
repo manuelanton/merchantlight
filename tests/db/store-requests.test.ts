@@ -101,49 +101,106 @@ describe('removing items', () => {
 
 describe('EEC commissions', () => {
   const item = async (name: string) => (await t.one<{ id: string }>(`select id from merchant.eec_items where name = $1`, [name])).id
-  const order = (customer: string, id: string | null) => t.one<{ id: string; item_name: string; price: number; status: string }>(`select * from merchant.place_eec_order($1, $2)`, [customer, id])
+  const order = (user: string, customer: string, lines: { item: string; qty: number }[]) =>
+    t.as(user, () => t.one<{ id: string }>(`select id from merchant.create_eec_order($1, $2::jsonb)`, [customer, JSON.stringify(lines)]))
+  const paid = (user: string, id: string, on: boolean) => t.as(user, () => t.db.query(`select merchant.set_eec_paid($1, $2)`, [id, on]))
+  const listed = (user: string, id: string) => t.as(user, () => t.one<{ fulfilled: boolean; paid: boolean; items: string; total: number; sale_id: string | null }>(`select * from merchant.eec_order_list() where id = $1`, [id]))
 
-  it('holds the whole list from the sheet', async () => {
+  it('holds the whole list from the sheet, at cost until prices are set', async () => {
     expect(await t.one(`select count(*)::int as n from merchant.eec_items`)).toEqual({ n: 79 })
-    expect(await t.one(`select price, weekly_limit from merchant.eec_items where name = 'Nocturnal Robes'`)).toEqual({ price: 30000, weekly_limit: null })
+    expect(await t.one(`select cost, price, weekly_limit from merchant.eec_items where name = 'Nocturnal Robes'`)).toEqual({ cost: 30000, price: 30000, weekly_limit: null })
     expect(await t.one(`select category, weekly_limit from merchant.eec_items where name = 'Linen Wraps'`)).toEqual({ category: 'Crafting Materials', weekly_limit: 10 })
   })
 
-  it('takes a customer order without an account, at the list price', async () => {
-    const placed = await order('  Lydia ', await item('Ruby'))
-    expect(placed).toMatchObject({ customer: 'Lydia', item_name: 'Ruby', price: 100, status: 'open' })
+  it('takes several items with amounts, at the prices of that moment', async () => {
+    const [ruby, pearl] = [await item('Ruby'), await item('Pearl')]
+    await t.as(manager, () => t.db.query(`update merchant.eec_items set price = 150 where id = $1`, [ruby]))
+    const placed = await order(employee, '  Lydia ', [{ item: ruby, qty: 2 }, { item: pearl, qty: 1 }])
+    await t.as(manager, () => t.db.query(`update merchant.eec_items set price = 999 where id = $1`, [ruby]))
+    expect(await listed(employee, placed.id)).toMatchObject({ customer: 'Lydia', items: '1× Pearl, 2× Ruby', total: 4300 })
+    await t.as(manager, () => t.db.query(`update merchant.eec_items set price = cost where id = $1`, [ruby]))
   })
 
   it('needs a name and an item from the list', async () => {
-    await expect(order(' ', await item('Ruby'))).rejects.toThrow(/your name/)
-    await expect(order('Lydia', null)).rejects.toThrow(/Pick an item/)
+    const ruby = await item('Ruby')
+    await expect(order(employee, ' ', [{ item: ruby, qty: 1 }])).rejects.toThrow(/customer/)
+    await expect(order(employee, 'Lydia', [])).rejects.toThrow(/at least one/)
+    await expect(order(employee, 'Lydia', [{ item: ruby, qty: 0 }])).rejects.toThrow(/above zero/)
+    await expect(order(employee, 'Lydia', [{ item: '00000000-0000-0000-0000-000000000000', qty: 1 }])).rejects.toThrow(/Pick an item/)
   })
 
-  it('moves through its statuses, for staff only', async () => {
-    const placed = await order('Faendal', await item('Garnet'))
-    const set = (user: string, status: string) => t.as(user, () => t.db.query(`select merchant.set_eec_order_status($1, $2)`, [placed.id, status]))
-    await set(employee, 'bought')
-    await set(employee, 'delivered')
-    expect(await t.one(`select status from merchant.eec_orders where id = $1`, [placed.id])).toEqual({ status: 'delivered' })
-    await expect(set(employee, 'lost')).rejects.toThrow(/Unknown status/)
-    const visitor = await t.createUser('visitor', 'Vera')
-    await expect(set(visitor, 'open')).rejects.toThrow(/Not allowed/)
-    expect(await t.as(visitor, () => t.rows(`select id from merchant.eec_orders`))).toEqual([])
+  it('posts a receipt when paid, without touching stock, and takes it back when unticked', async () => {
+    const [garnet, ruby] = [await item('Garnet'), await item('Ruby')]
+    await t.as(manager, () => t.db.query(`update merchant.eec_items set price = 80 where id = $1`, [garnet]))
+    const placed = await order(employee, 'Faendal', [{ item: garnet, qty: 3 }, { item: ruby, qty: 1 }])
+    await t.as(manager, () => t.db.query(`update merchant.eec_items set price = cost where id = $1`, [garnet]))
+    const moved = async () => (await t.one<{ n: number }>(`select count(*)::int as n from merchant.stock_movements`)).n
+    const before = await moved()
+
+    await paid(employee, placed.id, true)
+    const { sale_id: sale, paid: isPaid } = await listed(employee, placed.id)
+    expect(isPaid).toBe(true)
+    expect(await t.one(`select status::text, customer, net_total, cost_total, seller_name from merchant.sales where id = $1`, [sale]))
+      .toEqual({ status: 'posted', customer: 'Faendal', net_total: 340, cost_total: 280, seller_name: 'Erik' })
+    expect(await t.rows(`select good_name, category, quantity from merchant.sale_lines where sale_id = $1 order by good_name`, [sale]))
+      .toEqual([{ good_name: 'Garnet', category: 'Gems', quantity: 3 }, { good_name: 'Ruby', category: 'Gems', quantity: 1 }])
+    expect(await t.one(`select money_in from merchant.treasury_entries where category = 'Sales income' and ref_id = $1`, [sale])).toEqual({ money_in: 340 })
+    expect(await moved()).toBe(before)
+
+    await paid(employee, placed.id, true) // ticking twice changes nothing
+    expect(await t.one(`select count(*)::int as n from merchant.sales where id = $1`, [sale])).toEqual({ n: 1 })
+
+    await paid(manager, placed.id, false)
+    expect(await listed(employee, placed.id)).toMatchObject({ paid: false, sale_id: null })
+    expect(await t.one(`select coalesce(sum(money_in - money_out), 0) as net from merchant.treasury_entries where ref_id = $1`, [sale])).toEqual({ net: 0 })
   })
 
-  it('stops at the weekly limit, cancelled orders do not count', async () => {
+  it('shows an order as paid to staff who cannot see the receipt, and unpaid while it is reopened', async () => {
+    const placed = await order(manager, 'Hulda', [{ item: await item('Ruby'), qty: 1 }])
+    await paid(manager, placed.id, true)
+    expect((await listed(employee, placed.id)).paid).toBe(true)
+    const { sale_id: sale } = await listed(manager, placed.id)
+    await t.as(manager, () => t.db.query(`select merchant.unpost_sale($1)`, [sale]))
+    expect((await listed(employee, placed.id)).paid).toBe(false)
+    await paid(manager, placed.id, true)
+    expect(await listed(employee, placed.id)).toMatchObject({ paid: true, sale_id: sale })
+  })
+
+  it('ticks fulfilled apart from paid', async () => {
+    const placed = await order(employee, 'Ysolda', [{ item: await item('Ruby'), qty: 1 }])
+    await t.as(employee, () => t.db.query(`select merchant.set_eec_fulfilled($1, true)`, [placed.id]))
+    expect(await listed(employee, placed.id)).toMatchObject({ fulfilled: true, paid: false })
+    await t.as(employee, () => t.db.query(`select merchant.set_eec_fulfilled($1, false)`, [placed.id]))
+    expect((await listed(employee, placed.id)).fulfilled).toBe(false)
+  })
+
+  it('cancels only what is not paid, and a cancelled order takes no ticks', async () => {
+    const placed = await order(employee, 'Brenuin', [{ item: await item('Ruby'), qty: 1 }])
+    const cancel = (on: boolean) => t.as(employee, () => t.db.query(`select merchant.set_eec_cancelled($1, $2)`, [placed.id, on]))
+    await paid(employee, placed.id, true)
+    await expect(cancel(true)).rejects.toThrow(/untick Paid/)
+    await paid(employee, placed.id, false)
+    await cancel(true)
+    await expect(paid(employee, placed.id, true)).rejects.toThrow(/cancelled/)
+    await cancel(false)
+    await paid(employee, placed.id, true)
+  })
+
+  it('counts amounts against the weekly limit, cancelled orders do not', async () => {
     const wraps = await item('Linen Wraps')
-    const first = await order('Staff Order', wraps)
-    await t.as(employee, () => t.db.query(`select merchant.set_eec_order_status($1, 'cancelled')`, [first.id]))
-    for (let i = 0; i < 10; i++) await t.as(employee, () => t.db.query(`select merchant.place_eec_order('Staff Order', $1)`, [wraps]))
-    await expect(t.as(employee, () => t.db.query(`select merchant.place_eec_order('Staff Order', $1)`, [wraps]))).rejects.toThrow(/only sells 10/)
+    const first = await order(employee, 'Sigrid', [{ item: wraps, qty: 8 }])
+    await expect(order(employee, 'Sigrid', [{ item: wraps, qty: 3 }])).rejects.toThrow(/only sells 10/)
+    await t.as(employee, () => t.db.query(`select merchant.set_eec_cancelled($1, true)`, [first.id]))
+    await order(employee, 'Sigrid', [{ item: wraps, qty: 10 }])
   })
 
-  it('limits open orders per customer, not for staff', async () => {
-    const pearl = await item('Pearl')
-    for (let i = 0; i < 10; i++) await order('Nazeem', pearl)
-    await expect(order('nazeem', pearl)).rejects.toThrow(/10 open orders/)
-    await t.as(employee, () => t.db.query(`select merchant.place_eec_order('Nazeem', $1)`, [pearl]))
+  it('keeps it to staff, prices to managers', async () => {
+    const visitor = await t.createUser('visitor', 'Vera')
+    await expect(order(visitor, 'Vera', [{ item: await item('Ruby'), qty: 1 }])).rejects.toThrow(/Not allowed/)
+    await expect(t.as(visitor, () => t.rows(`select * from merchant.eec_order_list()`))).rejects.toThrow(/Not allowed/)
+    expect(await t.as(visitor, () => t.rows(`select id from merchant.eec_orders`))).toEqual([])
+    await t.as(employee, () => t.db.query(`update merchant.eec_items set price = 1`))
+    expect(await t.one(`select count(*)::int as n from merchant.eec_items where price = 1`)).toEqual({ n: 0 })
   })
 })
 

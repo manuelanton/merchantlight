@@ -2,77 +2,87 @@
 
 import { useState } from "react";
 import SuggestInput from "@/components/SuggestInput";
-import { g } from "@/lib/format";
+import { g, num } from "@/lib/format";
+import { addCommissionAction } from "@/lib/store-actions";
 import type { EecItem } from "@/lib/store-data";
 
-/** Name and item for an EEC order. `catalogue` also lists everything that can be ordered. */
-export default function CommissionForm({ items, action, catalogue = false, button }: {
-  items: EecItem[];
-  action: (form: FormData) => Promise<void>;
-  catalogue?: boolean;
-  button: string;
-}) {
-  const [id, setId] = useState("");
-  const item = items.find((i) => i.id === id);
-  const categories = [...new Set(items.map((i) => i.category))];
+/** A customer's order: pick items from the EEC list, each with its amount. */
+export default function CommissionForm({ items }: { items: EecItem[] }) {
+  const [lines, setLines] = useState<{ id: string; qty: string }[]>([]);
+  const [picks, setPicks] = useState(0);
+
+  const chosen = lines.flatMap((l) => {
+    const item = items.find((i) => i.id === l.id);
+    return item ? [{ ...l, item, amount: Math.floor(num(l.qty)) }] : [];
+  });
+  const total = chosen.reduce((sum, l) => sum + l.amount * l.item.price, 0);
+  const valid = chosen.length > 0 && chosen.every((l) => l.amount > 0);
 
   return (
-    <>
-      <form action={action} className="panel p-4 mb-6 grid sm:grid-cols-[1fr_1.5fr_auto] gap-3 items-end">
+    <form
+      action={async (data) => {
+        await addCommissionAction(data);
+        setLines([]);
+      }}
+      className="panel p-4 grid gap-3"
+    >
+      <div className="grid sm:grid-cols-2 gap-3">
         <div>
           <label className="lbl" htmlFor="commission-customer">Customer name</label>
           <input id="commission-customer" name="customer" maxLength={60} className="input !py-2 text-sm" required />
         </div>
         <div>
-          <label className="lbl" htmlFor="commission-item">Item</label>
+          <label className="lbl" htmlFor="commission-item">Add item</label>
           <SuggestInput
-            key={item?.id}
+            key={picks}
             id="commission-item"
-            label="Item"
+            autoFocus={picks > 0}
+            label="Add item"
             placeholder="Search the EEC list"
-            defaultValue={item?.name}
             options={items.map((i) => i.name)}
-            onPick={(name) => setId(items.find((i) => i.name === name)?.id ?? "")}
+            onPick={(name) => {
+              const item = items.find((i) => i.name === name);
+              if (item && !lines.some((l) => l.id === item.id)) setLines([...lines, { id: item.id, qty: "1" }]);
+              setPicks(picks + 1);
+            }}
           />
         </div>
-        <button className="btn-gold !py-2 text-sm" type="submit" disabled={!item}>{button}</button>
-        <input type="hidden" name="item" value={id} />
-        {/* Left empty by people; bots filling every field are turned away. */}
-        <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" />
-        {item && (
-          <p className="sm:col-span-3 text-sm">
-            {item.name}: <span className="tabular-nums text-[#e0bd4a]">{g(item.price)}g</span>
-            {item.weekly_limit && <span className="muted"> · at most {item.weekly_limit} a week</span>}
-          </p>
-        )}
-      </form>
+      </div>
 
-      {catalogue && categories.map((c) => (
-        <section key={c} className="mb-6">
-          <h2 className="eyebrow mb-2">{c}</h2>
-          <div className="panel divide-y divide-[#1c2b31]">
-            {items.filter((i) => i.category === c).map((i) => (
-              <div key={i.id} className="flex items-center justify-between gap-3 px-4 py-2 text-sm">
-                <span className="min-w-0 truncate">{i.name}{i.weekly_limit && <span className="muted text-xs"> · at most {i.weekly_limit} a week</span>}</span>
-                <span className="flex items-center gap-3 shrink-0">
-                  <span className="tabular-nums">{g(i.price)}g</span>
-                  <button
-                    type="button"
-                    className={`${i.id === id ? "btn-gold" : "btn-ghost"} !py-1 text-sm`}
-                    aria-label={`Choose ${i.name}`}
-                    onClick={() => {
-                      setId(i.id);
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
-                  >
-                    Choose
-                  </button>
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-      ))}
-    </>
+      {chosen.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="ledger min-w-[30rem]">
+            <thead><tr><th>Item</th><th className="text-right w-20">Amount</th><th className="text-right">Price</th><th className="text-right">Total</th><th className="w-10" /></tr></thead>
+            <tbody>
+              {chosen.map((l) => (
+                <tr key={l.id}>
+                  <td>{l.item.name}{l.item.weekly_limit && <span className="muted text-xs"> · at most {l.item.weekly_limit} a week</span>}</td>
+                  <td>
+                    <input
+                      inputMode="numeric"
+                      value={l.qty}
+                      onChange={(e) => setLines(lines.map((x) => (x.id === l.id ? { ...x, qty: e.target.value } : x)))}
+                      className="input !py-1 text-sm text-right"
+                      aria-label={`Amount of ${l.item.name}`}
+                    />
+                  </td>
+                  <td className="text-right tabular-nums">{g(l.item.price)}g</td>
+                  <td className="text-right tabular-nums">{g(l.amount * l.item.price)}g</td>
+                  <td className="text-right">
+                    <button type="button" className="btn-ghost !py-1 !px-2 text-sm" onClick={() => setLines(lines.filter((x) => x.id !== l.id))} aria-label={`Take out ${l.item.name}`}>×</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <input type="hidden" name="lines" value={JSON.stringify(chosen.map((l) => ({ item: l.id, qty: l.amount })))} />
+      <div className="flex items-center justify-end gap-3">
+        {chosen.length > 0 && <span className="tabular-nums text-sm">Total {g(total)}g</span>}
+        <button className="btn-gold !py-2 text-sm" type="submit" disabled={!valid}>Add order</button>
+      </div>
+    </form>
   );
 }

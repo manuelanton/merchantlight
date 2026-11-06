@@ -586,44 +586,50 @@ export interface EecItem {
   id: string;
   name: string;
   category: string;
+  cost: number;
   price: number;
   weekly_limit: number | null;
 }
 
-/** Also read by the public Commissions page, so it runs without a signed-in user. */
-export function listEecItems() {
-  return asService<EecItem>(`select id, name, category, price, weekly_limit from merchant.eec_items order by sort_order`);
+export function listEecItems(profileId: string) {
+  return asUser<EecItem>(profileId, `select id, name, category, cost, price, weekly_limit from merchant.eec_items order by sort_order`);
 }
 
 export interface EecOrder {
   id: string;
   customer: string;
-  item_name: string;
-  price: number;
-  status: string;
+  items: string;
+  total: number;
   order_date: string | Date;
+  fulfilled: boolean;
+  paid: boolean;
+  cancelled: boolean;
+  sale_id: string | null;
+  receipt_no: number | null;
 }
 
 export async function listEecOrders(profileId: string, filter: { q?: string; status: string; page: number }) {
-  const rows = await asUser<EecOrder & { total: number }>(
+  const rows = await asUser<EecOrder>(
     profileId,
-    `select id, customer, item_name, price, status, order_date, count(*) over ()::int as total
-     from merchant.eec_orders
-     where ($1 = 'all' or status = $1 or ($1 = 'active' and status in ('open', 'bought')))
-       and ($2::text is null or customer ilike '%' || $2 || '%' or item_name ilike '%' || $2 || '%')
-     order by order_date desc limit ${PAGE_SIZE} offset $3`,
-    [filter.status, filter.q?.trim() || null, filter.page * PAGE_SIZE],
+    `select * from merchant.eec_order_list() r
+     where ($2::text is null or r.customer ilike '%' || $2 || '%' or r.items ilike '%' || $2 || '%')
+       and case $1 when 'all' then true
+                   when 'cancelled' then r.cancelled
+                   when 'done' then not r.cancelled and r.fulfilled and r.paid
+                   else not r.cancelled and not (r.fulfilled and r.paid) end`,
+    [filter.status, filter.q?.trim() || null],
   );
-  return { rows, total: rows[0]?.total ?? 0 };
+  return { rows: rows.slice(filter.page * PAGE_SIZE, (filter.page + 1) * PAGE_SIZE), total: rows.length };
 }
 
 export async function eecOrderStats(profileId: string) {
   const [[stats], customers] = await Promise.all([
-    asUser<{ open: number; bought: number; open_value: number }>(
+    asUser<{ to_fulfil: number; to_collect: number; unpaid: number }>(
       profileId,
-      `select count(*) filter (where status = 'open')::int as open, count(*) filter (where status = 'bought')::int as bought,
-              coalesce(sum(price) filter (where status = 'open'), 0) as open_value
-       from merchant.eec_orders`,
+      `select count(*) filter (where not fulfilled)::int as to_fulfil,
+              count(*) filter (where not paid)::int as to_collect,
+              coalesce(sum(total) filter (where not paid), 0) as unpaid
+       from merchant.eec_order_list() where not cancelled`,
     ),
     asUser<{ customer: string }>(profileId, `select distinct customer from merchant.eec_orders order by 1 limit 200`),
   ]);

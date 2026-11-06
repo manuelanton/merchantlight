@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { num } from "@/lib/format";
-import { asService, asUser } from "@/lib/merchant-db";
+import { asUser } from "@/lib/merchant-db";
 import { rpcError } from "@/lib/merchant-rpc";
 import { setShopOpen } from "@/lib/shop";
 import { requireManager, requireOwner, requireStaff } from "@/lib/store-access";
@@ -150,25 +150,41 @@ export async function cancelCraftRequestAction(form: FormData) {
   await attempt("/admin/craft", () => asUser(access.profileId, `select merchant.cancel_craft_request($1)`, [text(form, "id")]));
 }
 
-/** The one action open to customers: it can only place an order, and the database limits those. */
-export async function placeCommissionAction(form: FormData) {
-  if (text(form, "website")) redirect("/commissions");
-  let placed = "";
-  await attempt("/commissions", async () => {
-    const [row] = await asService<{ item_name: string }>(`select item_name from merchant.place_eec_order($1, $2)`, [text(form, "customer"), text(form, "item") || null]);
-    placed = row.item_name;
-  });
-  redirect(`/commissions?placed=${encodeURIComponent(placed)}`);
-}
-
 export async function addCommissionAction(form: FormData) {
   const access = await requireStaff();
-  await attempt("/admin/commissions", () => asUser(access.profileId, `select merchant.place_eec_order($1, $2)`, [text(form, "customer"), text(form, "item") || null]));
+  await attempt("/admin/commissions", () =>
+    asUser(access.profileId, `select merchant.create_eec_order($1, $2::jsonb)`, [text(form, "customer"), text(form, "lines") || "[]"]),
+  );
 }
 
-export async function setCommissionStatusAction(form: FormData) {
+export async function setCommissionFulfilledAction(form: FormData) {
   const access = await requireStaff();
-  await attempt("/admin/commissions", () => asUser(access.profileId, `select merchant.set_eec_order_status($1, $2)`, [text(form, "id"), text(form, "status")]));
+  await attempt("/admin/commissions", () => asUser(access.profileId, `select merchant.set_eec_fulfilled($1, $2)`, [text(form, "id"), text(form, "on") === "1"]));
+}
+
+export async function setCommissionPaidAction(form: FormData) {
+  const access = await requireStaff();
+  await attempt("/admin/commissions", () => asUser(access.profileId, `select merchant.set_eec_paid($1, $2)`, [text(form, "id"), text(form, "on") === "1"]));
+}
+
+export async function setCommissionCancelledAction(form: FormData) {
+  const access = await requireStaff();
+  await attempt("/admin/commissions", () => asUser(access.profileId, `select merchant.set_eec_cancelled($1, $2)`, [text(form, "id"), text(form, "on") === "1"]));
+}
+
+/** The whole price list in one go: every row sends its own `cost_<id>` and `price_<id>`. */
+export async function saveEecPricesAction(form: FormData) {
+  const access = await requireManager();
+  const ids = form.getAll("id").map(String);
+  await attempt("/admin/commissions", () =>
+    asUser(
+      access.profileId,
+      `update merchant.eec_items e set cost = v.cost, price = v.price
+       from unnest($1::uuid[], $2::double precision[], $3::double precision[]) as v (id, cost, price)
+       where e.id = v.id and (e.cost <> v.cost or e.price <> v.price)`,
+      [ids, ids.map((id) => num(form.get(`cost_${id}`))), ids.map((id) => num(form.get(`price_${id}`)))],
+    ),
+  );
 }
 
 export async function craftAction(form: FormData) {

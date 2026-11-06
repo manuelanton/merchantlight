@@ -11,8 +11,9 @@ const TYPING_PAUSE_MS = 200;
  * With `onPick`, picking a name hands it over. Otherwise the page follows along:
  * every keystroke applies the surrounding form to the URL, without a reload.
  */
-export default function SuggestInput({ id, name, options, defaultValue = "", placeholder, label, className = "", onPick }: {
+export default function SuggestInput({ id, autoFocus, name, options, defaultValue = "", placeholder, label, className = "", onPick }: {
   id?: string;
+  autoFocus?: boolean;
   name?: string;
   options: string[];
   defaultValue?: string;
@@ -89,6 +90,7 @@ export default function SuggestInput({ id, name, options, defaultValue = "", pla
       <input
         ref={input}
         id={id}
+        autoFocus={autoFocus}
         name={name}
         value={value}
         onChange={(e) => {
@@ -115,7 +117,7 @@ export default function SuggestInput({ id, name, options, defaultValue = "", pla
         autoComplete="off"
       />
       {showing && (
-        <ul id={list} role="listbox" className="panel absolute z-30 mt-1 w-full min-w-56 max-h-64 overflow-y-auto py-1 text-sm">
+        <ul id={list} role="listbox" className="panel !bg-[#101a1e] absolute z-30 mt-1 w-full min-w-56 max-h-64 overflow-y-auto py-1 text-sm">
           {matches.map((m, i) => (
             <li
               key={m}

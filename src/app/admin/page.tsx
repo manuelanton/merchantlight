@@ -58,9 +58,9 @@ export default async function Today() {
           {requests.length} craft {requests.length === 1 ? "request is" : "requests are"} waiting on the Craft page.
         </Link>
       )}
-      {commissions.open > 0 && (
+      {commissions.to_fulfil + commissions.to_collect > 0 && (
         <Link href="/admin/commissions" className="panel block px-4 py-3 mb-3 text-sm hover:bg-[#1d1a16]">
-          {commissions.open} {commissions.open === 1 ? "commission is" : "commissions are"} waiting to be bought from the EEC.
+          Commissions: {commissions.to_fulfil} to fulfil, {commissions.to_collect} still unpaid.
         </Link>
       )}
       {low.length > 0 && (
