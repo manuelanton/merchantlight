@@ -93,6 +93,51 @@ export async function setStockAction(form: FormData) {
   });
 }
 
+export async function saveMaterialAction(form: FormData) {
+  const access = await requireManager();
+  const id = text(form, "id");
+  const fields = [text(form, "name"), num(form.get("buy_price")), num(form.get("min_stock"))];
+  await attempt("/admin/items", () =>
+    id
+      ? asUser(access.profileId, `update merchant.materials set name = $1, buy_price = $2, min_stock = $3 where id = $4`, [...fields, id])
+      : asUser(access.profileId, `insert into merchant.materials (name, buy_price, min_stock) values ($1, $2, $3)`, fields),
+  );
+}
+
+export async function addRecipeLineAction(form: FormData) {
+  const access = await requireManager();
+  const good = text(form, "good");
+  const [kind, part] = text(form, "part").split(":");
+  const column = kind === "material" ? "material_id" : "component_good_id";
+  await attempt(`/admin/items/${good}`, () =>
+    asUser(access.profileId, `insert into merchant.recipe_components (good_id, ${column}, quantity) values ($1, $2, $3)`, [good, part, num(form.get("quantity"), 1)]),
+  );
+}
+
+export async function removeRecipeLineAction(form: FormData) {
+  const access = await requireManager();
+  const good = text(form, "good");
+  await attempt(`/admin/items/${good}`, () => asUser(access.profileId, `delete from merchant.recipe_components where id = $1`, [text(form, "id")]));
+}
+
+export async function saveRecipeAction(form: FormData) {
+  const access = await requireManager();
+  const good = text(form, "good");
+  await attempt(`/admin/items/${good}`, () =>
+    asUser(access.profileId, `update merchant.goods set profession = $1, craft_yield = $2 where id = $3`, [text(form, "profession") || null, num(form.get("craft_yield"), 1), good]),
+  );
+}
+
+export async function craftAction(form: FormData) {
+  const access = await requireStaff();
+  await attempt("/admin/craft", () => asUser(access.profileId, `select merchant.craft($1, $2)`, [text(form, "id"), num(form.get("qty"))]));
+}
+
+export async function deleteCraftAction(form: FormData) {
+  const access = await requireManager();
+  await attempt("/admin/craft", () => asUser(access.profileId, `delete from merchant.crafts where id = $1`, [text(form, "id")]));
+}
+
 export async function createPurchaseAction(form: FormData) {
   const access = await requireManager();
   await attempt("/admin/purchases", () =>

@@ -1,8 +1,8 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { asUser } from '@/lib/merchant-db'
 import {
-  addDays, getSale, isLow, listGoods, listMaterials, listPurchases, listSales, listUnits, partnerBalances, partnerWeek,
-  rentalHistory, rentalSpace, todaysSales, treasuryBalance, treasuryCategories, treasuryEntries, weekStart,
+  addDays, analytics, getGood, getSale, isLow, listCrafts, listGoods, listMaterials, listPurchases, listRecipes, listSales, listUnits, partnerBalances, partnerWeek,
+  recipeLines, rentalHistory, rentalSpace, todaysSales, treasuryBalance, treasuryCategories, treasuryEntries, weekStart,
 } from '@/lib/store-data'
 import { createDb, type TestDb } from './harness'
 
@@ -95,9 +95,22 @@ describe('page reads', () => {
     expect(isLow({ ...good, min_stock: 0 })).toBe(false)
   })
 
+  it('adds up a range for the analytics page', async () => {
+    const today = new Date().toISOString().slice(0, 10)
+    const all = await analytics(manager, null, null)
+    const [day] = all.days
+    expect(day.day).toBe(today)
+    expect(all.items[0]).toMatchObject({ name: 'Rope' })
+    expect(all.categories[0].name).toBe('Tools')
+    expect(all.people.map((p) => p.receipts).reduce((a, b) => a + b)).toBe(day.receipts)
+    expect(all.balances.at(-1)?.balance).toBe(await treasuryBalance(manager))
+    expect((await analytics(manager, addDays(today, 1), null)).days).toEqual([])
+    expect(all.goods_value).toBe(0) // Rope has been oversold
+  })
+
   it('gives the payments page its figures', async () => {
     const week = await partnerWeek(manager, weekStart())
-    expect(week.sales_profit).toBeGreaterThan(0)
+    expect(week.sales_income).toBeGreaterThan(0)
     expect(week.partners.map((p) => p.name)).toEqual(['Mira'])
     expect(await partnerBalances(manager)).toEqual([])
   })
@@ -140,6 +153,35 @@ describe('rentals', () => {
     expect(rows.find((u) => u.name === 'Safe')).toMatchObject({ kind: 'internal', rental_id: null, has_history: false })
     expect(await rentalHistory(manager)).toMatchObject([{ unit: 'Barrel 1', renter: 'Lydia', paid: 120, ended: false }])
     expect((await treasuryEntries(manager, 'Rental income'))[0].money_in).toBe(120)
+  })
+})
+
+describe('items with a recipe', () => {
+  it('can be bought, sold and crafted by the right trade', async () => {
+    const [linen] = await asUser<{ id: string }>(manager, `insert into merchant.materials (name, buy_price) values ('Linen', 3) returning id`)
+    const [tunic] = await asUser<{ id: string }>(manager, `insert into merchant.goods (name, category, sell_price, buy_price, profession) values ('Tunic', 'Clothes', 20, 9, 'Tailor') returning id`)
+    await asUser(manager, `insert into merchant.recipe_components (good_id, material_id, quantity) values ($1, $2, 2)`, [tunic.id, linen.id])
+    await asUser(manager, `select merchant.create_purchase($1::jsonb, null, null, false)`, [
+      JSON.stringify([{ kind: 'material', item_id: linen.id, qty: 5, unit_price: 3 }, { kind: 'good', item_id: tunic.id, qty: 1, unit_price: 9 }]),
+    ])
+
+    expect(await getGood(employee, tunic.id)).toMatchObject({ unit_cost: 6, cost_error: null, profession: 'Tailor' })
+    expect(await recipeLines(employee, tunic.id)).toMatchObject([{ name: 'Linen', quantity: 2, stock: 5 }])
+    const [recipe] = (await listRecipes(employee)).filter((r) => r.id === tunic.id)
+    expect(recipe).toMatchObject({ profession: 'Tailor', parts: '2× Linen', max_qty: 2, stock: 1 })
+
+    await asUser(employee, `select merchant.craft($1, $2)`, [tunic.id, 2])
+    expect(await getGood(employee, tunic.id)).toMatchObject({ stock: 3 })
+    expect((await listMaterials(manager)).find((m) => m.id === linen.id)?.stock).toBe(1)
+    expect((await listCrafts(employee))[0]).toMatchObject({ good_name: 'Tunic', quantity: 2, created_by_name: 'Erik' })
+
+    const [sale] = await receipt(employee, [{ good_id: tunic.id, qty: 1, unit_price: 20 }])
+    expect(await getGood(employee, tunic.id)).toMatchObject({ stock: 2 })
+    expect((await getSale(employee, sale.id))?.sale.profit).toBe(12)
+  })
+
+  it('stays out of the employees\' hands to edit', async () => {
+    await expect(asUser(employee, `update merchant.goods set profession = 'Smith' where name = 'Tunic' returning id`)).resolves.toEqual([])
   })
 })
 

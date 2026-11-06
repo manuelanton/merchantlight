@@ -2,7 +2,8 @@
 
 The new business logic, ported once from Darkwater Forge and then changed for the General
 Goods Store (`*_store_rules.sql`). It lives next to the old tables in
-`public` and is not used by the running app yet. Nothing here has been applied to Neon.
+`public`. `npm run db:setup` installs both on the Neon database in `DATABASE_URL` and applies new
+migrations later on; it never deletes anything and refuses a database that still holds the old books.
 
 ## How access works
 

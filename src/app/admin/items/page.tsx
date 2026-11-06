@@ -1,8 +1,9 @@
+import Link from "next/link";
 import { Empty, Notice, PageHeader, Section } from "@/components/store-ui";
 import { g } from "@/lib/format";
 import { isManager, requireStaff } from "@/lib/store-access";
-import { saveItemAction } from "@/lib/store-actions";
-import { listGoods, type Good } from "@/lib/store-data";
+import { saveItemAction, saveMaterialAction } from "@/lib/store-actions";
+import { listGoods, listMaterials, type Good } from "@/lib/store-data";
 
 export const dynamic = "force-dynamic";
 
@@ -10,16 +11,17 @@ export default async function Items({ searchParams }: { searchParams: Promise<{ 
   const access = await requireStaff();
   const manager = isManager(access);
   const { error, q } = await searchParams;
-  const goods = await listGoods(access.profileId);
+  const [goods, materials] = await Promise.all([listGoods(access.profileId), listMaterials(access.profileId)]);
   const search = q?.trim().toLowerCase();
   const shown = search ? goods.filter((i) => i.name.toLowerCase().includes(search)) : goods;
+  const shownMaterials = search ? materials.filter((m) => m.name.toLowerCase().includes(search)) : materials;
 
   const groups = new Map<string, Good[]>();
   for (const i of shown) groups.set(i.category, [...(groups.get(i.category) ?? []), i]);
 
   return (
     <>
-      <PageHeader title="Items" subtitle="What we sell and what it costs.">
+      <PageHeader title="Items" subtitle="What we sell, what it costs and how it is made.">
         <form className="flex gap-2">
           <input name="q" defaultValue={q} className="input !w-48 !py-2 text-sm" placeholder="Search items" aria-label="Search items" />
           <button className="btn-ghost !py-2 text-sm" type="submit">Search</button>
@@ -46,13 +48,14 @@ export default async function Items({ searchParams }: { searchParams: Promise<{ 
       {[...groups.entries()].map(([category, items]) => (
         <Section key={category} title={category} aside={items.length === 1 ? "1 item" : `${items.length} items`}>
           <div className="panel overflow-x-auto">
-            <table className="ledger min-w-[34rem] table-fixed">
+            <table className="ledger min-w-[38rem] table-fixed">
               <thead>
                 <tr>
                   <th>Item</th>
                   <th className="text-right w-24">Price</th>
                   <th className="text-right w-24">Cost</th>
                   <th className="text-right w-24">Low at</th>
+                  <th className="text-right w-20">Recipe</th>
                   {manager && <th className="w-20" />}
                 </tr>
               </thead>
@@ -76,6 +79,9 @@ export default async function Items({ searchParams }: { searchParams: Promise<{ 
                       {cell("sell_price", "Price", i.sell_price)}
                       {cell("buy_price", "Cost", i.buy_price)}
                       {cell("min_stock", "Low at", i.min_stock)}
+                      <td className="text-right">
+                        <Link href={`/admin/items/${i.id}`} className="text-sm text-[#c9a227] hover:text-[#e8dcc4]">{i.parts ? `${i.parts} ${i.parts === 1 ? "part" : "parts"}` : manager ? "+ Add" : "—"}</Link>
+                      </td>
                       {manager && (
                         <td>
                           <form id={form} action={saveItemAction} className="flex justify-end">
@@ -93,6 +99,59 @@ export default async function Items({ searchParams }: { searchParams: Promise<{ 
           </div>
         </Section>
       ))}
+
+      {(manager || shownMaterials.length > 0) && (
+        <Section title="Raw materials" aside="Bought in and used in recipes, not sold.">
+          <div className="panel overflow-x-auto">
+            <table className="ledger min-w-[30rem] table-fixed">
+              <thead>
+                <tr>
+                  <th>Material</th>
+                  <th className="text-right w-24">Cost</th>
+                  <th className="text-right w-24">Low at</th>
+                  {manager && <th className="w-20" />}
+                </tr>
+              </thead>
+              <tbody>
+                {shownMaterials.map((m) => {
+                  const form = `material-${m.id}`;
+                  return manager ? (
+                    <tr key={m.id}>
+                      <td><input form={form} name="name" defaultValue={m.name} className="input !py-1 text-sm" aria-label={`Name of ${m.name}`} required /></td>
+                      <td><input form={form} name="buy_price" inputMode="decimal" defaultValue={g(m.buy_price)} className="input !py-1 text-sm text-right" aria-label={`Cost of ${m.name}`} /></td>
+                      <td><input form={form} name="min_stock" inputMode="decimal" defaultValue={g(m.min_stock)} className="input !py-1 text-sm text-right" aria-label={`Low at of ${m.name}`} /></td>
+                      <td>
+                        <form id={form} action={saveMaterialAction} className="flex justify-end">
+                          <input type="hidden" name="id" value={m.id} />
+                          <button className="btn-ghost !py-1 !px-2 text-sm" type="submit">Save</button>
+                        </form>
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr key={m.id}>
+                      <td className="truncate">{m.name}</td>
+                      <td className="text-right tabular-nums">{g(m.buy_price)}</td>
+                      <td className="text-right tabular-nums">{g(m.min_stock)}</td>
+                    </tr>
+                  );
+                })}
+                {manager && (
+                  <tr>
+                    <td><input form="material-new" name="name" className="input !py-1 text-sm" placeholder="New material" aria-label="New material" required /></td>
+                    <td><input form="material-new" name="buy_price" inputMode="decimal" className="input !py-1 text-sm text-right" placeholder="0" aria-label="Cost of the new material" /></td>
+                    <td><input form="material-new" name="min_stock" inputMode="decimal" className="input !py-1 text-sm text-right" placeholder="0" aria-label="Low at of the new material" /></td>
+                    <td>
+                      <form id="material-new" action={saveMaterialAction} className="flex justify-end">
+                        <button className="btn-gold !py-1 !px-2 text-sm" type="submit">Add</button>
+                      </form>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+      )}
     </>
   );
 }

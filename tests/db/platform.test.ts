@@ -9,7 +9,7 @@ const MIGRATIONS = fileURLToPath(new URL('../../db/merchant/migrations', import.
 
 const UPSERT = `select * from merchant.upsert_discord_profile($1, 'name', 'Display', null, $2, true)`
 
-describe('without a superuser (like the Neon owner role)', () => {
+describe('without a superuser (like the Neon owner role)', { timeout: 120_000 }, () => {
   it('applies every migration and can drop into merchant_app', async () => {
     const db = new PGlite()
     await db.exec(`

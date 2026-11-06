@@ -23,12 +23,15 @@ export interface Good {
   stock: number;
   min_stock: number;
   is_bundle: boolean;
+  profession: string | null;
+  craft_yield: number;
+  parts: number;
 }
 
 export interface PartnerWeek {
   week_start: string;
   closed: boolean;
-  sales_profit: number;
+  sales_income: number;
   other_income: number;
   expenses: number;
   net: number;
@@ -108,9 +111,81 @@ export async function getSale(profileId: string, id: string) {
 export function listGoods(profileId: string) {
   return asUser<Good>(
     profileId,
-    `select id, name, category, sell_price, buy_price, stock, min_stock, is_bundle
-     from merchant.goods where active order by category, name`,
+    `select g.id, g.name, g.category, g.sell_price, g.buy_price, g.stock, g.min_stock, g.is_bundle, g.profession, g.craft_yield,
+            (select count(*)::int from merchant.recipe_components r where r.good_id = g.id) as parts
+     from merchant.goods g where g.active order by g.category, g.name`,
   );
+}
+
+export interface Analytics {
+  days: { day: string; revenue: number; profit: number; receipts: number }[];
+  items: { name: string; revenue: number; quantity: number }[];
+  categories: { name: string; revenue: number }[];
+  people: { name: string; receipts: number; revenue: number; profit: number; tips: number }[];
+  net: number;
+  balances: { day: string; balance: number }[];
+  goods_value: number;
+  materials_value: number;
+}
+
+const utcDay = (column: string) => `(${column} at time zone 'UTC')::date`;
+const inRange = (column: string) => `($1::date is null or ${utcDay(column)} >= $1::date) and ($2::date is null or ${utcDay(column)} <= $2::date)`;
+
+/** Everything the Analytics page shows for a range; either end may stay open. */
+export async function analytics(profileId: string, from: string | null, to: string | null): Promise<Analytics> {
+  const range = [from, to];
+  const [days, items, people, totals, balances, [stock]] = await Promise.all([
+    asUser<Analytics["days"][number]>(
+      profileId,
+      `select ${utcDay("sale_date")}::text as day, sum(net_total) as revenue, sum(net_total - cost_total) as profit, count(*)::int as receipts
+       from merchant.sales where status = 'posted' and ${inRange("sale_date")} group by 1 order by 1`,
+      range,
+    ),
+    asUser<Analytics["items"][number] & { category: string | null }>(
+      profileId,
+      `select l.good_name as name, l.category, sum(l.quantity * l.unit_price) as revenue, sum(l.quantity) as quantity
+       from merchant.sale_lines l join merchant.sales s on s.id = l.sale_id
+       where s.status = 'posted' and ${inRange("s.sale_date")} group by 1, 2 order by 3 desc`,
+      range,
+    ),
+    asUser<Analytics["people"][number]>(
+      profileId,
+      `select coalesce(max(seller_name), 'Unknown') as name, count(*)::int as receipts, sum(net_total) as revenue,
+              sum(net_total - cost_total) as profit, sum(tip) as tips
+       from merchant.sales where status = 'posted' and ${inRange("sale_date")} group by seller_id order by 3 desc`,
+      range,
+    ),
+    asUser<{ net: number }>(
+      profileId,
+      `select coalesce(sum(money_in) filter (where category <> 'Deposit'), 0)
+             - coalesce(sum(money_out) filter (where category not in ('Withdrawal', 'Partner payout')), 0) as net
+       from merchant.treasury_entries where ${inRange("entry_date")}`,
+      range,
+    ),
+    asUser<Analytics["balances"][number]>(
+      profileId,
+      `select day::text, sum(moved) over (order by day) as balance
+       from (select ${utcDay("entry_date")} as day, sum(money_in - money_out) as moved from merchant.treasury_entries group by 1) d
+       order by day`,
+    ),
+    asUser<{ goods_value: number; materials_value: number }>(
+      profileId,
+      `select coalesce((select sum(greatest(g.stock, 0) * coalesce(c.unit_cost, 0)) from merchant.goods g
+                        left join merchant.good_costs() c on c.good_id = g.id where g.active), 0) as goods_value,
+              coalesce((select sum(greatest(stock, 0) * buy_price) from merchant.materials where active), 0) as materials_value`,
+    ),
+  ]);
+  const categories = new Map<string, number>();
+  for (const i of items) categories.set(i.category ?? "Other", (categories.get(i.category ?? "Other") ?? 0) + i.revenue);
+  return {
+    days,
+    items,
+    categories: [...categories].map(([name, revenue]) => ({ name, revenue })).sort((a, b) => b.revenue - a.revenue),
+    people,
+    net: totals[0].net,
+    balances,
+    ...stock,
+  };
 }
 
 export const isLow = (item: { stock: number; min_stock: number }) => item.min_stock > 0 && item.stock <= item.min_stock;
@@ -257,4 +332,67 @@ export async function rentalSpace(site: string) {
     [site],
   );
   return row;
+}
+
+// Recipes and crafting -----------------------------------------------------------
+
+export async function getGood(profileId: string, id: string) {
+  const [good] = await asUser<Good & { unit_cost: number | null; cost_error: string | null }>(
+    profileId,
+    `select g.id, g.name, g.category, g.sell_price, g.buy_price, g.stock, g.min_stock, g.is_bundle, g.profession, g.craft_yield,
+            c.unit_cost, c.cost_error
+     from merchant.goods g
+     left join merchant.good_costs() c on c.good_id = g.id
+     where g.id = $1`,
+    [id],
+  );
+  return good ?? null;
+}
+
+export function recipeLines(profileId: string, goodId: string) {
+  return asUser<{ id: string; name: string; quantity: number; stock: number }>(
+    profileId,
+    `select r.id, coalesce(m.name, c.name) as name, r.quantity, coalesce(m.stock, c.stock) as stock
+     from merchant.recipe_components r
+     left join merchant.materials m on m.id = r.material_id
+     left join merchant.goods c on c.id = r.component_good_id
+     where r.good_id = $1 order by r.created_at`,
+    [goodId],
+  );
+}
+
+export interface Recipe {
+  id: string;
+  name: string;
+  profession: string | null;
+  stock: number;
+  craft_yield: number;
+  parts: string;
+  max_qty: number;
+  limiting: string | null;
+}
+
+/** Bundles have a recipe too, but they are taken apart when sold, not crafted. */
+export function listRecipes(profileId: string) {
+  return asUser<Recipe>(
+    profileId,
+    `select g.id, g.name, g.profession, g.stock, g.craft_yield, cap.max_qty, cap.limiting,
+            (select string_agg(r.quantity || '× ' || coalesce(m.name, c.name), ', ' order by r.created_at)
+             from merchant.recipe_components r
+             left join merchant.materials m on m.id = r.material_id
+             left join merchant.goods c on c.id = r.component_good_id
+             where r.good_id = g.id) as parts
+     from merchant.goods g
+     left join merchant.craft_capacity() cap on cap.good_id = g.id
+     where g.active and not g.is_bundle
+       and exists (select 1 from merchant.recipe_components r where r.good_id = g.id)
+     order by g.profession nulls last, g.name`,
+  );
+}
+
+export function listCrafts(profileId: string) {
+  return asUser<{ id: string; good_name: string; quantity: number; created_at: string | Date; created_by_name: string | null }>(
+    profileId,
+    `select id, good_name, quantity, created_at, created_by_name from merchant.crafts order by created_at desc limit 20`,
+  );
 }

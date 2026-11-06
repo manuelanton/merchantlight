@@ -109,26 +109,26 @@ describe('partner split', () => {
       const mat = (await t.one<{ id: string }>(`insert into merchant.materials (name, buy_price) values ('Cloth', 4) returning id`)).id
       const g = await good('Cloak', 104)
       await t.db.query(`insert into merchant.recipe_components (good_id, material_id, quantity) values ($1, $2, 1)`, [g, mat])
-      await sell(g, 1, 104) // profit 100
+      await sell(g, 1, 104)
     })
     expect(await t.one(`select commission_amount from merchant.sales`)).toEqual({ commission_amount: 0 })
   })
 
-  it('divides profit minus expenses by Owners and Managers, not Employees', async () => {
+  it('divides income minus expenses by Owners and Managers, not Employees', async () => {
     await t.as(manager, () => expense(40))
     const { w } = await week(manager)
-    expect(w).toMatchObject({ closed: false, sales_profit: 100, expenses: 40, net: 60, per_partner: 30 })
+    expect(w).toMatchObject({ closed: false, sales_income: 104, expenses: 40, net: 64, per_partner: 32 })
     expect((w.partners as { name: string }[]).map((p) => p.name)).toEqual(['Mira', 'Olaf'])
   })
 
-  it('does not charge material purchases twice', async () => {
-    await t.db.query(`insert into merchant.treasury_entries (entry_date, category, description, money_out) values ($1, 'Material purchase', 'x', 500), ($1, 'Withdrawal', 'x', 300)`, [`${WEEK} 14:00+00`])
-    expect((await week(manager)).w).toMatchObject({ expenses: 40, net: 60 })
+  it('counts purchases as expenses, withdrawals not', async () => {
+    await t.db.query(`insert into merchant.treasury_entries (entry_date, category, description, money_out) values ($1, 'Material purchase', 'x', 500), ($1, 'Withdrawal', 'x', 300)`, ['2026-08-31 14:00+00'])
+    expect((await week(manager, '2026-08-31')).w).toMatchObject({ sales_income: 0, expenses: 500, net: -500 })
   })
 
   it('counts rental income as profit', async () => {
     await t.db.query(`insert into merchant.treasury_entries (entry_date, category, description, money_in) values ($1, 'Rental income', 'x', 20), ($1, 'Deposit', 'x', 999)`, [`${WEEK} 15:00+00`])
-    expect((await week(manager)).w).toMatchObject({ other_income: 20, net: 80, per_partner: 40 })
+    expect((await week(manager)).w).toMatchObject({ other_income: 20, net: 84, per_partner: 42 })
   })
 
   it('keeps it from Employees', async () => {
@@ -151,7 +151,7 @@ describe('partner split', () => {
     await close(manager)
     await t.createUser('manager', 'Newcomer')
     const { w } = await week(manager)
-    expect(w).toMatchObject({ closed: true, per_partner: 40 })
+    expect(w).toMatchObject({ closed: true, per_partner: 42 })
     expect(w.partners).toHaveLength(2)
     // The next week does count the new Manager.
     expect(((await week(manager, NEXT)).w.partners as unknown[])).toHaveLength(3)
@@ -160,8 +160,8 @@ describe('partner split', () => {
   it('tracks balances and payouts, and a payout is no expense', async () => {
     await t.as(manager, () => t.db.query(`select merchant.pay_partner($1, 15, 'first')`, [owner]))
     const rows = await t.as(manager, () => t.rows<{ name: string; earned: number; paid: number; balance: number }>(`select * from merchant.partner_balances()`))
-    expect(rows.find((r) => r.name === 'Olaf')).toMatchObject({ earned: 40, paid: 15, balance: 25 })
-    expect(rows.find((r) => r.name === 'Mira')).toMatchObject({ earned: 40, paid: 0, balance: 40 })
+    expect(rows.find((r) => r.name === 'Olaf')).toMatchObject({ earned: 42, paid: 15, balance: 27 })
+    expect(rows.find((r) => r.name === 'Mira')).toMatchObject({ earned: 42, paid: 0, balance: 42 })
     const now = await t.one<{ d: string }>(`select date_trunc('week', now() at time zone 'UTC')::date::text as d`)
     expect((await week(manager, now.d)).w).toMatchObject({ expenses: 0 })
   })
@@ -172,7 +172,7 @@ describe('partner split', () => {
     const { w } = await week(manager, NEXT)
     expect(w).toMatchObject({ net: -90, per_partner: -30 })
     const rows = await t.as(owner, () => t.rows<{ name: string; balance: number }>(`select * from merchant.partner_balances()`))
-    expect(rows.find((r) => r.name === 'Mira')?.balance).toBe(10)
+    expect(rows.find((r) => r.name === 'Mira')?.balance).toBe(12)
   })
 
   it('lets only the Owner reopen a week', async () => {

@@ -26,7 +26,7 @@ export default async function Payments({ searchParams }: { searchParams: Promise
 
   return (
     <>
-      <PageHeader title="Payments" subtitle="Profit minus expenses, shared equally by Owners and Managers, week by week.">
+      <PageHeader title="Payments" subtitle="Income minus expenses, shared equally by Owners and Managers, week by week.">
         <div className="flex items-center gap-2 text-sm">
           <Link className="btn-ghost !py-1 !px-3" href={`/admin/payments?week=${addDays(week, -7)}`} aria-label="Previous week">←</Link>
           <span className="tabular-nums">{week} – {addDays(week, 6)}</span>
@@ -37,13 +37,13 @@ export default async function Payments({ searchParams }: { searchParams: Promise
       <Notice error={error} />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
-        <Stat label="Profit" value={`${g(w.sales_profit + w.other_income)}g`} />
+        <Stat label="Income" value={`${g(w.sales_income + w.other_income)}g`} />
         <Stat label="Expenses" value={`${g(w.expenses)}g`} />
         <Stat label="Net" value={`${g(w.net)}g`} tone={w.net < 0 ? "bad" : undefined} />
         <Stat label="Per partner" value={w.per_partner === null ? "—" : `${g(w.per_partner)}g`} tone={(w.per_partner ?? 0) < 0 ? "bad" : undefined} />
       </div>
       <p className="muted text-xs mb-8">
-        Profit is sales minus their cost, plus rent income. Purchases aren&apos;t expenses: their cost is already in the sales. Weeks run Monday to Sunday, UTC.
+        Income is sales plus rent. Expenses include purchases, so what is bought this week counts this week. Deposits, withdrawals and payouts count for neither. Weeks run Monday to Sunday, UTC.
       </p>
 
       <Section
