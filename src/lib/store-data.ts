@@ -233,15 +233,25 @@ export async function analytics(profileId: string, from: string | null, to: stri
   const [days, items, people, totals, balances, [stock]] = await Promise.all([
     asUser<Analytics["days"][number]>(
       profileId,
-      `select ${utcDay("sale_date")}::text as day, sum(net_total) as revenue, sum(net_total - cost_total) as profit, count(*)::int as receipts
-       from merchant.sales where status = 'posted' and ${inRange("sale_date")} group by 1 order by 1`,
+      `select day::text, sum(revenue) as revenue, sum(profit) as profit, sum(receipts)::int as receipts
+       from (select ${utcDay("sale_date")} as day, net_total as revenue, net_total - cost_total as profit, 1 as receipts
+             from merchant.sales where status = 'posted' and ${inRange("sale_date")}
+             union all
+             select ${utcDay("mint_date")}, amount, amount - cost_total, 0
+             from merchant.mints where ${inRange("mint_date")}) x
+       group by 1 order by 1`,
       range,
     ),
     asUser<Analytics["items"][number] & { category: string | null }>(
       profileId,
-      `select l.good_name as name, l.category, sum(l.quantity * l.unit_price) as revenue, sum(l.quantity) as quantity
-       from merchant.sale_lines l join merchant.sales s on s.id = l.sale_id
-       where s.status = 'posted' and ${inRange("s.sale_date")} group by 1, 2 order by 3 desc`,
+      `select name, category, sum(revenue) as revenue, sum(quantity) as quantity
+       from (select l.good_name as name, l.category, l.quantity * l.unit_price as revenue, l.quantity
+             from merchant.sale_lines l join merchant.sales s on s.id = l.sale_id
+             where s.status = 'posted' and ${inRange("s.sale_date")}
+             union all
+             select material_name || ' (minted)', 'Minting', amount, quantity
+             from merchant.mints where ${inRange("mint_date")}) x
+       group by 1, 2 order by 3 desc`,
       range,
     ),
     asUser<Analytics["people"][number]>(
@@ -653,6 +663,70 @@ export async function eecOrderStats(profileId: string) {
     asUser<{ customer: string }>(profileId, `select distinct customer from merchant.eec_orders order by 1 limit 200`),
   ]);
   return { ...stats, customers: customers.map((c) => c.customer) };
+}
+
+// Minting -------------------------------------------------------------------------
+
+export interface Mintable {
+  id: string;
+  name: string;
+  mint_rate: number;
+  stock: number;
+}
+
+export function listMintables(profileId: string) {
+  return asUser<Mintable>(
+    profileId,
+    `select id, name, mint_rate, stock from merchant.materials where active and mint_rate is not null order by name`,
+  );
+}
+
+export interface MintRow {
+  id: string;
+  mint_no: number;
+  mint_date: string | Date;
+  material_name: string;
+  quantity: number;
+  rate: number;
+  amount: number;
+  note: string;
+  created_at: string | Date;
+  minted_by_name: string | null;
+  mine: boolean;
+}
+
+export async function listMints(profileId: string, page: number) {
+  const rows = await asUser<MintRow & { total: number }>(
+    profileId,
+    `select m.id, m.mint_no, m.mint_date, m.material_name, m.quantity, m.rate, m.amount, m.note, m.created_at,
+            coalesce(p.display_name, p.username) as minted_by_name, m.minted_by = merchant_auth.uid() as mine,
+            count(*) over ()::int as total
+     from merchant.mints m left join merchant.profiles p on p.id = m.minted_by
+     order by m.mint_date desc, m.mint_no desc limit $1 offset $2`,
+    [PAGE_SIZE, page * PAGE_SIZE],
+  );
+  return { rows, total: rows[0]?.total ?? 0 };
+}
+
+/** Septims, ingots and the ingots' cost for the week starting on `week`. */
+export async function mintWeek(profileId: string, week: string) {
+  const [row] = await asUser<{ amount: number; quantity: number; cost: number }>(
+    profileId,
+    `select coalesce(sum(amount), 0) as amount, coalesce(sum(quantity), 0) as quantity, coalesce(sum(cost_total), 0) as cost
+     from merchant.mints where ${utcDay("mint_date")} >= $1::date and ${utcDay("mint_date")} < $1::date + 7`,
+    [week],
+  );
+  return row;
+}
+
+/** Today's mintings, which count toward revenue and profit like sales. */
+export async function mintToday(profileId: string) {
+  const [row] = await asUser<{ amount: number; cost: number }>(
+    profileId,
+    `select coalesce(sum(amount), 0) as amount, coalesce(sum(cost_total), 0) as cost
+     from merchant.mints where ${utcDay("mint_date")} = (now() at time zone 'UTC')::date`,
+  );
+  return row;
 }
 
 export function listCrafts(profileId: string) {

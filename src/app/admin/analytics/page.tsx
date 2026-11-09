@@ -41,6 +41,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const profit = data.days.reduce((sum, d) => sum + d.profit, 0);
   const receipts = data.days.reduce((sum, d) => sum + d.receipts, 0);
   const sold = data.items.reduce((sum, i) => sum + i.quantity, 0);
+  const minted = data.categories.find((c) => c.name === "Minting")?.revenue ?? 0;
 
   // Days without a sale stay on the chart as zero, so the gaps show.
   const byDay = new Map(data.days.map((d) => [d.day, d]));
@@ -60,19 +61,19 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         <Stat label="Margin" value={`${revenue ? Math.round((profit / revenue) * 100) : 0}%`} />
         <Stat label="Receipts" value={String(receipts)} />
         <Stat label="Items sold" value={g(sold)} />
-        <Stat label="Avg receipt" value={`${g(receipts ? revenue / receipts : 0)}g`} />
+        <Stat label="Avg receipt" value={`${g(receipts ? (revenue - minted) / receipts : 0)}g`} />
       </div>
       <div className="mb-8">
         <Stat label="Net profit" value={`${g(data.net)}g`} tone={data.net < 0 ? "bad" : undefined} />
         <p className="muted text-xs mt-2">
-          Net profit is sales and rent minus every expense, purchases included: what Payments shares out. Profit above is only what the receipts earned over their cost.
+          Net profit is sales, minting and rent minus every expense, purchases included: what Payments shares out. Profit above is only what receipts and minting earned over their cost.
         </p>
       </div>
 
       <Section title="Sales over time" aside="Revenue and profit per day">
         <div className="panel p-4">
-          {receipts ? <SalesChart days={days} /> : <Empty>No receipts in this range.</Empty>}
-          {receipts > 0 && (
+          {revenue ? <SalesChart days={days} /> : <Empty>No sales in this range.</Empty>}
+          {revenue > 0 && (
             <details className="mt-2">
               <summary className="muted text-xs cursor-pointer">Show as table</summary>
               <table className="ledger mt-2">

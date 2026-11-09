@@ -192,6 +192,26 @@ export async function craftAction(form: FormData) {
   await attempt("/admin/craft", () => asUser(access.profileId, `select merchant.craft($1, $2)`, [text(form, "id"), num(form.get("qty"))]));
 }
 
+export async function mintAction(form: FormData) {
+  const access = await requireStaff();
+  const rate = text(form, "rate");
+  const date = text(form, "date");
+  await attempt("/admin/mint", () =>
+    asUser(access.profileId, `select merchant.mint($1, $2, $3, $4, $5::timestamp at time zone 'UTC')`, [
+      text(form, "material"),
+      num(form.get("qty")),
+      rate ? num(rate) : null,
+      text(form, "note"),
+      date || null,
+    ]),
+  );
+}
+
+export async function deleteMintAction(form: FormData) {
+  const access = await requireStaff();
+  await attempt("/admin/mint", () => asUser(access.profileId, `select merchant.delete_mint($1)`, [text(form, "id")]));
+}
+
 export async function deleteCraftAction(form: FormData) {
   const access = await requireManager();
   await attempt("/admin/craft", () => asUser(access.profileId, `delete from merchant.crafts where id = $1`, [text(form, "id")]));
