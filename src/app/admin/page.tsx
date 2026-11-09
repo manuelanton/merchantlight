@@ -4,7 +4,7 @@ import { g } from "@/lib/format";
 import { isShopOpen } from "@/lib/shop";
 import { isManager, requireStaff } from "@/lib/store-access";
 import { setOpenAction } from "@/lib/store-actions";
-import { eecOrderStats, isLow, listCraftRequests, listGoods, listMaterials, partnerLedger, partnerWeek, todaysSales, weekStart } from "@/lib/store-data";
+import { eecOrderStats, isLow, listCraftRequests, listGoods, listMaterials, mintToday, partnerLedger, partnerWeek, todaysSales, weekStart } from "@/lib/store-data";
 
 export const dynamic = "force-dynamic";
 
@@ -15,12 +15,13 @@ export default async function Today() {
   const [week, ledger] = manager
     ? await Promise.all([partnerWeek(access.profileId, weekStart()), partnerLedger(access.profileId, weekStart())])
     : [null, []];
-  const [requests, commissions] = await Promise.all([listCraftRequests(access.profileId), eecOrderStats(access.profileId)]);
+  const [requests, commissions, minted] = await Promise.all([listCraftRequests(access.profileId), eecOrderStats(access.profileId), mintToday(access.profileId)]);
 
   const posted = sales.filter((s) => s.status === "posted");
   const drafts = sales.length - posted.length;
-  const revenue = posted.reduce((sum, s) => sum + s.total, 0);
-  const profit = posted.reduce((sum, s) => sum + (s.profit ?? 0), 0);
+  // Septims from the mint count like a sale.
+  const revenue = posted.reduce((sum, s) => sum + s.total, 0) + minted.amount;
+  const profit = posted.reduce((sum, s) => sum + (s.profit ?? 0), 0) + minted.amount - minted.cost;
   const items = posted.reduce((sum, s) => sum + s.items, 0);
   const low = [...goods, ...materials].filter(isLow);
 

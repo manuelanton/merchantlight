@@ -15,6 +15,7 @@ const LINKS: (NavLink & { managers?: boolean; owners?: boolean })[] = [
   { href: "/admin/items", label: "Items" },
   { href: "/admin/stock", label: "Stock" },
   { href: "/admin/craft", label: "Craft" },
+  { href: "/admin/mint", label: "Minting" },
   { href: "/admin/commissions", label: "Commissions" },
   { href: "/admin/purchases", label: "Purchases", managers: true },
   { href: "/admin/rentals", label: "Rentals" },
